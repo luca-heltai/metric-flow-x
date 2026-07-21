@@ -1383,6 +1383,7 @@ var namespaces_dup =
       [ "past_the_end", "http://www.dealii.org/developer/doxygen/deal.II/namespaceIteratorState.html#a4e92f4a9d339ff987cc3eb5b0a1ac507a0294fc03dff1d6840ff833fae6f4cdf7", null ],
       [ "valid", "http://www.dealii.org/developer/doxygen/deal.II/namespaceIteratorState.html#a4e92f4a9d339ff987cc3eb5b0a1ac507a457da025bc5a3a2231a667bd5c6f3c92", null ]
     ] ],
+    [ "LA", "namespaceLA.html", null ],
     [ "LACExceptions", "http://www.dealii.org/developer/doxygen/deal.II/namespaceLACExceptions.html", [
       [ "ExcDifferentBlockIndices", "http://www.dealii.org/developer/doxygen/deal.II/group__Exceptions.html#gac106b0072cd8668f12858e16353777fe", null ],
       [ "ExcDifferentBlockIndices", "http://www.dealii.org/developer/doxygen/deal.II/group__Exceptions.html#gac106b0072cd8668f12858e16353777fe", null ],

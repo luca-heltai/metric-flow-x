@@ -1,7 +1,7 @@
 var searchData=
 [
   ['ida_0',['IDA',['http://www.dealii.org/developer/doxygen/deal.II/classSUNDIALS_1_1IDA.html',1,'SUNDIALS']]],
-  ['ida_3c_20vector_3c_20double_20_3e_20_3e_1',['IDA&lt; Vector&lt; double &gt; &gt;',['http://www.dealii.org/developer/doxygen/deal.II/classSUNDIALS_1_1IDA.html',1,'SUNDIALS']]],
+  ['ida_3c_20vectortype_20_3e_1',['IDA&lt; VectorType &gt;',['http://www.dealii.org/developer/doxygen/deal.II/classSUNDIALS_1_1IDA.html',1,'SUNDIALS']]],
   ['identity_2',['Identity',['http://www.dealii.org/developer/doxygen/deal.II/classTensorAccessors_1_1internal_1_1Identity.html',1,'TensorAccessors::internal']]],
   ['identityfunction_3',['IdentityFunction',['http://www.dealii.org/developer/doxygen/deal.II/classFunctions_1_1IdentityFunction.html',1,'Functions']]],
   ['identitymatrix_4',['IdentityMatrix',['http://www.dealii.org/developer/doxygen/deal.II/classIdentityMatrix.html',1,'']]],

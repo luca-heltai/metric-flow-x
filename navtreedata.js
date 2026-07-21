@@ -41,6 +41,7 @@ var NAVTREE =
         [ "All", "functions.html", "functions_dup" ],
         [ "Functions", "functions_func.html", null ],
         [ "Variables", "functions_vars.html", null ],
+        [ "Typedefs", "functions_type.html", null ],
         [ "Enumerations", "functions_enum.html", null ],
         [ "Related Symbols", "functions_rela.html", null ]
       ] ]
@@ -58,16 +59,17 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "annotated.html",
-"group__Exceptions.html#ga41588265da25c21e5a1d25e34ef9dbd0",
-"namespaceCGALWrappers_1_1internal.html#a19f9f3e6cb3dcb7da476f20507cb6d95",
-"namespaceDoFTools_1_1internal_1_1Assembler.html",
-"namespaceGridTools.html#a79820d66b08b06e94541817ba78d6213",
-"namespaceMatrixCreator.html#adef4c0c33fba6a38518bfa39130ba02d",
-"namespacePlasticityLab.html#a9e0d4bbddee2055b298f79b49eedaadb",
-"namespaceUtilities.html#a07a15c28893574e4d3c1887376fb185c",
-"namespaceVectorTools.html#a363b651e28ef8eb4312ea9ebcea5b33a",
-"namespaceinternal.html#acc7b55ff84e90bf1625fc52925d93b87",
-"namespaceinternal_1_1TriangulationImplementation.html#a24df330823d752b94f90abcb57289c44"
+"functions_u.html",
+"namespaceCGALWrappers.html#a4a0671b58da8b709c344ee2442fe2831",
+"namespaceDoFTools.html#ad2c28189ed143dc13fd899c32e62cbcf",
+"namespaceGridTools.html#a20b8792e26692c87fc3f8efe1f79ccf3",
+"namespaceMGTools.html#ada3bd2b1896ccb45f96c6dda0d2cd064",
+"namespacePlasticityLab.html#a40c49420428218647f26870bcd871953",
+"namespaceTrilinosWrappers.html#a8be4529212cf7e03b311e2f8956dd59f",
+"namespaceUtilities_1_1internal.html#a62b8ba3912533cebf195b4bd69a1eefc",
+"namespaceinternal.html#a74e55221218f17d9a8632187363202ab",
+"namespaceinternal_1_1SparseMatrixImplementation.html#ab3b84e121953503dd5c4eb96a13cd1c9",
+"structJunctionFace.html"
 ];
 
 const SYNCONMSG = 'click to disable panel synchronization';

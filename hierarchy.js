@@ -21,5 +21,6 @@ var hierarchy =
       [ "ParsedTools::Function< dim >", "classParsedTools_1_1Function.html", null ]
     ] ],
     [ "BloodFlowSystem&lt; dim, spacedim &gt;::RCRPhysics", "structBloodFlowSystem_1_1RCRPhysics.html", null ],
+    [ "BloodFlowSystem&lt; dim, spacedim &gt;::TraceContinuityPair", "structBloodFlowSystem_1_1TraceContinuityPair.html", null ],
     [ "BloodFlowSystem&lt; dim, spacedim &gt;::VesselPhysicalProperties", "structBloodFlowSystem_1_1VesselPhysicalProperties.html", null ]
 ];
