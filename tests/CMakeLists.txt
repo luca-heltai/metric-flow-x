@@ -1,2 +1,2 @@
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CURRENT_SOURCE_DIR}/../source)
-DEAL_II_PICKUP_TESTS()
+set(TEST_LIBRARIES MetricFlowX::metric_flow_x)
+deal_II_pickup_tests()
