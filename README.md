@@ -49,10 +49,11 @@ vectors. Component values are identified with
 
 ## Standalone application
 
-The `blood_flow` executable reads a parameter file, runs the existing SUNDIALS
-IDA time integration, and writes the established VTU/PVD and CSV outputs. The
-library Problem owns physics and spatial assembly; applications embedding it
-can own time integration and call the residual/Jacobian API directly.
+The `blood_flow` executable reads a parameter file, delegates SUNDIALS IDA
+time integration to its standalone `BloodFlowIDARunner`, and writes the
+established VTU/PVD and CSV outputs. The library Problem owns physics and
+spatial assembly; applications embedding it can own time integration and call
+the residual/Jacobian API directly.
 
 ## Building
 

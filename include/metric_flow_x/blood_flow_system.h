@@ -123,6 +123,9 @@ namespace MetricFlowX
 
   using BloodFlowParameters = ParsedTools::Constants;
 
+  template <int dim, int spacedim>
+  class BloodFlowIDARunner;
+
   // ---------------------------------------------------------------------------
   // Distributed linear algebra types.
   //
@@ -249,6 +252,9 @@ namespace MetricFlowX
   class BloodFlowSystem : public ParameterAcceptor
   {
   public:
+    template <int, int>
+    friend class BloodFlowIDARunner;
+
     BloodFlowSystem(const MPI_Comm comm = MPI_COMM_WORLD);
 
     enum class Component
@@ -414,9 +420,6 @@ namespace MetricFlowX
 
     void
     compute_errors(const unsigned int k);
-
-    void
-    run();
 
     enum class NumericalFluxType
     {
