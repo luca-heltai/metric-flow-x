@@ -12,7 +12,7 @@
 #include <fstream>
 #include <map>
 
-#include "blood_flow_system.h"
+#include "metric_flow_system.h"
 #include "tests.h"
 #include "vtk_utils.h"
 

@@ -1,0 +1,241 @@
+{
+  "schema": "blood-flow-convergence-v1",
+  "provenance": {
+    "source": "tutorials/01_single_vessel_mms/reference/convergence.txt",
+    "sha256": "7789933cabd07a015fbbd50d8ff14d293f0831a6f436bfd64b308d76e7e1d3a5",
+    "note": "Values are parsed once from the immutable TXT reference; displayed error/rate strings are retained verbatim."
+  },
+  "tables": [
+    {
+      "polynomial_degree": 3,
+      "columns": [
+        "Cycle",
+        "DoFs",
+        "A L2",
+        "A L2 rate",
+        "A H1",
+        "A H1 rate",
+        "U L2",
+        "U L2 rate",
+        "U H1",
+        "U H1 rate"
+      ],
+      "rows": [
+        {
+          "Cycle": 1,
+          "DoFs": 48,
+          "A L2": "2.621e-08",
+          "A L2 rate": "--",
+          "A H1": "1.386e-06",
+          "A H1 rate": "--",
+          "U L2": "2.557e-04",
+          "U L2 rate": "--",
+          "U H1": "1.895e-02",
+          "U H1 rate": "--"
+        },
+        {
+          "Cycle": 2,
+          "DoFs": 96,
+          "A L2": "1.676e-09",
+          "A L2 rate": "3.97",
+          "A H1": "1.796e-07",
+          "A H1 rate": "2.95",
+          "U L2": "1.657e-05",
+          "U L2 rate": "3.95",
+          "U H1": "2.438e-03",
+          "U H1 rate": "2.96"
+        },
+        {
+          "Cycle": 3,
+          "DoFs": 192,
+          "A L2": "1.054e-10",
+          "A L2 rate": "3.99",
+          "A H1": "2.274e-08",
+          "A H1 rate": "2.98",
+          "U L2": "1.050e-06",
+          "U L2 rate": "3.98",
+          "U H1": "3.075e-04",
+          "U H1 rate": "2.99"
+        },
+        {
+          "Cycle": 4,
+          "DoFs": 384,
+          "A L2": "6.598e-12",
+          "A L2 rate": "4.00",
+          "A H1": "2.855e-09",
+          "A H1 rate": "2.99",
+          "U L2": "6.602e-08",
+          "U L2 rate": "3.99",
+          "U H1": "3.855e-05",
+          "U H1 rate": "3.00"
+        },
+        {
+          "Cycle": 5,
+          "DoFs": 768,
+          "A L2": "4.299e-13",
+          "A L2 rate": "3.94",
+          "A H1": "3.574e-10",
+          "A H1 rate": "3.00",
+          "U L2": "4.267e-09",
+          "U L2 rate": "3.95",
+          "U H1": "4.825e-06",
+          "U H1 rate": "3.00"
+        }
+      ]
+    },
+    {
+      "polynomial_degree": 2,
+      "columns": [
+        "Cycle",
+        "DoFs",
+        "A L2",
+        "A L2 rate",
+        "A H1",
+        "A H1 rate",
+        "U L2",
+        "U L2 rate",
+        "U H1",
+        "U H1 rate"
+      ],
+      "rows": [
+        {
+          "Cycle": 1,
+          "DoFs": 40,
+          "A L2": "2.729e-07",
+          "A L2 rate": "--",
+          "A H1": "8.754e-06",
+          "A H1 rate": "--",
+          "U L2": "2.554e-03",
+          "U L2 rate": "--",
+          "U H1": "1.295e-01",
+          "U H1 rate": "--"
+        },
+        {
+          "Cycle": 2,
+          "DoFs": 80,
+          "A L2": "3.502e-08",
+          "A L2 rate": "2.96",
+          "A H1": "2.289e-06",
+          "A H1 rate": "1.94",
+          "U L2": "3.328e-04",
+          "U L2 rate": "2.94",
+          "U H1": "3.343e-02",
+          "U H1 rate": "1.95"
+        },
+        {
+          "Cycle": 3,
+          "DoFs": 160,
+          "A L2": "4.409e-09",
+          "A L2 rate": "2.99",
+          "A H1": "5.816e-07",
+          "A H1 rate": "1.98",
+          "U L2": "4.238e-05",
+          "U L2 rate": "2.97",
+          "U H1": "8.438e-03",
+          "U H1 rate": "1.99"
+        },
+        {
+          "Cycle": 4,
+          "DoFs": 320,
+          "A L2": "5.523e-10",
+          "A L2 rate": "3.00",
+          "A H1": "1.463e-07",
+          "A H1 rate": "1.99",
+          "U L2": "5.343e-06",
+          "U L2 rate": "2.99",
+          "U H1": "2.116e-03",
+          "U H1 rate": "2.00"
+        },
+        {
+          "Cycle": 5,
+          "DoFs": 640,
+          "A L2": "6.908e-11",
+          "A L2 rate": "3.00",
+          "A H1": "3.668e-08",
+          "A H1 rate": "2.00",
+          "U L2": "6.707e-07",
+          "U L2 rate": "2.99",
+          "U H1": "5.297e-04",
+          "U H1 rate": "2.00"
+        }
+      ]
+    },
+    {
+      "polynomial_degree": 1,
+      "columns": [
+        "Cycle",
+        "DoFs",
+        "A L2",
+        "A L2 rate",
+        "A H1",
+        "A H1 rate",
+        "U L2",
+        "U L2 rate",
+        "U H1",
+        "U H1 rate"
+      ],
+      "rows": [
+        {
+          "Cycle": 1,
+          "DoFs": 32,
+          "A L2": "2.197e-06",
+          "A L2 rate": "--",
+          "A H1": "3.316e-05",
+          "A H1 rate": "--",
+          "U L2": "1.926e-02",
+          "U L2 rate": "--",
+          "U H1": "5.766e-01",
+          "U H1 rate": "--"
+        },
+        {
+          "Cycle": 2,
+          "DoFs": 64,
+          "A L2": "5.714e-07",
+          "A L2 rate": "1.94",
+          "A H1": "1.758e-05",
+          "A H1 rate": "0.92",
+          "U L2": "5.021e-03",
+          "U L2 rate": "1.94",
+          "U H1": "2.982e-01",
+          "U H1 rate": "0.95"
+        },
+        {
+          "Cycle": 3,
+          "DoFs": 128,
+          "A L2": "1.441e-07",
+          "A L2 rate": "1.99",
+          "A H1": "8.960e-06",
+          "A H1 rate": "0.97",
+          "U L2": "1.286e-03",
+          "U L2 rate": "1.97",
+          "U H1": "1.506e-01",
+          "U H1 rate": "0.99"
+        },
+        {
+          "Cycle": 4,
+          "DoFs": 256,
+          "A L2": "3.609e-08",
+          "A L2 rate": "2.00",
+          "A H1": "4.514e-06",
+          "A H1 rate": "0.99",
+          "U L2": "3.256e-04",
+          "U L2 rate": "1.98",
+          "U H1": "7.549e-02",
+          "U H1 rate": "1.00"
+        },
+        {
+          "Cycle": 5,
+          "DoFs": 512,
+          "A L2": "9.030e-09",
+          "A L2 rate": "2.00",
+          "A H1": "2.264e-06",
+          "A H1 rate": "1.00",
+          "U L2": "8.193e-05",
+          "U L2 rate": "1.99",
+          "U H1": "3.778e-02",
+          "U H1 rate": "1.00"
+        }
+      ]
+    }
+  ]
+}

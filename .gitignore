@@ -50,3 +50,5 @@ env/
 doc/api/
 # pip install logs
 =*
+# Local Pi runtime state
+.atl/

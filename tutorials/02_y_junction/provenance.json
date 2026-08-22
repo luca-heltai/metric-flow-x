@@ -1,0 +1,18 @@
+{
+  "copied_asset": "tutorials/02_y_junction/network.vtk",
+  "schema": "blood-flow.y-junction.provenance.v1",
+  "source": "notebooks/bifurcation_network.vtk",
+  "source_sha256": "4536f94764b94aa4f34fdaac83cd01e4a8e1211f727e7bf72a2f978ba4ca3b58",
+  "validation": {
+    "cells": 3,
+    "diagnostics": [],
+    "points": 4,
+    "terminal_boundary_ids": [
+      1,
+      2
+    ],
+    "valid": true,
+    "vessels": 3
+  },
+  "validator": "tools/validate_vtk_network.py"
+}

@@ -25,7 +25,7 @@
 #include <cmath>
 #include <iostream>
 
-#include "blood_flow_system.h"
+#include "metric_flow_system.h"
 #include "tests.h"
 #include "vtk_utils.h"
 
@@ -34,7 +34,7 @@ using namespace dealii;
 void
 test()
 {
-  BloodFlowSystem<1, 3> problem;
+  MetricFlowSystem<1, 3> problem;
   problem.initialize_params(PRM_DIR "constant.prm");
 
   // initialize_params() resets deallog depth according to the parameter file.

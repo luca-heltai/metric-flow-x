@@ -1,0 +1,59 @@
+schema: blood-flow.adan56.provenance.v1
+status: reproducible-input-demonstration-not-validated-benchmark
+title: ADAN56 benchmark
+identity:
+  maintainer_clarification: 56 anatomical arteries represented by 77 computational vessel segments
+  anatomical_arteries: 56
+  computational_vessel_segments: 77
+  identity_status: resolved-for-identity
+  naming_note: ADAN56 is the clarified identity; no alternate artery count is asserted.
+source:
+  path: notebooks/56_adnr_new.vtk
+  copied_asset: tutorials/04_adan56/network.vtk
+  sha256: 2565e6ec349aea4defa4ee964da9f06ebddfe6f2d5ae67219f9026fbf9883bd4
+  copy_policy: byte-for-byte copy
+  selected_variant: 56_adnr_new
+  selection_basis: Existing 56_ADNR parameter source references this mesh; exact arrays and connectivity were checked before copying.
+parameter_source:
+  path: parameters/benchmark-parameters/56_ADNR/56_adnr.prm
+  copied_template: tutorials/04_adan56/parameters.prm.in
+  source_sha256: 425a414aabee5028e79c5f731e0c2c5a90bb65f60527e67d8558bc8317c6a263
+  copied_template_sha256: 12738a578e9d638ebb147b2cf9902f595f99f13cf6acf2acfd35bd221cb78600
+  copy_policy: Source-backed template with only portable mesh and tutorial output paths adapted.
+  mesh_path: '@SOURCE_DIR@/tutorials/04_adan56/network.vtk'
+validation:
+  validator: tools/validate_vtk_network.py
+  valid: true
+  points: 78
+  cells: 77
+  vessels: 77
+  cell_type: VTK_LINE
+  vessel_id_range: [0, 76]
+  terminal_boundary_ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+  topology_json: tutorials/04_adan56/topology.json
+  diagram_svg: tutorials/04_adan56/network.svg
+arrays:
+  cell: [vessel_id, a0, a_d, E, h_wall, p_d, p0, L, r_d]
+  point: [boundary_id, R1, R2, C, P_out]
+  exact_copy_checked: true
+  connectivity_checked: true
+variant_comparison:
+  alternative_path: notebooks/56_adnr.vtk
+  points_and_connectivity_match: true
+  common_arrays_match: true
+  alternative_only_arrays: [r_in, r_out]
+  selected_variant_has_taper_arrays: false
+  note: The alternative variant was not substituted; taper/no-taper equivalence is not assumed.
+comparison_data:
+  raw_reference_curves_available: false
+  literature_reference_available: false
+  image_only_results:
+    paths: [NumData/56-arteries, parameters/benchmark-parameters/56_ADNR]
+    status: demonstration/reference-only
+    limitation: Image/PDF artifacts do not expose raw samples, grids, uncertainty, input mapping, run details, or complete provenance.
+  acceptance_threshold: pending-maintainer-set
+missing_provenance:
+  source_license_and_raw_reference_details: pending-maintainer-review
+  raw_solver_outputs_and_run_receipt: pending
+  literature_and_external_reference_data: pending
+  note: Input identity and integrity are resolved; missing provenance does not support a quantitative validation claim.

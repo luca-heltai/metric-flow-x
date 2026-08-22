@@ -3,14 +3,12 @@
 
 ```{toctree}
 :hidden:
+:maxdepth: 1
 
 overview
-background
 getting-started
-testing
-documentation
-repository-layout
 math
+tutorials
+api
 references
-api/library_root
 ```

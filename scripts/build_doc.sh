@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Build the Doxygen XML consumed by Breathe/Exhale, then render the Sphinx site.
+# Run this script from any directory; all paths are resolved from the repository.
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -7,23 +9,17 @@ ROOT_DIR=$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)
 VENV_DIR="${ROOT_DIR}/env"
 REQUIREMENTS_FILE="${ROOT_DIR}/doc/requirements.txt"
 BUILD_DIR="${ROOT_DIR}/build/docs"
-DOXYGEN_OUT="${BUILD_DIR}/doxygen"
+DOXYGEN_DIR="${BUILD_DIR}/doxygen"
 SITE_DIR="${BUILD_DIR}/site"
-DOXYFILE="${ROOT_DIR}/doc/Doxyfile"
 DOCS_SOURCE_DIR="${ROOT_DIR}/doc"
 API_STUB_DIR="${DOCS_SOURCE_DIR}/api"
-
-if [ -d "$HOME/anaconda3/bin" ]; then
-  echo "Anaconda3 found."
-  PATH="$HOME/anaconda3/bin:$PATH"
-  export PATH
-fi
+DOXYFILE="${ROOT_DIR}/doc/Doxyfile"
+TMP_DOXYFILE="${BUILD_DIR}/Doxyfile"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "python3 not found in PATH." >&2
   exit 1
 fi
-
 if ! command -v doxygen >/dev/null 2>&1; then
   echo "doxygen not found in PATH." >&2
   exit 1
@@ -32,14 +28,8 @@ fi
 if [ ! -d "${VENV_DIR}" ]; then
   python3 -m venv "${VENV_DIR}"
 fi
-
+# shellcheck source=/dev/null
 . "${VENV_DIR}/bin/activate"
-
-if [ ! -f "${REQUIREMENTS_FILE}" ]; then
-  echo "${REQUIREMENTS_FILE} not found." >&2
-  exit 1
-fi
-
 python3 -m pip install -r "${REQUIREMENTS_FILE}"
 
 if ! command -v sphinx-build >/dev/null 2>&1; then
@@ -47,30 +37,25 @@ if ! command -v sphinx-build >/dev/null 2>&1; then
   exit 1
 fi
 
-mkdir -p "${BUILD_DIR}" "${DOXYGEN_OUT}" "${API_STUB_DIR}"
+mkdir -p "${BUILD_DIR}" "${DOXYGEN_DIR}"
 rm -rf "${SITE_DIR}" "${API_STUB_DIR}"
-mkdir -p "${API_STUB_DIR}"
 
-tmp_doxyfile="$(mktemp "${TMPDIR:-/tmp}/immersx-doxygen.XXXXXX")"
-trap 'rm -f "${tmp_doxyfile}"' EXIT
-
-sed \
-  -e "s|^OUTPUT_DIRECTORY[[:space:]]*=.*$|OUTPUT_DIRECTORY = ${DOXYGEN_OUT}|" \
-  -e "s|^GENERATE_HTML[[:space:]]*=.*$|GENERATE_HTML = NO|" \
-  -e "s|^GENERATE_XML[[:space:]]*=.*$|GENERATE_XML = YES|" \
-  -e "s|^HTML_OUTPUT[[:space:]]*=.*$|HTML_OUTPUT = html|" \
-  -e "s|^XML_OUTPUT[[:space:]]*=.*$|XML_OUTPUT = xml|" \
-  "${DOXYFILE}" > "${tmp_doxyfile}"
-
+# Doxygen resolves relative INPUT values against its invocation context. Append
+# absolute overrides so the pipeline is independent of the caller's directory,
+# and keep XML exactly where doc/conf.py expects it.
+cp "${DOXYFILE}" "${TMP_DOXYFILE}"
+cat >> "${TMP_DOXYFILE}" <<EOF
+OUTPUT_DIRECTORY = ${DOXYGEN_DIR}
+INPUT = ${ROOT_DIR}/source ${ROOT_DIR}/include ${ROOT_DIR}/README.md
+STRIP_FROM_PATH = ${ROOT_DIR}
+GENERATE_HTML = NO
+GENERATE_XML = YES
+XML_OUTPUT = xml
+EOF
 (
   cd "${ROOT_DIR}"
-  doxygen "${tmp_doxyfile}"
+  doxygen "${TMP_DOXYFILE}"
 )
 
-sphinx-build \
-  -b html \
-  -W \
-  "${DOCS_SOURCE_DIR}" \
-  "${SITE_DIR}"
-
+sphinx-build -b html -W "${DOCS_SOURCE_DIR}" "${SITE_DIR}"
 echo "Documentation site generated in ${SITE_DIR}"

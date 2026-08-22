@@ -42,7 +42,8 @@ foreach(parameter_file IN LISTS PARAMETER_FILES)
   endif()
 endforeach()
 
-# Create one executable per file in apps/
+# Create one executable per file in apps/.  The application filename defines
+# the target name (currently metric_flow_x).
 file(GLOB APP_SOURCES apps/*.cc)
 foreach(app_src ${APP_SOURCES})
   get_filename_component(app_name ${app_src} NAME_WE)

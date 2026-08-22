@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">
+  <title>Y-junction network topology</title>
+  <desc>Generated from legacy ASCII VTK connectivity; vessel and boundary identifiers are labels.</desc>
+  <rect width="800" height="420" fill="white"/>
+  <line x1="346.939246" y1="55.000000" x2="346.939246" y2="70.683223" stroke="#245a9b" stroke-width="6" data-vessel-id="0"/>
+  <text x="346.939246" y="54.841611" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 0</text>
+  <line x1="346.939246" y1="70.683223" x2="352.663317" y2="78.858044" stroke="#245a9b" stroke-width="6" data-vessel-id="1"/>
+  <text x="349.801282" y="66.770633" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 1</text>
+  <line x1="346.939246" y1="70.683223" x2="347.045178" y2="72.704525" stroke="#245a9b" stroke-width="6" data-vessel-id="2"/>
+  <text x="346.992212" y="63.693874" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 2</text>
+  <line x1="352.663317" y1="78.858044" x2="354.705742" y2="81.472229" stroke="#245a9b" stroke-width="6" data-vessel-id="3"/>
+  <text x="353.684530" y="72.165136" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 3</text>
+  <line x1="352.663317" y1="78.858044" x2="368.748552" y2="84.712591" stroke="#245a9b" stroke-width="6" data-vessel-id="4"/>
+  <text x="360.705935" y="73.785317" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 4</text>
+  <line x1="354.705742" y1="81.472229" x2="395.912860" y2="94.070509" stroke="#245a9b" stroke-width="6" data-vessel-id="5"/>
+  <text x="375.309301" y="79.771369" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 5</text>
+  <line x1="354.705742" y1="81.472229" x2="360.391197" y2="88.012596" stroke="#245a9b" stroke-width="6" data-vessel-id="6"/>
+  <text x="357.548469" y="76.742412" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 6</text>
+  <line x1="360.391197" y1="88.012596" x2="376.983765" y2="107.100162" stroke="#245a9b" stroke-width="6" data-vessel-id="7"/>
+  <text x="368.687481" y="89.556379" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 7</text>
+  <line x1="376.983765" y1="107.100162" x2="407.832722" y2="142.587828" stroke="#245a9b" stroke-width="6" data-vessel-id="8"/>
+  <text x="392.408243" y="116.843995" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 8</text>
+  <line x1="407.832722" y1="142.587828" x2="469.362847" y2="157.929011" stroke="#245a9b" stroke-width="6" data-vessel-id="9"/>
+  <text x="438.597785" y="142.258420" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 9</text>
+  <line x1="407.832722" y1="142.587828" x2="412.189159" y2="147.099050" stroke="#245a9b" stroke-width="6" data-vessel-id="10"/>
+  <text x="410.010940" y="136.843439" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 10</text>
+  <line x1="412.189159" y1="147.099050" x2="415.554360" y2="147.753179" stroke="#245a9b" stroke-width="6" data-vessel-id="11"/>
+  <text x="413.871760" y="139.426114" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 11</text>
+  <line x1="412.189159" y1="147.099050" x2="449.068449" y2="181.489544" stroke="#245a9b" stroke-width="6" data-vessel-id="12"/>
+  <text x="430.628804" y="156.294297" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 12</text>
+  <line x1="415.554360" y1="147.753179" x2="463.254006" y2="157.025051" stroke="#245a9b" stroke-width="6" data-vessel-id="13"/>
+  <text x="439.404183" y="144.389115" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 13</text>
+  <line x1="368.748552" y1="84.712591" x2="381.145673" y2="81.390792" stroke="#245a9b" stroke-width="6" data-vessel-id="14"/>
+  <text x="374.947112" y="75.051691" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 14</text>
+  <line x1="368.748552" y1="84.712591" x2="395.375042" y2="92.853126" stroke="#245a9b" stroke-width="6" data-vessel-id="15"/>
+  <text x="382.061797" y="80.782858" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 15</text>
+  <line x1="347.045178" y1="72.704525" x2="333.495758" y2="94.388129" stroke="#245a9b" stroke-width="6" data-vessel-id="16"/>
+  <text x="340.270468" y="75.546327" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 16</text>
+  <line x1="347.045178" y1="72.704525" x2="347.198916" y2="74.167242" stroke="#245a9b" stroke-width="6" data-vessel-id="17"/>
+  <text x="347.122047" y="65.435883" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 17</text>
+  <line x1="333.495758" y1="94.388129" x2="321.681555" y2="99.402961" stroke="#245a9b" stroke-width="6" data-vessel-id="18"/>
+  <text x="327.588656" y="88.895545" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 18</text>
+  <line x1="333.495758" y1="94.388129" x2="319.997112" y2="118.740332" stroke="#245a9b" stroke-width="6" data-vessel-id="19"/>
+  <text x="326.746435" y="98.564231" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 19</text>
+  <line x1="347.198916" y1="74.167242" x2="342.152993" y2="83.270328" stroke="#245a9b" stroke-width="6" data-vessel-id="20"/>
+  <text x="344.675954" y="70.718785" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 20</text>
+  <line x1="347.198916" y1="74.167242" x2="348.618512" y2="83.130223" stroke="#245a9b" stroke-width="6" data-vessel-id="21"/>
+  <text x="347.908714" y="70.648733" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 21</text>
+  <line x1="342.152993" y1="83.270328" x2="303.480719" y2="102.132057" stroke="#245a9b" stroke-width="6" data-vessel-id="22"/>
+  <text x="322.816856" y="84.701193" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 22</text>
+  <line x1="342.152993" y1="83.270328" x2="338.354036" y2="91.059343" stroke="#245a9b" stroke-width="6" data-vessel-id="23"/>
+  <text x="340.253514" y="79.164836" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 23</text>
+  <line x1="338.354036" y1="91.059343" x2="327.267064" y2="113.791005" stroke="#245a9b" stroke-width="6" data-vessel-id="24"/>
+  <text x="332.810550" y="94.425174" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 24</text>
+  <line x1="327.267064" y1="113.791005" x2="306.654089" y2="156.053866" stroke="#245a9b" stroke-width="6" data-vessel-id="25"/>
+  <text x="316.960577" y="126.922435" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 25</text>
+  <line x1="306.654089" y1="156.053866" x2="249.348072" y2="187.819110" stroke="#245a9b" stroke-width="6" data-vessel-id="26"/>
+  <text x="278.001081" y="163.936488" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 26</text>
+  <line x1="306.654089" y1="156.053866" x2="304.203720" y2="161.826574" stroke="#245a9b" stroke-width="6" data-vessel-id="27"/>
+  <text x="305.428905" y="150.940220" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 27</text>
+  <line x1="304.203720" y1="161.826574" x2="301.296453" y2="163.643236" stroke="#245a9b" stroke-width="6" data-vessel-id="28"/>
+  <text x="302.750087" y="154.734905" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 28</text>
+  <line x1="304.203720" y1="161.826574" x2="286.956952" y2="209.211681" stroke="#245a9b" stroke-width="6" data-vessel-id="29"/>
+  <text x="295.580336" y="177.519127" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 29</text>
+  <line x1="301.296453" y1="163.643236" x2="260.087543" y2="189.393421" stroke="#245a9b" stroke-width="6" data-vessel-id="30"/>
+  <text x="280.691998" y="168.518329" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 30</text>
+  <line x1="348.618512" y1="83.130223" x2="348.944816" y2="85.190422" stroke="#245a9b" stroke-width="6" data-vessel-id="31"/>
+  <text x="348.781664" y="76.160323" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 31</text>
+  <line x1="348.944816" y1="85.190422" x2="377.769020" y2="115.038760" stroke="#245a9b" stroke-width="6" data-vessel-id="32"/>
+  <text x="363.356918" y="92.114591" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 32</text>
+  <line x1="348.944816" y1="85.190422" x2="349.290125" y2="86.814975" stroke="#245a9b" stroke-width="6" data-vessel-id="33"/>
+  <text x="349.117470" y="78.002698" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 33</text>
+  <line x1="349.290125" y1="86.814975" x2="334.629457" y2="121.353345" stroke="#245a9b" stroke-width="6" data-vessel-id="34"/>
+  <text x="341.959791" y="96.084160" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 34</text>
+  <line x1="349.290125" y1="86.814975" x2="350.138668" y2="89.981781" stroke="#245a9b" stroke-width="6" data-vessel-id="35"/>
+  <text x="349.714397" y="80.398378" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 35</text>
+  <line x1="350.138668" y1="89.981781" x2="382.680432" y2="117.287563" stroke="#245a9b" stroke-width="6" data-vessel-id="36"/>
+  <text x="366.409550" y="95.634672" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 36</text>
+  <line x1="350.138668" y1="89.981781" x2="350.485606" y2="91.049544" stroke="#245a9b" stroke-width="6" data-vessel-id="37"/>
+  <text x="350.312137" y="82.515662" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 37</text>
+  <line x1="350.485606" y1="91.049544" x2="339.075159" y2="128.371433" stroke="#245a9b" stroke-width="6" data-vessel-id="38"/>
+  <text x="344.780382" y="101.710489" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 38</text>
+  <line x1="350.485606" y1="91.049544" x2="359.666914" y2="114.967669" stroke="#245a9b" stroke-width="6" data-vessel-id="39"/>
+  <text x="355.076260" y="95.008607" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 39</text>
+  <line x1="359.666914" y1="114.967669" x2="359.912205" y2="115.606675" stroke="#245a9b" stroke-width="6" data-vessel-id="40"/>
+  <text x="359.789559" y="107.287172" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 40</text>
+  <line x1="359.912205" y1="115.606675" x2="362.851757" y2="117.589429" stroke="#245a9b" stroke-width="6" data-vessel-id="41"/>
+  <text x="361.381981" y="108.598052" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 41</text>
+  <line x1="359.912205" y1="115.606675" x2="361.111330" y2="118.299954" stroke="#245a9b" stroke-width="6" data-vessel-id="42"/>
+  <text x="360.511768" y="108.953315" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 42</text>
+  <line x1="362.851757" y1="117.589429" x2="374.875105" y2="124.813784" stroke="#245a9b" stroke-width="6" data-vessel-id="43"/>
+  <text x="368.863431" y="113.201607" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 43</text>
+  <line x1="362.851757" y1="117.589429" x2="363.683856" y2="117.574904" stroke="#245a9b" stroke-width="6" data-vessel-id="44"/>
+  <text x="363.267807" y="109.582166" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 44</text>
+  <line x1="363.683856" y1="117.574904" x2="379.910073" y2="128.519625" stroke="#245a9b" stroke-width="6" data-vessel-id="45"/>
+  <text x="371.796965" y="115.047265" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 45</text>
+  <line x1="363.683856" y1="117.574904" x2="377.224122" y2="116.628077" stroke="#245a9b" stroke-width="6" data-vessel-id="46"/>
+  <text x="370.453989" y="109.101490" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 46</text>
+  <line x1="361.111330" y1="118.299954" x2="400.204557" y2="141.789535" stroke="#245a9b" stroke-width="6" data-vessel-id="47"/>
+  <text x="380.657944" y="122.044744" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 47</text>
+  <line x1="361.111330" y1="118.299954" x2="361.524591" y2="119.111025" stroke="#245a9b" stroke-width="6" data-vessel-id="48"/>
+  <text x="361.317961" y="110.705490" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 48</text>
+  <line x1="361.524591" y1="119.111025" x2="360.884088" y2="123.668440" stroke="#245a9b" stroke-width="6" data-vessel-id="49"/>
+  <text x="361.204340" y="113.389732" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 49</text>
+  <line x1="361.524591" y1="119.111025" x2="362.786739" y2="121.297130" stroke="#245a9b" stroke-width="6" data-vessel-id="50"/>
+  <text x="362.155665" y="112.204077" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 50</text>
+  <line x1="362.786739" y1="121.297130" x2="369.991172" y2="124.656612" stroke="#245a9b" stroke-width="6" data-vessel-id="51"/>
+  <text x="366.388956" y="114.976871" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 51</text>
+  <line x1="362.786739" y1="121.297130" x2="368.995469" y2="130.857736" stroke="#245a9b" stroke-width="6" data-vessel-id="52"/>
+  <text x="365.891104" y="118.077433" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 52</text>
+  <line x1="368.995469" y1="130.857736" x2="386.629028" y2="137.982156" stroke="#245a9b" stroke-width="6" data-vessel-id="53"/>
+  <text x="377.812249" y="126.419946" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 53</text>
+  <line x1="368.995469" y1="130.857736" x2="374.226265" y2="138.057308" stroke="#245a9b" stroke-width="6" data-vessel-id="54"/>
+  <text x="371.610867" y="126.457522" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 54</text>
+  <line x1="374.226265" y1="138.057308" x2="384.363267" y2="150.575463" stroke="#245a9b" stroke-width="6" data-vessel-id="55"/>
+  <text x="379.294766" y="136.316385" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 55</text>
+  <line x1="374.226265" y1="138.057308" x2="374.498593" y2="153.658963" stroke="#245a9b" stroke-width="6" data-vessel-id="56"/>
+  <text x="374.362429" y="137.858135" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 56</text>
+  <line x1="384.363267" y1="150.575463" x2="398.777416" y2="166.583997" stroke="#245a9b" stroke-width="6" data-vessel-id="57"/>
+  <text x="391.570341" y="150.579730" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 57</text>
+  <line x1="384.363267" y1="150.575463" x2="399.053142" y2="154.787717" stroke="#245a9b" stroke-width="6" data-vessel-id="58"/>
+  <text x="391.708204" y="144.681590" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 58</text>
+  <line x1="403.232536" y1="171.531909" x2="452.187956" y2="182.834158" stroke="#245a9b" stroke-width="6" data-vessel-id="59"/>
+  <text x="427.710246" y="169.183034" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 59</text>
+  <line x1="398.777416" y1="166.583997" x2="403.232536" y2="171.531909" stroke="#245a9b" stroke-width="6" data-vessel-id="60"/>
+  <text x="401.004976" y="161.057953" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 60</text>
+  <line x1="403.232536" y1="171.531909" x2="450.814897" y2="219.114270" stroke="#245a9b" stroke-width="6" data-vessel-id="61"/>
+  <text x="427.023716" y="187.323090" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 61</text>
+  <line x1="450.814897" y1="219.114270" x2="470.490880" y2="238.790253" stroke="#245a9b" stroke-width="6" data-vessel-id="62"/>
+  <text x="460.652889" y="220.952262" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 62</text>
+  <line x1="470.490880" y1="238.790253" x2="550.651928" y2="252.924809" stroke="#245a9b" stroke-width="6" data-vessel-id="63"/>
+  <text x="510.571404" y="237.857531" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 63</text>
+  <line x1="470.490880" y1="238.790253" x2="471.868760" y2="240.030902" stroke="#245a9b" stroke-width="6" data-vessel-id="64"/>
+  <text x="471.179820" y="231.410578" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 64</text>
+  <line x1="471.868760" y1="240.030902" x2="477.532666" y2="245.130706" stroke="#245a9b" stroke-width="6" data-vessel-id="65"/>
+  <text x="474.700713" y="234.580804" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 65</text>
+  <line x1="477.532666" y1="245.130706" x2="537.501234" y2="299.126647" stroke="#245a9b" stroke-width="6" data-vessel-id="66"/>
+  <text x="507.516950" y="264.128676" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 66</text>
+  <line x1="374.498593" y1="153.658963" x2="376.001260" y2="175.148106" stroke="#245a9b" stroke-width="6" data-vessel-id="67"/>
+  <text x="375.249926" y="156.403534" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 67</text>
+  <line x1="374.498593" y1="153.658963" x2="365.953083" y2="166.328201" stroke="#245a9b" stroke-width="6" data-vessel-id="68"/>
+  <text x="370.225838" y="151.993582" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 68</text>
+  <line x1="376.001260" y1="175.148106" x2="376.465703" y2="181.789959" stroke="#245a9b" stroke-width="6" data-vessel-id="69"/>
+  <text x="376.233482" y="170.469032" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 69</text>
+  <line x1="376.465703" y1="181.789959" x2="350.588565" y2="224.856749" stroke="#245a9b" stroke-width="6" data-vessel-id="70"/>
+  <text x="363.527134" y="195.323354" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 70</text>
+  <line x1="376.465703" y1="181.789959" x2="384.666489" y2="248.579997" stroke="#245a9b" stroke-width="6" data-vessel-id="71"/>
+  <text x="380.566096" y="207.184978" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 71</text>
+  <line x1="384.666489" y1="248.579997" x2="388.057606" y2="276.198432" stroke="#245a9b" stroke-width="6" data-vessel-id="72"/>
+  <text x="386.362048" y="254.389215" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 72</text>
+  <line x1="388.057606" y1="276.198432" x2="349.843647" y2="348.068438" stroke="#245a9b" stroke-width="6" data-vessel-id="73"/>
+  <text x="368.950627" y="304.133435" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 73</text>
+  <line x1="388.057606" y1="276.198432" x2="388.379569" y2="278.024374" stroke="#245a9b" stroke-width="6" data-vessel-id="74"/>
+  <text x="388.218588" y="269.111403" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 74</text>
+  <line x1="388.379569" y1="278.024374" x2="389.703071" y2="285.530324" stroke="#245a9b" stroke-width="6" data-vessel-id="75"/>
+  <text x="389.041320" y="273.777349" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 75</text>
+  <line x1="389.703071" y1="285.530324" x2="403.715719" y2="365.000000" stroke="#245a9b" stroke-width="6" data-vessel-id="76"/>
+  <text x="396.709395" y="317.265162" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 76</text>
+  <circle cx="346.939246" cy="55.000000" r="9" fill="#d65f5f" data-boundary-id="0"/>
+  <text x="360.939246" y="43.000000" font-family="sans-serif" font-size="13">point 0; boundary 0</text>
+  <circle cx="346.939246" cy="70.683223" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="360.939246" y="58.683223" font-family="sans-serif" font-size="13">point 1; boundary 255</text>
+  <circle cx="352.663317" cy="78.858044" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="366.663317" y="66.858044" font-family="sans-serif" font-size="13">point 2; boundary 255</text>
+  <circle cx="347.045178" cy="72.704525" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="361.045178" y="60.704525" font-family="sans-serif" font-size="13">point 3; boundary 255</text>
+  <circle cx="354.705742" cy="81.472229" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="368.705742" y="69.472229" font-family="sans-serif" font-size="13">point 4; boundary 255</text>
+  <circle cx="368.748552" cy="84.712591" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="382.748552" y="72.712591" font-family="sans-serif" font-size="13">point 5; boundary 255</text>
+  <circle cx="395.912860" cy="94.070509" r="9" fill="#d65f5f" data-boundary-id="1"/>
+  <text x="409.912860" y="82.070509" font-family="sans-serif" font-size="13">point 6; boundary 1</text>
+  <circle cx="360.391197" cy="88.012596" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="374.391197" y="76.012596" font-family="sans-serif" font-size="13">point 7; boundary 255</text>
+  <circle cx="376.983765" cy="107.100162" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="390.983765" y="95.100162" font-family="sans-serif" font-size="13">point 8; boundary 255</text>
+  <circle cx="407.832722" cy="142.587828" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="421.832722" y="130.587828" font-family="sans-serif" font-size="13">point 9; boundary 255</text>
+  <circle cx="469.362847" cy="157.929011" r="9" fill="#d65f5f" data-boundary-id="2"/>
+  <text x="483.362847" y="145.929011" font-family="sans-serif" font-size="13">point 10; boundary 2</text>
+  <circle cx="412.189159" cy="147.099050" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="426.189159" y="135.099050" font-family="sans-serif" font-size="13">point 11; boundary 255</text>
+  <circle cx="415.554360" cy="147.753179" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="429.554360" y="135.753179" font-family="sans-serif" font-size="13">point 12; boundary 255</text>
+  <circle cx="449.068449" cy="181.489544" r="9" fill="#d65f5f" data-boundary-id="3"/>
+  <text x="463.068449" y="169.489544" font-family="sans-serif" font-size="13">point 13; boundary 3</text>
+  <circle cx="463.254006" cy="157.025051" r="9" fill="#d65f5f" data-boundary-id="4"/>
+  <text x="477.254006" y="145.025051" font-family="sans-serif" font-size="13">point 14; boundary 4</text>
+  <circle cx="381.145673" cy="81.390792" r="9" fill="#d65f5f" data-boundary-id="5"/>
+  <text x="395.145673" y="69.390792" font-family="sans-serif" font-size="13">point 15; boundary 5</text>
+  <circle cx="395.375042" cy="92.853126" r="9" fill="#d65f5f" data-boundary-id="6"/>
+  <text x="409.375042" y="80.853126" font-family="sans-serif" font-size="13">point 16; boundary 6</text>
+  <circle cx="333.495758" cy="94.388129" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="347.495758" y="82.388129" font-family="sans-serif" font-size="13">point 17; boundary 255</text>
+  <circle cx="347.198916" cy="74.167242" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="361.198916" y="62.167242" font-family="sans-serif" font-size="13">point 18; boundary 255</text>
+  <circle cx="321.681555" cy="99.402961" r="9" fill="#d65f5f" data-boundary-id="7"/>
+  <text x="335.681555" y="87.402961" font-family="sans-serif" font-size="13">point 19; boundary 7</text>
+  <circle cx="319.997112" cy="118.740332" r="9" fill="#d65f5f" data-boundary-id="8"/>
+  <text x="333.997112" y="106.740332" font-family="sans-serif" font-size="13">point 20; boundary 8</text>
+  <circle cx="342.152993" cy="83.270328" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="356.152993" y="71.270328" font-family="sans-serif" font-size="13">point 21; boundary 255</text>
+  <circle cx="348.618512" cy="83.130223" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="362.618512" y="71.130223" font-family="sans-serif" font-size="13">point 22; boundary 255</text>
+  <circle cx="303.480719" cy="102.132057" r="9" fill="#d65f5f" data-boundary-id="9"/>
+  <text x="317.480719" y="90.132057" font-family="sans-serif" font-size="13">point 23; boundary 9</text>
+  <circle cx="338.354036" cy="91.059343" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="352.354036" y="79.059343" font-family="sans-serif" font-size="13">point 24; boundary 255</text>
+  <circle cx="327.267064" cy="113.791005" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="341.267064" y="101.791005" font-family="sans-serif" font-size="13">point 25; boundary 255</text>
+  <circle cx="306.654089" cy="156.053866" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="320.654089" y="144.053866" font-family="sans-serif" font-size="13">point 26; boundary 255</text>
+  <circle cx="249.348072" cy="187.819110" r="9" fill="#d65f5f" data-boundary-id="10"/>
+  <text x="263.348072" y="175.819110" font-family="sans-serif" font-size="13">point 27; boundary 10</text>
+  <circle cx="304.203720" cy="161.826574" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="318.203720" y="149.826574" font-family="sans-serif" font-size="13">point 28; boundary 255</text>
+  <circle cx="301.296453" cy="163.643236" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="315.296453" y="151.643236" font-family="sans-serif" font-size="13">point 29; boundary 255</text>
+  <circle cx="286.956952" cy="209.211681" r="9" fill="#d65f5f" data-boundary-id="12"/>
+  <text x="300.956952" y="197.211681" font-family="sans-serif" font-size="13">point 30; boundary 12</text>
+  <circle cx="260.087543" cy="189.393421" r="9" fill="#d65f5f" data-boundary-id="11"/>
+  <text x="274.087543" y="177.393421" font-family="sans-serif" font-size="13">point 31; boundary 11</text>
+  <circle cx="348.944816" cy="85.190422" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="362.944816" y="73.190422" font-family="sans-serif" font-size="13">point 32; boundary 255</text>
+  <circle cx="377.769020" cy="115.038760" r="9" fill="#d65f5f" data-boundary-id="13"/>
+  <text x="391.769020" y="103.038760" font-family="sans-serif" font-size="13">point 33; boundary 13</text>
+  <circle cx="349.290125" cy="86.814975" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="363.290125" y="74.814975" font-family="sans-serif" font-size="13">point 34; boundary 255</text>
+  <circle cx="334.629457" cy="121.353345" r="9" fill="#d65f5f" data-boundary-id="14"/>
+  <text x="348.629457" y="109.353345" font-family="sans-serif" font-size="13">point 35; boundary 14</text>
+  <circle cx="350.138668" cy="89.981781" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="364.138668" y="77.981781" font-family="sans-serif" font-size="13">point 36; boundary 255</text>
+  <circle cx="382.680432" cy="117.287563" r="9" fill="#d65f5f" data-boundary-id="15"/>
+  <text x="396.680432" y="105.287563" font-family="sans-serif" font-size="13">point 37; boundary 15</text>
+  <circle cx="350.485606" cy="91.049544" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="364.485606" y="79.049544" font-family="sans-serif" font-size="13">point 38; boundary 255</text>
+  <circle cx="339.075159" cy="128.371433" r="9" fill="#d65f5f" data-boundary-id="16"/>
+  <text x="353.075159" y="116.371433" font-family="sans-serif" font-size="13">point 39; boundary 16</text>
+  <circle cx="359.666914" cy="114.967669" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="373.666914" y="102.967669" font-family="sans-serif" font-size="13">point 40; boundary 255</text>
+  <circle cx="359.912205" cy="115.606675" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="373.912205" y="103.606675" font-family="sans-serif" font-size="13">point 41; boundary 255</text>
+  <circle cx="362.851757" cy="117.589429" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="376.851757" y="105.589429" font-family="sans-serif" font-size="13">point 42; boundary 255</text>
+  <circle cx="361.111330" cy="118.299954" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="375.111330" y="106.299954" font-family="sans-serif" font-size="13">point 43; boundary 255</text>
+  <circle cx="374.875105" cy="124.813784" r="9" fill="#d65f5f" data-boundary-id="17"/>
+  <text x="388.875105" y="112.813784" font-family="sans-serif" font-size="13">point 44; boundary 17</text>
+  <circle cx="363.683856" cy="117.574904" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="377.683856" y="105.574904" font-family="sans-serif" font-size="13">point 45; boundary 255</text>
+  <circle cx="379.910073" cy="128.519625" r="9" fill="#d65f5f" data-boundary-id="18"/>
+  <text x="393.910073" y="116.519625" font-family="sans-serif" font-size="13">point 46; boundary 18</text>
+  <circle cx="377.224122" cy="116.628077" r="9" fill="#d65f5f" data-boundary-id="19"/>
+  <text x="391.224122" y="104.628077" font-family="sans-serif" font-size="13">point 47; boundary 19</text>
+  <circle cx="400.204557" cy="141.789535" r="9" fill="#d65f5f" data-boundary-id="20"/>
+  <text x="414.204557" y="129.789535" font-family="sans-serif" font-size="13">point 48; boundary 20</text>
+  <circle cx="361.524591" cy="119.111025" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="375.524591" y="107.111025" font-family="sans-serif" font-size="13">point 49; boundary 255</text>
+  <circle cx="360.884088" cy="123.668440" r="9" fill="#d65f5f" data-boundary-id="21"/>
+  <text x="374.884088" y="111.668440" font-family="sans-serif" font-size="13">point 50; boundary 21</text>
+  <circle cx="362.786739" cy="121.297130" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="376.786739" y="109.297130" font-family="sans-serif" font-size="13">point 51; boundary 255</text>
+  <circle cx="369.991172" cy="124.656612" r="9" fill="#d65f5f" data-boundary-id="22"/>
+  <text x="383.991172" y="112.656612" font-family="sans-serif" font-size="13">point 52; boundary 22</text>
+  <circle cx="368.995469" cy="130.857736" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="382.995469" y="118.857736" font-family="sans-serif" font-size="13">point 53; boundary 255</text>
+  <circle cx="386.629028" cy="137.982156" r="9" fill="#d65f5f" data-boundary-id="23"/>
+  <text x="400.629028" y="125.982156" font-family="sans-serif" font-size="13">point 54; boundary 23</text>
+  <circle cx="374.226265" cy="138.057308" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="388.226265" y="126.057308" font-family="sans-serif" font-size="13">point 55; boundary 255</text>
+  <circle cx="384.363267" cy="150.575463" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="398.363267" y="138.575463" font-family="sans-serif" font-size="13">point 56; boundary 255</text>
+  <circle cx="374.498593" cy="153.658963" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="388.498593" y="141.658963" font-family="sans-serif" font-size="13">point 57; boundary 255</text>
+  <circle cx="398.777416" cy="166.583997" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="412.777416" y="154.583997" font-family="sans-serif" font-size="13">point 58; boundary 255</text>
+  <circle cx="399.053142" cy="154.787717" r="9" fill="#d65f5f" data-boundary-id="24"/>
+  <text x="413.053142" y="142.787717" font-family="sans-serif" font-size="13">point 59; boundary 24</text>
+  <circle cx="403.232536" cy="171.531909" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="417.232536" y="159.531909" font-family="sans-serif" font-size="13">point 60; boundary 255</text>
+  <circle cx="452.187956" cy="182.834158" r="9" fill="#d65f5f" data-boundary-id="25"/>
+  <text x="466.187956" y="170.834158" font-family="sans-serif" font-size="13">point 61; boundary 25</text>
+  <circle cx="450.814897" cy="219.114270" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="464.814897" y="207.114270" font-family="sans-serif" font-size="13">point 62; boundary 255</text>
+  <circle cx="470.490880" cy="238.790253" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="484.490880" y="226.790253" font-family="sans-serif" font-size="13">point 63; boundary 255</text>
+  <circle cx="550.651928" cy="252.924809" r="9" fill="#d65f5f" data-boundary-id="26"/>
+  <text x="564.651928" y="240.924809" font-family="sans-serif" font-size="13">point 64; boundary 26</text>
+  <circle cx="471.868760" cy="240.030902" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="485.868760" y="228.030902" font-family="sans-serif" font-size="13">point 65; boundary 255</text>
+  <circle cx="477.532666" cy="245.130706" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="491.532666" y="233.130706" font-family="sans-serif" font-size="13">point 66; boundary 255</text>
+  <circle cx="537.501234" cy="299.126647" r="9" fill="#d65f5f" data-boundary-id="27"/>
+  <text x="551.501234" y="287.126647" font-family="sans-serif" font-size="13">point 67; boundary 27</text>
+  <circle cx="376.001260" cy="175.148106" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="390.001260" y="163.148106" font-family="sans-serif" font-size="13">point 68; boundary 255</text>
+  <circle cx="365.953083" cy="166.328201" r="9" fill="#d65f5f" data-boundary-id="28"/>
+  <text x="379.953083" y="154.328201" font-family="sans-serif" font-size="13">point 69; boundary 28</text>
+  <circle cx="376.465703" cy="181.789959" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="390.465703" y="169.789959" font-family="sans-serif" font-size="13">point 70; boundary 255</text>
+  <circle cx="350.588565" cy="224.856749" r="9" fill="#d65f5f" data-boundary-id="29"/>
+  <text x="364.588565" y="212.856749" font-family="sans-serif" font-size="13">point 71; boundary 29</text>
+  <circle cx="384.666489" cy="248.579997" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="398.666489" y="236.579997" font-family="sans-serif" font-size="13">point 72; boundary 255</text>
+  <circle cx="388.057606" cy="276.198432" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="402.057606" y="264.198432" font-family="sans-serif" font-size="13">point 73; boundary 255</text>
+  <circle cx="349.843647" cy="348.068438" r="9" fill="#d65f5f" data-boundary-id="30"/>
+  <text x="363.843647" y="336.068438" font-family="sans-serif" font-size="13">point 74; boundary 30</text>
+  <circle cx="388.379569" cy="278.024374" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="402.379569" y="266.024374" font-family="sans-serif" font-size="13">point 75; boundary 255</text>
+  <circle cx="389.703071" cy="285.530324" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="403.703071" y="273.530324" font-family="sans-serif" font-size="13">point 76; boundary 255</text>
+  <circle cx="403.715719" cy="365.000000" r="9" fill="#d65f5f" data-boundary-id="31"/>
+  <text x="417.715719" y="353.000000" font-family="sans-serif" font-size="13">point 77; boundary 31</text>
+</svg>

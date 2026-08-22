@@ -1,6 +1,8 @@
 # Mathematics
 
-This page collects the mathematical formulation for the blood-flow model.
+This page collects an explanatory summary of the blood-flow model represented by the current source.
+
+Where intended mathematics differs from implementation details, the source and maintainer decisions take precedence.
 
 ## Governing equations
 

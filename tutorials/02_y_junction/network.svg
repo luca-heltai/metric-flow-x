@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420">
+  <title>Y-junction network topology</title>
+  <desc>Generated from legacy ASCII VTK connectivity; vessel and boundary identifiers are labels.</desc>
+  <rect width="800" height="420" fill="white"/>
+  <line x1="211.601498" y1="210.000000" x2="433.398502" y2="210.000000" stroke="#245a9b" stroke-width="6" data-vessel-id="0"/>
+  <text x="322.500000" y="202.000000" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 0</text>
+  <line x1="433.398502" y1="210.000000" x2="588.398502" y2="55.000000" stroke="#245a9b" stroke-width="6" data-vessel-id="1"/>
+  <text x="510.898502" y="124.500000" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 1</text>
+  <line x1="433.398502" y1="210.000000" x2="588.398502" y2="365.000000" stroke="#245a9b" stroke-width="6" data-vessel-id="2"/>
+  <text x="510.898502" y="279.500000" font-family="sans-serif" font-size="14" text-anchor="middle">vessel 2</text>
+  <circle cx="211.601498" cy="210.000000" r="9" fill="#d65f5f" data-boundary-id="0"/>
+  <text x="225.601498" y="198.000000" font-family="sans-serif" font-size="13">point 0; boundary 0</text>
+  <circle cx="433.398502" cy="210.000000" r="9" fill="#d65f5f" data-boundary-id="255"/>
+  <text x="447.398502" y="198.000000" font-family="sans-serif" font-size="13">point 1; boundary 255</text>
+  <circle cx="588.398502" cy="55.000000" r="9" fill="#d65f5f" data-boundary-id="1"/>
+  <text x="602.398502" y="43.000000" font-family="sans-serif" font-size="13">point 2; boundary 1</text>
+  <circle cx="588.398502" cy="365.000000" r="9" fill="#d65f5f" data-boundary-id="2"/>
+  <text x="602.398502" y="353.000000" font-family="sans-serif" font-size="13">point 3; boundary 2</text>
+</svg>

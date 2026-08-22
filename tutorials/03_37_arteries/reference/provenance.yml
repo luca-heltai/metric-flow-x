@@ -1,0 +1,33 @@
+schema: blood-flow.37-segment-arterial-network.provenance.v1
+status: reproducible-demonstration-not-validated-benchmark
+source:
+  path: notebooks/37_vessel_network.vtk
+  copied_asset: tutorials/03_37_arteries/network.vtk
+  sha256: 28c6d138903f4e5cca31d78f57ed6adfd31448fe81216babee9650f30b82bcc1
+  copy_policy: byte-for-byte copy
+validation:
+  validator: tools/validate_vtk_network.py
+  valid: true
+  points: 38
+  cells: 37
+  vessels: 37
+  cell_type: VTK_LINE
+  terminal_boundary_ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  topology_json: tutorials/03_37_arteries/topology.json
+geometry:
+  description: 37-segment arterial network
+  taper_arrays_present: false
+  taper_note: The active VTK has no r_in/r_out taper arrays; this tutorial does not claim tapering.
+comparison_data:
+  raw_reference_curves_available: false
+  note: No raw reference curves or machine-readable measurement tables were found in the checkout.
+  image_only_numdata:
+    path: NumData/37-arteries
+    limitation: PDF plots are image-only evidence; their numerical values, sampling grids, uncertainty, and provenance cannot be recovered reproducibly from these assets.
+    included_for: provenance pointer only, not quantitative validation
+periodicity:
+  diagnostic: tools/analyze_periodicity.py
+  csv_schema: time column plus explicitly named trace_* columns
+  period_selection: caller supplies the documented cycle period; the tool compares the final two complete windows algorithmically.
+  threshold: pending-maintainer-set
+  threshold_note: No numerical acceptance threshold is invented by this tutorial.

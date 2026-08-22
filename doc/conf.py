@@ -3,9 +3,9 @@ import sys
 import io
 import glob
 
-project = "blood-flow"
-author = "contributors"
-html_baseurl = ""
+project = "MetricFlow-X"
+author = "Raksha Devi and Luca Heltai"
+html_baseurl = "https://luca-heltai.github.io/metric-flow-x/"
 default_role = "any"
 
 extensions = [
@@ -18,10 +18,21 @@ extensions = [
 ]
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "html"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "html",
+    "_static/**",
+]
 
 # Suppress specific warnings that are benign for this repository build.
-suppress_warnings = ['doxygenfunction']
+suppress_warnings = [
+    'doxygenfunction',
+    # README is included at the documentation root but retains repository
+    # relative links such as doc/configuration.md for GitHub readers.
+    'myst.xref_missing',
+]
 
 html_theme = "furo"
 html_title = project
@@ -37,8 +48,8 @@ breathe_projects = {
     project: os.path.abspath("../build/docs/doxygen/xml"),
 }
 breathe_default_project = project
-bibtex_bibfiles = ["references.bib"]
-bibtex_reference_style = "author_year"
+bibtex_bibfiles = ["../bibliography/references.bib"]
+bibtex_reference_style = "label"
 
 exhale_args = {
     "containmentFolder": "./api",
@@ -60,7 +71,8 @@ myst_enable_extensions = [
 mathjax_path = (
     "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
 )
- 
+
+
 def _strip_operator_doxygenfunctions(api_dir):
     """Remove doxygenfunction directives that reference operator overloads.
 
@@ -105,7 +117,22 @@ def remove_operator_doxygenfunctions(app, env, docnames):
     _strip_operator_doxygenfunctions(api_dir)
 
 
+def mark_generated_api_root_orphan(app):
+    """Mark Exhale's linked API root as intentionally outside the toctree."""
+    path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "api", "library_root.rst")
+    try:
+        with io.open(path, "r", encoding="utf-8") as fh:
+            contents = fh.read()
+        if not contents.startswith(":orphan:"):
+            with io.open(path, "w", encoding="utf-8") as fh:
+                fh.write(":orphan:\n\n" + contents)
+    except OSError:
+        pass
+
+
 def setup(app):
+    app.connect("builder-inited", mark_generated_api_root_orphan)
     app.connect("env-before-read-docs", remove_operator_doxygenfunctions)
+
 
 mermaid_version = "11.4.1"

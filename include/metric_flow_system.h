@@ -1,5 +1,5 @@
-#ifndef BLOOD_FLOW_SYSTEM_H
-#define BLOOD_FLOW_SYSTEM_H
+#ifndef METRIC_FLOW_SYSTEM_H
+#define METRIC_FLOW_SYSTEM_H
 
 #include <deal.II/base/conditional_ostream.h>
 #include <deal.II/base/function.h>
@@ -74,7 +74,7 @@ namespace LA
 #endif
 } // namespace LA
 
-using BloodFlowParameters = ParsedTools::Constants;
+using MetricFlowParameters = ParsedTools::Constants;
 
 // ---------------------------------------------------------------------------
 // Distributed linear algebra types.
@@ -114,9 +114,9 @@ struct FaceTraceDof
 // Scratch / copy-data structures for cell and face integrals.
 // ---------------------------------------------------------------------------
 template <int dim, int spacedim>
-struct BloodFlowScratchData
+struct MetricFlowScratchData
 {
-  BloodFlowScratchData(
+  MetricFlowScratchData(
     const FiniteElement<dim, spacedim> &fe,
     const Quadrature<dim>              &quadrature,
     const Quadrature<dim - 1>          &quadrature_face,
@@ -132,7 +132,7 @@ struct BloodFlowScratchData
     , fe_interface_values(fe, quadrature_face, interface_update_flags)
   {}
 
-  BloodFlowScratchData(const BloodFlowScratchData<dim, spacedim> &src)
+  MetricFlowScratchData(const MetricFlowScratchData<dim, spacedim> &src)
     : fe_values(src.fe_values.get_fe(),
                 src.fe_values.get_quadrature(),
                 src.fe_values.get_update_flags())
@@ -145,19 +145,19 @@ struct BloodFlowScratchData
   FEInterfaceValues<dim, spacedim> fe_interface_values;
 };
 
-struct BloodFlowCopyDataFace
+struct MetricFlowCopyDataFace
 {
   FullMatrix<double>                   cell_matrix;
   Vector<double>                       cell_rhs;
   std::vector<types::global_dof_index> joint_dof_indices;
 };
 
-struct BloodFlowCopyData
+struct MetricFlowCopyData
 {
   FullMatrix<double>                   cell_matrix;
   Vector<double>                       cell_rhs;
   std::vector<types::global_dof_index> local_dof_indices;
-  std::vector<BloodFlowCopyDataFace>   face_data;
+  std::vector<MetricFlowCopyDataFace>  face_data;
 
   template <class Iterator>
   void
@@ -197,10 +197,10 @@ struct BloodFlowCopyData
 // close the junction equations.
 // ===========================================================================
 template <int dim, int spacedim = dim>
-class BloodFlowSystem : public ParameterAcceptor
+class MetricFlowSystem : public ParameterAcceptor
 {
 public:
-  BloodFlowSystem(const MPI_Comm comm = MPI_COMM_WORLD);
+  MetricFlowSystem(const MPI_Comm comm = MPI_COMM_WORLD);
 
   void
   initialize_params(const std::string &filename = "");
@@ -373,6 +373,12 @@ private:
   parallel::fullydistributed::Triangulation<dim, spacedim> triangulation;
   DoFHandler<dim, spacedim>                                dof_handler;
   std::unique_ptr<FiniteElement<dim, spacedim>>            fe;
+
+  // Canonical component extractors shared by all assembly member functions.
+  const FEValuesExtractors::Scalar area_extractor{0};
+  const FEValuesExtractors::Scalar velocity_extractor{1};
+  const FEValuesExtractors::Scalar a_hat_extractor{2};
+  const FEValuesExtractors::Scalar u_hat_extractor{3};
 
   types::global_dof_index n_total_dofs = 0;
 
@@ -588,7 +594,6 @@ private:
   std::string  constants              = "1.0";
   std::string  output_filename        = "solution";
   bool         use_direct_solver      = true;
-  bool         use_junction_mesh      = true;
   bool         use_riemann_invariants = true;
   unsigned int n_refinement_cycles    = 1;
   unsigned int n_global_refinements   = 5;
@@ -1170,4 +1175,4 @@ private:
   test();
 };
 
-#endif // BLOOD_FLOW_SYSTEM_H
+#endif // METRIC_FLOW_SYSTEM_H

@@ -1,0 +1,79 @@
+{
+  "points": [
+    {
+      "boundary_id": 0,
+      "id": 0,
+      "xyz": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "boundary_id": 255,
+      "id": 1,
+      "xyz": [
+        0.086,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "boundary_id": 1,
+      "id": 2,
+      "xyz": [
+        0.1461,
+        0.0601,
+        0.0
+      ]
+    },
+    {
+      "boundary_id": 2,
+      "id": 3,
+      "xyz": [
+        0.1461,
+        -0.0601,
+        0.0
+      ]
+    }
+  ],
+  "schema": "blood-flow.y-junction.topology.v1",
+  "source": "notebooks/bifurcation_network.vtk",
+  "source_sha256": "4536f94764b94aa4f34fdaac83cd01e4a8e1211f727e7bf72a2f978ba4ca3b58",
+  "validation": {
+    "cells": 3,
+    "points": 4,
+    "terminal_boundary_ids": [
+      1,
+      2
+    ],
+    "valid": true,
+    "vessels": 3
+  },
+  "vessels": [
+    {
+      "cell": 0,
+      "id": 0,
+      "points": [
+        0,
+        1
+      ]
+    },
+    {
+      "cell": 1,
+      "id": 1,
+      "points": [
+        1,
+        2
+      ]
+    },
+    {
+      "cell": 2,
+      "id": 2,
+      "points": [
+        1,
+        3
+      ]
+    }
+  ]
+}

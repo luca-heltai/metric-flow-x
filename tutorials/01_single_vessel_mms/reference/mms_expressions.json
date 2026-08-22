@@ -1,0 +1,45 @@
+{
+  "equations": "implemented volume equations in source/metric_flow_system.cc",
+  "profiles": {
+    "p1": {
+      "area": "1.0*a0*(0.1*sin(2*PI*x)*cos(2*PI*t/5) + 1.0)",
+      "area_t": "-0.04*PI*a0*sin(2*PI*t/5)*sin(2*PI*x)",
+      "area_x": "0.2*PI*a0*cos(2*PI*t/5)*cos(2*PI*x)",
+      "eta": "2*(xi+2)*PI*mu/rho",
+      "mass_source": "-0.04*PI*a0*(-0.1*a0*sin(2*PI*x)^2*cos(2*PI*t/5) - 1.0*a0*sin(2*PI*x) + 0.1*a0*cos(2*PI*t/5)*cos(2*PI*x)^2 + 1.0*sin(2*PI*x))*sin(2*PI*t/5)",
+      "momentum_source": "-0.133333333333333*(-0.1*PI^(3/2)*E*a0*h_wall*sin(2*PI*x)*cos(2*PI*t/5)^2 - 1.0*PI^(3/2)*E*a0*h_wall*cos(2*PI*t/5) + 0.0006*PI*a0^2*a_d*rho*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*sin(2*PI*t/5)^2*sin(2*PI*x)^2*cos(2*PI*t/5) + 0.006*PI*a0^2*a_d*rho*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*sin(2*PI*t/5)^2*sin(2*PI*x) + 0.006*PI*a0*a_d*rho*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*sin(2*PI*x)*cos(2*PI*t/5)^2 + 0.06*PI*a0*a_d*rho*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*cos(2*PI*t/5) - 0.3*PI*a_d*mu*xi*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*sin(2*PI*t/5) - 0.6*PI*a_d*mu*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*sin(2*PI*t/5))*cos(2*PI*x)/(a_d*rho*sqrt(a0*(0.1*sin(2*PI*x)*cos(2*PI*t/5) + 1.0))*(0.1*sin(2*PI*x)*cos(2*PI*t/5) + 1.0))",
+      "pressure_law": "p0 + p_d + (4/3)*sqrt(PI)*E*h_wall/a_d*(sqrt(A)-sqrt(a_d))",
+      "rhs_expression": "-0.04*PI*a0*(-0.1*a0*sin(2*PI*x)^2*cos(2*PI*t/5) - 1.0*a0*sin(2*PI*x) + 0.1*a0*cos(2*PI*t/5)*cos(2*PI*x)^2 + 1.0*sin(2*PI*x))*sin(2*PI*t/5); -0.133333333333333*(-0.1*PI^(3/2)*E*a0*h_wall*sin(2*PI*x)*cos(2*PI*t/5)^2 - 1.0*PI^(3/2)*E*a0*h_wall*cos(2*PI*t/5) + 0.0006*PI*a0^2*a_d*rho*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*sin(2*PI*t/5)^2*sin(2*PI*x)^2*cos(2*PI*t/5) + 0.006*PI*a0^2*a_d*rho*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*sin(2*PI*t/5)^2*sin(2*PI*x) + 0.006*PI*a0*a_d*rho*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*sin(2*PI*x)*cos(2*PI*t/5)^2 + 0.06*PI*a0*a_d*rho*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*cos(2*PI*t/5) - 0.3*PI*a_d*mu*xi*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*sin(2*PI*t/5) - 0.6*PI*a_d*mu*sqrt(0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0)*sin(2*PI*t/5))*cos(2*PI*x)/(a_d*rho*sqrt(a0*(0.1*sin(2*PI*x)*cos(2*PI*t/5) + 1.0))*(0.1*sin(2*PI*x)*cos(2*PI*t/5) + 1.0))",
+      "velocity": "-0.02*a0*sin(2*PI*t/5)*cos(2*PI*x)",
+      "velocity_t": "-0.008*PI*a0*cos(2*PI*t/5)*cos(2*PI*x)",
+      "velocity_x": "0.04*PI*a0*sin(2*PI*t/5)*sin(2*PI*x)"
+    },
+    "p2": {
+      "area": "t*sin(2*PI*x) + 4",
+      "area_t": "sin(2*PI*x)",
+      "area_x": "2*PI*t*cos(2*PI*x)",
+      "eta": "2*(xi+2)*PI*mu/rho",
+      "mass_source": "0",
+      "momentum_source": "(8*PI^(5/2)*E*h_wall*t^4*sin(2*PI*x)^3 + 96*PI^(5/2)*E*h_wall*t^3*sin(2*PI*x)^2 + 384*PI^(5/2)*E*h_wall*t^2*sin(2*PI*x) + 512*PI^(5/2)*E*h_wall*t - 6*PI*a_d*mu*t*xi*sqrt(t*sin(2*PI*x) + 4)*sin(2*PI*x) - 12*PI*a_d*mu*t*sqrt(t*sin(2*PI*x) + 4)*sin(2*PI*x) - 24*PI*a_d*mu*xi*sqrt(t*sin(2*PI*x) + 4) - 48*PI*a_d*mu*sqrt(t*sin(2*PI*x) + 4) - 6*a_d*rho*t*sqrt(t*sin(2*PI*x) + 4)*sin(2*PI*x)^2 - 3*a_d*rho*t*sqrt(t*sin(2*PI*x) + 4)*cos(2*PI*x)^2 - 24*a_d*rho*sqrt(t*sin(2*PI*x) + 4)*sin(2*PI*x))*cos(2*PI*x)/(6*PI*a_d*rho*(t*sin(2*PI*x) + 4)^(7/2))",
+      "pressure_law": "p0 + p_d + (4/3)*sqrt(PI)*E*h_wall/a_d*(sqrt(A)-sqrt(a_d))",
+      "rhs_expression": "0; (8*PI^(5/2)*E*h_wall*t^4*sin(2*PI*x)^3 + 96*PI^(5/2)*E*h_wall*t^3*sin(2*PI*x)^2 + 384*PI^(5/2)*E*h_wall*t^2*sin(2*PI*x) + 512*PI^(5/2)*E*h_wall*t - 6*PI*a_d*mu*t*xi*sqrt(t*sin(2*PI*x) + 4)*sin(2*PI*x) - 12*PI*a_d*mu*t*sqrt(t*sin(2*PI*x) + 4)*sin(2*PI*x) - 24*PI*a_d*mu*xi*sqrt(t*sin(2*PI*x) + 4) - 48*PI*a_d*mu*sqrt(t*sin(2*PI*x) + 4) - 6*a_d*rho*t*sqrt(t*sin(2*PI*x) + 4)*sin(2*PI*x)^2 - 3*a_d*rho*t*sqrt(t*sin(2*PI*x) + 4)*cos(2*PI*x)^2 - 24*a_d*rho*sqrt(t*sin(2*PI*x) + 4)*sin(2*PI*x))*cos(2*PI*x)/(6*PI*a_d*rho*(t*sin(2*PI*x) + 4)^(7/2))",
+      "velocity": "cos(2*PI*x)/(2*PI*(t*sin(2*PI*x) + 4))",
+      "velocity_t": "-sin(2*PI*x)*cos(2*PI*x)/(2*PI*(t*sin(2*PI*x) + 4)^2)",
+      "velocity_x": "-(t*sin(2*PI*x)^2 + t*cos(2*PI*x)^2 + 4*sin(2*PI*x))/(t*sin(2*PI*x) + 4)^2"
+    },
+    "p3": {
+      "area": "-1.0*(0.005*sin(9.42*t - 6.28*x) - 1.0)",
+      "area_t": "-0.0471*cos(9.42*t - 6.28*x)",
+      "area_x": "0.0314*cos(9.42*t - 6.28*x)",
+      "eta": "2*(xi+2)*PI*mu/rho",
+      "mass_source": "-0.314*(-0.005*sin(6.28*x)*cos(9.42*t - 6.28*x) + 0.005*sin(9.42*t - 6.28*x)*cos(6.28*x) - 1.0*cos(6.28*x) + 0.15*cos(9.42*t - 6.28*x))",
+      "momentum_source": "-0.2*(0.000523333333333333*sqrt(PI)*E*h_wall*sin(9.42*t - 6.28*x)*cos(9.42*t - 6.28*x) - 0.104666666666667*sqrt(PI)*E*h_wall*cos(9.42*t - 6.28*x) + 0.5*PI*a_d*mu*xi*sqrt(1 - 0.005*sin(9.42*t - 6.28*x))*sin(6.28*x) + 1.0*PI*a_d*mu*sqrt(1 - 0.005*sin(9.42*t - 6.28*x))*sin(6.28*x) + 0.0003925*a_d*rho*sqrt(1 - 0.005*sin(9.42*t - 6.28*x))*sin(6.28*x)*sin(9.42*t - 6.28*x)*cos(6.28*x) - 0.0785*a_d*rho*sqrt(1 - 0.005*sin(9.42*t - 6.28*x))*sin(6.28*x)*cos(6.28*x))/(a_d*rho*(1.0 - 0.005*sin(9.42*t - 6.28*x))^(3/2))",
+      "pressure_law": "p0 + p_d + (4/3)*sqrt(PI)*E*h_wall/a_d*(sqrt(A)-sqrt(a_d))",
+      "rhs_expression": "-0.314*(-0.005*sin(6.28*x)*cos(9.42*t - 6.28*x) + 0.005*sin(9.42*t - 6.28*x)*cos(6.28*x) - 1.0*cos(6.28*x) + 0.15*cos(9.42*t - 6.28*x)); -0.2*(0.000523333333333333*sqrt(PI)*E*h_wall*sin(9.42*t - 6.28*x)*cos(9.42*t - 6.28*x) - 0.104666666666667*sqrt(PI)*E*h_wall*cos(9.42*t - 6.28*x) + 0.5*PI*a_d*mu*xi*sqrt(1 - 0.005*sin(9.42*t - 6.28*x))*sin(6.28*x) + 1.0*PI*a_d*mu*sqrt(1 - 0.005*sin(9.42*t - 6.28*x))*sin(6.28*x) + 0.0003925*a_d*rho*sqrt(1 - 0.005*sin(9.42*t - 6.28*x))*sin(6.28*x)*sin(9.42*t - 6.28*x)*cos(6.28*x) - 0.0785*a_d*rho*sqrt(1 - 0.005*sin(9.42*t - 6.28*x))*sin(6.28*x)*cos(6.28*x))/(a_d*rho*(1.0 - 0.005*sin(9.42*t - 6.28*x))^(3/2))",
+      "velocity": "0.05*sin(6.28*x)",
+      "velocity_t": "0",
+      "velocity_x": "0.314*cos(6.28*x)"
+    }
+  },
+  "schema": "blood-flow-mms-v1"
+}

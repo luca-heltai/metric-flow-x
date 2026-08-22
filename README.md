@@ -1,73 +1,91 @@
-# Blood Flow DG/ARKode Solver
+# MetricFlow-X
 
-This project solves a 1D blood–flow model embedded in 3D using discontinuous Galerkin (DG) spatial discretization and SUNDIALS ARKode for time integration. The formulation follows the notes in `latex/blood_flow.tex`.
+This repository contains a C++/deal.II implementation of an MPI-parallel implicit solver for one-dimensional **navier-stokes flow models** defined on **metric networks embedded in three-dimensional space**. The space discretization is based on an HDG-type (hybridized) monolithic system, which is then solved in time via the SUNDIALS Differential-Algebraic equation solver (IDA).
 
-## What We Solve
+## Authors
 
-### Unknowns
+[Devi Raksha](https://github.com/devi-raksha) and [Luca Heltai](https://github.com/luca-heltai)
 
-- Cross-sectional area: $A(x,t)$
-- Mean velocity along the centerline: $U(x,t)$
+## Overview
 
-### Governing equations (conservation form)
+- **Geometry:** 1D network geometry can be defined through VTK files, embedded in `spacedim = 3`.
+- **Cell fields:** cross-sectional area `A` and mean axial velocity `U`, represented with discontinuous Galerkin finite elements of arbitrary order.
+- **Hybridized fields:** face traces `A_hat` and `U_hat`; terminal RCR capacitor pressures are appended to the global unknown vector.
+- **Time integration:** SUNDIALS **IDA** (`SUNDIALS::IDA`), with cell and capacitor rows treated as differential and trace rows as algebraic.
+- **Numerical fluxes:** `HLL`, `HLL_HDG`, or `LAX_FRIEDRICHS` fluxes are supported via parameter files.
+- **Newton linear solves:** with `Use direct solver = true`, PETSc uses `SparseDirectMUMPS` when PETSc is selected and Trilinos uses `TrilinosWrappers::SolverDirect` otherwise. With it set to `false`, the implementation uses GMRES with an ILU preconditioner.
 
-The mathematical formulation (conservation laws, tube law, and wave-speed)
-is documented in the site page **Mathematics**: see `doc/math.md`.
+## Prerequisites
 
-## Numerical Method
+A configured deal.II installation (deal.II 9.8.0 or newer), CMake 3.23 or newer, a C++ compiler, and the MPI/linear-algebra support provided by deal.II are required. The selected deal.II build must provide PETSc or Trilinos; the source rejects configurations with neither backend. Doxygen and the Python packages in `doc/requirements.txt` are only needed to build the developer documentation.
 
-- **Spatial discretization:** DG on the 1D mesh embedded in 3D, with Lax–Friedrichs/HLL numerical fluxes and characteristic boundary conditions.
-- **Time integration:** ARKode (deal.II wrapper) in fully implicit mode (`f_E = 0`, `f_I = L`). Mass matrix supplied; Jacobian assembled explicitly; UMFPack solves for the Newton systems and mass solves.
-- **Linearization:** Newton systems use `N = M – γ J`, with exact Jacobian of the implicit residual; viscosity term included.
+## Configure and build
 
-## Repository Layout
-
-- `source/`, `include/`: Implementation of `BloodFlowSystem` and utilities.
-- `apps/`: One executable per `.cc` driver (CMake auto-generates targets).
-- `parameters/`: Sample parameter files, including ARKode settings, output directory, verbosity, and tube-law constants.
-- `tests/`: Unit/regression tests (DG residuals, Jacobian finite-difference check).
-- `latex/blood_flow.tex`: Detailed mathematical derivation.
-
-## Building
+From the repository root:
 
 ```bash
 cmake -S . -B build
 cmake --build build
 ```
 
-Executables are generated for each file in `apps/`, linked against the shared library built from `source/*.cc`.
+CMake creates the `metric_flow_x` executable from `apps/metric_flow_x.cc`, builds the shared `test_library`, mirrors `parameters/` into `build/parameters/`, and configures the tests. Parameter templates ending in `.prm.in` are expanded while configuring; for example, `parameters/aortic.prm.in` becomes `build/parameters/aortic.prm` with the source-tree path substituted into the mesh setting.
 
-## Running
+## Run
 
-Pass a parameter file to an app, e.g.:
-
-```bash
-./build/blood_flow params/parameters.prm
-```
-
-Key runtime settings (see parameter files):
-
-- `Output filename`, `Output directory` for VTU/PVD output.
-- `Verbosity (console depth)` to control `deallog`.
-- ARKode block: initial/final time, tolerances, step-size hints, implicit/explicit flags.
-
-## Testing
+The executable requires an existing parameter-file path for a normal run. After a successful configure, the configured aortic example can be invoked as:
 
 ```bash
-ctest --output-on-failure
+./build/metric_flow_x build/parameters/aortic.prm
 ```
 
-Tests include residual checks, mass integration, and a finite-difference Jacobian comparison (`tests/test_jacobian_fd`).
+Command-line modes are:
 
-## Notes on Boundary Conditions
+```text
+./build/metric_flow_x --help
+./build/metric_flow_x --print-parameters
+./build/metric_flow_x --validate-parameters build/parameters/aortic.prm
+```
 
-Characteristic-based mapping of exterior states is used for subcritical/supercritical in/outflow. Residual and Jacobian assemble the same flux/viscosity terms; signs follow the formulation in `latex/blood_flow.tex`.
+`--print-parameters` prints the schema registered by the existing
+`MetricFlowSystem` and its existing parameter defaults. `--validate-parameters`
+parses the given file against that schema without running the simulation. After running a successful simulation, a `last_used_parameters.prm` file is written to the current working directory. Missing parameter files are rejected.
 
-## References
+See [Configuration](doc/configuration.md) for the registered parameter groups and [Outputs](doc/outputs.md) for the files written by the current implementation.
 
-- Formulation and linearization: `latex/blood_flow.tex`.
-- ARKode wrapper: deal.II `SUNDIALS::ARKode`.
+## Tests
+
+CTest discovers the test executables configured by deal.II's `DEAL_II_PICKUP_TESTS()` macro. Run the configured build-tree tests with:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+## Repository map
+
+- `apps/`: application entry points; currently `metric_flow_x.cc`.
+- `include/`, `source/`: the `MetricFlowSystem` implementation, parameter handling, assembly, solvers, and VTK utilities.
+- `parameters/`: input meshes, parameter files/templates, and example/reference assets. The configured copies used by a build are under `build/parameters/`.
+- `tests/`: deal.II test sources and expected output files.
+- `doc/`: this documentation skeleton and the Doxygen/Sphinx configuration.
+- `latex/`: the repository's mathematical manuscript source.
+- `scripts/`: helper scripts, including documentation serving/building and test/formatting helpers.
+
+## Citing
+
+If you use this software, please cite it as **MetricFlow-X solver**. The
+canonical bibliography is `bibliography/references.bib`,
+and its metadata policy and unresolved-key list are documented in
+[`bibliography/README.md`](bibliography/README.md). The documentation reference
+page is [References](doc/references.md).
 
 ## License
 
 This project is licensed under the MIT License (see `LICENSE.md`).
+
+## Funding
+
+> - **Project:** dealii-X
+> - **Grant agreement number:** 101172493
+> - **DOI:** [10.3030/101172493](https://doi.org/10.3030/101172493)
+> - **Programme:** Horizon Europe
+> - **Funder:** EuroHPC JU

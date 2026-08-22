@@ -1,6 +1,6 @@
 
 
-subsection BloodFlowSystem<1, 3>
+subsection MetricFlowSystem<1, 3>
   set Finite element degree                = 2
   set Number of global refinement          = 5
   set Number of refinement cycles          = 1
@@ -38,7 +38,7 @@ end
 # and viscoelastic vessels", JCP 495 (2023) 112530.
 
 
-subsection Blood Flow Parameters
+subsection Metric Flow Parameters
   set Density (rho)                           = 1050
   set Elastic modulus of the vessel wall (E) = 80
   set Reference cross-sectional area (a0)     = 3.14e-4
