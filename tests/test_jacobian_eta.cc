@@ -39,19 +39,20 @@
 
 #include <deal.II/lac/petsc_vector.h>
 
+#include <metric_flow_x/blood_flow_system.h>
+#include <metric_flow_x/io/vtk_utils.h>
+
 #include <cmath>
 #include <iomanip>
 
-#include "metric_flow_system.h"
 #include "tests.h"
-#include "vtk_utils.h"
 
 using namespace dealii;
 
 void
 test()
 {
-  MetricFlowSystem<1, 3> problem;
+  BloodFlowSystem<1, 3> problem;
   problem.initialize_params(PRM_DIR "constant.prm");
 
   // initialize_params() resets deallog depth according to the parameter file.
@@ -103,7 +104,7 @@ test()
   // operator[] on every rank, as the serial version did, isn't valid here,
   // and summing beyond locally_owned_dofs would double-count anything also
   // visible as a ghost. There's no member named n_trace_end on
-  // MetricFlowSystem (it doesn't exist -- checked against the header); the
+  // BloodFlowSystem (it doesn't exist -- checked against the header); the
   // actual FE/capacitor boundary the header documents is
   // dof_handler.n_dofs(): rows before it are the cell (differential) and
   // trace (algebraic) unknowns, rows at or after it are the RCR capacitor

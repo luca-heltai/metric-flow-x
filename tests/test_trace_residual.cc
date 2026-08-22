@@ -33,16 +33,17 @@
 
 #include <deal.II/lac/vector.h>
 
-#include "metric_flow_system.h"
+#include <metric_flow_x/blood_flow_system.h>
+#include <metric_flow_x/io/vtk_utils.h>
+
 #include "tests.h"
-#include "vtk_utils.h"
 
 using namespace dealii;
 
 void
 test()
 {
-  MetricFlowSystem<1, 3> problem;
+  BloodFlowSystem<1, 3> problem;
   problem.initialize_params(PRM_DIR "multi_vessel.prm");
   deallog.depth_console(10);
   deallog.depth_file(10);

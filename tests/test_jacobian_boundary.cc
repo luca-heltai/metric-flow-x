@@ -17,19 +17,20 @@
 
 #include <deal.II/base/mpi.h>
 
+#include <metric_flow_x/blood_flow_system.h>
+#include <metric_flow_x/io/vtk_utils.h>
+
 #include <cmath>
 #include <iomanip>
 
-#include "metric_flow_system.h"
 #include "tests.h"
-#include "vtk_utils.h"
 
 using namespace dealii;
 
 void
 test()
 {
-  MetricFlowSystem<1, 3> problem;
+  BloodFlowSystem<1, 3> problem;
   problem.initialize_params(PRM_DIR "constant.prm");
 
   // initialize_params() resets deallog depth according to the parameter file.

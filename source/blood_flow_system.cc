@@ -17,8 +17,6 @@
  * vectors, write only rows this rank owns, and close with one compress().
  * --------------------------------------------------------------------------
  */
-#include "metric_flow_system.h"
-
 #include <deal.II/base/function_parser.h>
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/types.h>
@@ -42,6 +40,9 @@
 #include <deal.II/numerics/error_estimator.h>
 #include <deal.II/numerics/vector_tools.h>
 
+#include <metric_flow_x/blood_flow_system.h>
+#include <metric_flow_x/io/vtk_utils.h>
+
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -49,13 +50,11 @@
 #include <limits>
 #include <sstream>
 
-#include "vtk_utils.h"
-
 // ==========================================================================
 // Constructor
 // ==========================================================================
 template <int dim, int spacedim>
-MetricFlowSystem<dim, spacedim>::MetricFlowSystem(const MPI_Comm comm)
+BloodFlowSystem<dim, spacedim>::BloodFlowSystem(const MPI_Comm comm)
   : mpi_communicator(comm)
   , n_mpi_processes(Utilities::MPI::n_mpi_processes(comm))
   , this_mpi_process(Utilities::MPI::this_mpi_process(comm))
@@ -65,7 +64,7 @@ MetricFlowSystem<dim, spacedim>::MetricFlowSystem(const MPI_Comm comm)
                     TimerOutput::summary,
                     TimerOutput::wall_times)
   , direct_solver_control(1000, 1e-10)
-  , par("Metric Flow Parameters",
+  , par("Blood Flow Parameters",
         {"rho", "mu", "xi", "m", "Rt"},
         {1060, 0.004, 2.0, 0.5, 0.5},
         {"Density",
@@ -103,6 +102,7 @@ MetricFlowSystem<dim, spacedim>::MetricFlowSystem(const MPI_Comm comm)
   add_parameter("Output directory", output_directory);
   add_parameter("Numerical flux type", numerical_flux_type_str);
   add_parameter("Use Riemann Invariants", use_riemann_invariants);
+  add_parameter("Use junction mesh", use_junction_mesh);
   add_parameter("Outlet boundary condition type", outlet_type);
   add_parameter("Vtk file path for mesh input", vtk_file_path);
 
@@ -118,7 +118,7 @@ MetricFlowSystem<dim, spacedim>::MetricFlowSystem(const MPI_Comm comm)
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::initialize_params(const std::string &filename)
+BloodFlowSystem<dim, spacedim>::initialize_params(const std::string &filename)
 {
   TimerOutput::Scope t(computing_timer, "initialize_params");
 
@@ -136,13 +136,6 @@ MetricFlowSystem<dim, spacedim>::initialize_params(const std::string &filename)
   exact_solution.update_constants(par);
   rhs_function.update_constants(par);
   inflow_function.update_constants(par);
-
-  AssertThrow(outlet_type == "RCR" || outlet_type == "Reflection" ||
-                outlet_type == "Single Resistance",
-              ExcMessage(
-                "Unknown outlet boundary condition type: " + outlet_type +
-                ". Supported values are RCR, Reflection, and "
-                "Single Resistance."));
 
   if (numerical_flux_type_str == "HLL")
     numerical_flux_type = NumericalFluxType::HLL;
@@ -169,7 +162,7 @@ MetricFlowSystem<dim, spacedim>::initialize_params(const std::string &filename)
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::create_triangulation()
+BloodFlowSystem<dim, spacedim>::create_triangulation()
 {
   TimerOutput::Scope timer(computing_timer, "create_triangulation");
 
@@ -303,7 +296,7 @@ MetricFlowSystem<dim, spacedim>::create_triangulation()
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::build_global_vessel_data()
+BloodFlowSystem<dim, spacedim>::build_global_vessel_data()
 {
   TimerOutput::Scope timer(computing_timer, "build_global_vessel_data");
 
@@ -418,7 +411,7 @@ MetricFlowSystem<dim, spacedim>::build_global_vessel_data()
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::detect_junctions()
+BloodFlowSystem<dim, spacedim>::detect_junctions()
 {
   TimerOutput::Scope timer(computing_timer, "detect_junctions");
 
@@ -529,7 +522,7 @@ MetricFlowSystem<dim, spacedim>::detect_junctions()
 // ============================================================================
 template <int dim, int spacedim>
 std::pair<CellId, unsigned int>
-MetricFlowSystem<dim, spacedim>::canonical_face_key(
+BloodFlowSystem<dim, spacedim>::canonical_face_key(
   const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
   const unsigned int                                              face_no) const
 {
@@ -565,7 +558,7 @@ MetricFlowSystem<dim, spacedim>::canonical_face_key(
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::build_face_dof_map()
+BloodFlowSystem<dim, spacedim>::build_face_dof_map()
 {
   TimerOutput::Scope timer(computing_timer, "build_face_dof_map");
 
@@ -647,7 +640,7 @@ MetricFlowSystem<dim, spacedim>::build_face_dof_map()
 // ==========================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::build_rcr_dof_map()
+BloodFlowSystem<dim, spacedim>::build_rcr_dof_map()
 {
   TimerOutput::Scope timer(computing_timer, "build_rcr_dof_map");
 
@@ -720,7 +713,7 @@ MetricFlowSystem<dim, spacedim>::build_rcr_dof_map()
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::update_ghosted_vectors(
+BloodFlowSystem<dim, spacedim>::update_ghosted_vectors(
   const VectorType &y) const
 {
   TimerOutput::Scope timer(computing_timer, "update_ghosted_vectors");
@@ -758,7 +751,7 @@ MetricFlowSystem<dim, spacedim>::update_ghosted_vectors(
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::get_face_trace(
+BloodFlowSystem<dim, spacedim>::get_face_trace(
   const VectorType                                               &y,
   const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
   const unsigned int                                              face_no,
@@ -789,8 +782,7 @@ MetricFlowSystem<dim, spacedim>::get_face_trace(
 // dependence on the two incident cells, assembled in build_trace_sparsity().
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::build_cell_sparsity(
-  DynamicSparsityPattern &dsp)
+BloodFlowSystem<dim, spacedim>::build_cell_sparsity(DynamicSparsityPattern &dsp)
 {
   std::vector<types::global_dof_index> ldofs(fe->n_dofs_per_cell());
   std::vector<types::global_dof_index> nb_dofs(fe->n_dofs_per_cell());
@@ -823,7 +815,7 @@ MetricFlowSystem<dim, spacedim>::build_cell_sparsity(
 // the cell DoFs on both sides of the face.
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::build_trace_sparsity(
+BloodFlowSystem<dim, spacedim>::build_trace_sparsity(
   DynamicSparsityPattern &dsp)
 {
   std::vector<types::global_dof_index> cell_dofs(fe->n_dofs_per_cell());
@@ -878,7 +870,7 @@ MetricFlowSystem<dim, spacedim>::build_trace_sparsity(
 // DoFs feeding each vessel's Riemann invariant.
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::build_junction_sparsity(
+BloodFlowSystem<dim, spacedim>::build_junction_sparsity(
   DynamicSparsityPattern &dsp)
 {
   std::vector<types::global_dof_index> cell_dofs(fe->n_dofs_per_cell());
@@ -921,7 +913,7 @@ MetricFlowSystem<dim, spacedim>::build_junction_sparsity(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::build_rcr_sparsity(DynamicSparsityPattern &dsp)
+BloodFlowSystem<dim, spacedim>::build_rcr_sparsity(DynamicSparsityPattern &dsp)
 {
   for (const auto &cell : dof_handler.active_cell_iterators())
     {
@@ -957,7 +949,7 @@ MetricFlowSystem<dim, spacedim>::build_rcr_sparsity(DynamicSparsityPattern &dsp)
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::build_trace_continuity_sparsity(
+BloodFlowSystem<dim, spacedim>::build_trace_continuity_sparsity(
   DynamicSparsityPattern &dsp)
 {
   // The duplicate side is always a locally owned cell's own pair, so these
@@ -981,7 +973,7 @@ MetricFlowSystem<dim, spacedim>::build_trace_continuity_sparsity(
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::build_extended_sparsity_pattern()
+BloodFlowSystem<dim, spacedim>::build_extended_sparsity_pattern()
 {
   TimerOutput::Scope timer(computing_timer, "build_extended_sparsity_pattern");
 
@@ -1013,7 +1005,7 @@ MetricFlowSystem<dim, spacedim>::build_extended_sparsity_pattern()
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::setup_system()
+BloodFlowSystem<dim, spacedim>::setup_system()
 {
   TimerOutput::Scope timer(computing_timer, "setup_system");
 
@@ -1143,7 +1135,7 @@ MetricFlowSystem<dim, spacedim>::setup_system()
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::initialize_terminal_capacitors()
+BloodFlowSystem<dim, spacedim>::initialize_terminal_capacitors()
 {
   terminal_Pc_storage.clear();
 
@@ -1174,8 +1166,8 @@ MetricFlowSystem<dim, spacedim>::initialize_terminal_capacitors()
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::compute_initial_solution(VectorType &dst,
-                                                          const double /*t*/)
+BloodFlowSystem<dim, spacedim>::compute_initial_solution(VectorType &dst,
+                                                         const double /*t*/)
 {
   TimerOutput::Scope timer(computing_timer, "compute_initial_solution");
 
@@ -1245,8 +1237,8 @@ MetricFlowSystem<dim, spacedim>::compute_initial_solution(VectorType &dst,
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::initialize_trace_unknowns(VectorType  &sol,
-                                                           const double t)
+BloodFlowSystem<dim, spacedim>::initialize_trace_unknowns(VectorType  &sol,
+                                                          const double t)
 {
   TimerOutput::Scope timer(computing_timer, "initialize_trace_unknowns");
 
@@ -1363,7 +1355,7 @@ MetricFlowSystem<dim, spacedim>::initialize_trace_unknowns(VectorType  &sol,
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::build_per_cell_mass_inv()
+BloodFlowSystem<dim, spacedim>::build_per_cell_mass_inv()
 {
   TimerOutput::Scope timer(computing_timer, "build_per_cell_mass_inv");
 
@@ -1432,7 +1424,7 @@ MetricFlowSystem<dim, spacedim>::build_per_cell_mass_inv()
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::open_csv_files()
+BloodFlowSystem<dim, spacedim>::open_csv_files()
 {
   const std::string dir =
     output_directory + (output_directory.empty() ? "" : "/");
@@ -1500,8 +1492,8 @@ MetricFlowSystem<dim, spacedim>::open_csv_files()
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::write_csv_row(const double      t,
-                                               const VectorType &sol)
+BloodFlowSystem<dim, spacedim>::write_csv_row(const double      t,
+                                              const VectorType &sol)
 {
   const unsigned int dofs_per_cell = fe->n_dofs_per_cell();
 
@@ -1548,7 +1540,7 @@ MetricFlowSystem<dim, spacedim>::write_csv_row(const double      t,
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::close_csv_files()
+BloodFlowSystem<dim, spacedim>::close_csv_files()
 {
   for (auto &kv : csv_vessel)
     if (kv.second.is_open())
@@ -1560,16 +1552,16 @@ MetricFlowSystem<dim, spacedim>::close_csv_files()
 // ============================================================================
 template <int dim, int spacedim>
 std::array<double, 2>
-MetricFlowSystem<dim, spacedim>::hll_flux(const double       bn_L,
-                                          const double       bn_R,
-                                          const double       A_L,
-                                          const double       U_L,
-                                          const double       A_R,
-                                          const double       U_R,
-                                          const unsigned int vid_L,
-                                          const unsigned int vid_R,
-                                          const double       ad_L,
-                                          const double       ad_R) const
+BloodFlowSystem<dim, spacedim>::hll_flux(const double       bn_L,
+                                         const double       bn_R,
+                                         const double       A_L,
+                                         const double       U_L,
+                                         const double       A_R,
+                                         const double       U_R,
+                                         const unsigned int vid_L,
+                                         const unsigned int vid_R,
+                                         const double       ad_L,
+                                         const double       ad_R) const
 {
   const double c_L   = compute_wave_speed(A_L, vid_L, ad_L);
   const double c_R   = compute_wave_speed(A_R, vid_R, ad_R);
@@ -1604,20 +1596,20 @@ MetricFlowSystem<dim, spacedim>::hll_flux(const double       bn_L,
 // ============================================================================
 template <int dim, int spacedim>
 std::array<double, 2>
-MetricFlowSystem<dim, spacedim>::hll_flux_jac(const double       bn_L,
-                                              const double       bn_R,
-                                              const double       A_L,
-                                              const double       U_L,
-                                              const double       A_R,
-                                              const double       U_R,
-                                              const double       dA_L,
-                                              const double       dU_L,
-                                              const double       dA_R,
-                                              const double       dU_R,
-                                              const unsigned int vid_L,
-                                              const unsigned int vid_R,
-                                              const double       ad_L,
-                                              const double       ad_R) const
+BloodFlowSystem<dim, spacedim>::hll_flux_jac(const double       bn_L,
+                                             const double       bn_R,
+                                             const double       A_L,
+                                             const double       U_L,
+                                             const double       A_R,
+                                             const double       U_R,
+                                             const double       dA_L,
+                                             const double       dU_L,
+                                             const double       dA_R,
+                                             const double       dU_R,
+                                             const unsigned int vid_L,
+                                             const unsigned int vid_R,
+                                             const double       ad_L,
+                                             const double       ad_R) const
 {
   const double c_L   = compute_wave_speed(A_L, vid_L, ad_L);
   const double c_R   = compute_wave_speed(A_R, vid_R, ad_R);
@@ -1654,16 +1646,16 @@ MetricFlowSystem<dim, spacedim>::hll_flux_jac(const double       bn_L,
 
 template <int dim, int spacedim>
 std::array<double, 2>
-MetricFlowSystem<dim, spacedim>::hll_hdg_flux(const double bn_L,
-                                              const double /*bn_R*/,
-                                              const double A_L,
-                                              const double U_L, // interior U_e
-                                              const double A_R,
-                                              const double U_R, // trace U_b
-                                              const unsigned int /*vid_L*/,
-                                              const unsigned int vid_R,
-                                              const double /*ad_L*/,
-                                              const double ad_R) const
+BloodFlowSystem<dim, spacedim>::hll_hdg_flux(const double bn_L,
+                                             const double /*bn_R*/,
+                                             const double A_L,
+                                             const double U_L, // interior U_e
+                                             const double A_R,
+                                             const double U_R, // trace U_b
+                                             const unsigned int /*vid_L*/,
+                                             const unsigned int vid_R,
+                                             const double /*ad_L*/,
+                                             const double ad_R) const
 {
   // Stabilization from TRACE state only (eq. 37 of Vila-Perez et
   // al.)
@@ -1684,7 +1676,7 @@ MetricFlowSystem<dim, spacedim>::hll_hdg_flux(const double bn_L,
 
 template <int dim, int spacedim>
 std::array<double, 2>
-MetricFlowSystem<dim, spacedim>::hll_hdg_flux_jac(
+BloodFlowSystem<dim, spacedim>::hll_hdg_flux_jac(
   const double bn_L,
   const double /*bn_R*/,
   const double A_L,
@@ -1734,16 +1726,16 @@ MetricFlowSystem<dim, spacedim>::hll_hdg_flux_jac(
 // ============================================================================
 template <int dim, int spacedim>
 std::array<double, 2>
-MetricFlowSystem<dim, spacedim>::lf_flux(const double       bn_L,
-                                         const double       bn_R,
-                                         const double       A_L,
-                                         const double       U_L,
-                                         const double       A_R,
-                                         const double       U_R,
-                                         const unsigned int vid_L,
-                                         const unsigned int vid_R,
-                                         const double       ad_L,
-                                         const double       ad_R) const
+BloodFlowSystem<dim, spacedim>::lf_flux(const double       bn_L,
+                                        const double       bn_R,
+                                        const double       A_L,
+                                        const double       U_L,
+                                        const double       A_R,
+                                        const double       U_R,
+                                        const unsigned int vid_L,
+                                        const unsigned int vid_R,
+                                        const double       ad_L,
+                                        const double       ad_R) const
 {
   const double FAL = scalar_area_flux(bn_L, A_L, U_L);
   const double FUL = scalar_momentum_flux(
@@ -1764,20 +1756,20 @@ MetricFlowSystem<dim, spacedim>::lf_flux(const double       bn_L,
 // ============================================================================
 template <int dim, int spacedim>
 std::array<double, 2>
-MetricFlowSystem<dim, spacedim>::lf_flux_jac(const double       bn_L,
-                                             const double       bn_R,
-                                             const double       A_L,
-                                             const double       U_L,
-                                             const double       A_R,
-                                             const double       U_R,
-                                             const double       dA_L,
-                                             const double       dU_L,
-                                             const double       dA_R,
-                                             const double       dU_R,
-                                             const unsigned int vid_L,
-                                             const unsigned int vid_R,
-                                             const double       ad_L,
-                                             const double       ad_R) const
+BloodFlowSystem<dim, spacedim>::lf_flux_jac(const double       bn_L,
+                                            const double       bn_R,
+                                            const double       A_L,
+                                            const double       U_L,
+                                            const double       A_R,
+                                            const double       U_R,
+                                            const double       dA_L,
+                                            const double       dU_L,
+                                            const double       dA_R,
+                                            const double       dU_R,
+                                            const unsigned int vid_L,
+                                            const unsigned int vid_R,
+                                            const double       ad_L,
+                                            const double       ad_R) const
 {
   const double c2L = compute_wave_speed(A_L, vid_L, ad_L);
   const double c2R = compute_wave_speed(A_R, vid_R, ad_R);
@@ -1798,7 +1790,7 @@ MetricFlowSystem<dim, spacedim>::lf_flux_jac(const double       bn_L,
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_cell_residuals(
+BloodFlowSystem<dim, spacedim>::assemble_cell_residuals(
   const double t,
   const VectorType & /*y*/,
   VectorType &F)
@@ -1811,6 +1803,10 @@ MetricFlowSystem<dim, spacedim>::assemble_cell_residuals(
   // its ghost neighbours.
   const VectorType &y_cell = y_fe_relevant;
 
+  const FEValuesExtractors::Scalar area_extractor(0);
+  const FEValuesExtractors::Scalar velocity_extractor(1);
+  const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
+  const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
   const QGauss<dim>     quad_cell(fe->tensor_degree() + 1);
   const QGauss<dim - 1> quad_face(fe->tensor_degree() + 1);
@@ -1958,7 +1954,7 @@ MetricFlowSystem<dim, spacedim>::assemble_cell_residuals(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_trace_interior_equations(
+BloodFlowSystem<dim, spacedim>::assemble_trace_interior_equations(
   const VectorType &y,
   VectorType       &F)
 {
@@ -1971,6 +1967,10 @@ MetricFlowSystem<dim, spacedim>::assemble_trace_interior_equations(
   // its ghost neighbours.
   const VectorType &y_cell = y_fe_relevant;
 
+  const FEValuesExtractors::Scalar area_extractor(0);
+  const FEValuesExtractors::Scalar velocity_extractor(1);
+  // const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
+  // const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
   const QGauss<dim - 1> quad_face(1); // each 1-D face is a single 0-D point
   FEFaceValues<dim, spacedim> fef(*fe,
@@ -2066,7 +2066,7 @@ MetricFlowSystem<dim, spacedim>::assemble_trace_interior_equations(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_trace_boundary_equations(
+BloodFlowSystem<dim, spacedim>::assemble_trace_boundary_equations(
   const double      t,
   const VectorType &y,
   VectorType       &F)
@@ -2080,6 +2080,10 @@ MetricFlowSystem<dim, spacedim>::assemble_trace_boundary_equations(
   // its ghost neighbours.
   const VectorType &y_cell = y_fe_relevant;
 
+  const FEValuesExtractors::Scalar area_extractor(0);
+  const FEValuesExtractors::Scalar velocity_extractor(1);
+  const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
+  const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
   const QGauss<dim - 1>       quad_face(1);
   FEFaceValues<dim, spacedim> fef(*fe, quad_face, update_values);
@@ -2131,9 +2135,7 @@ MetricFlowSystem<dim, spacedim>::assemble_trace_boundary_equations(
               res_A = A_hat_cur * U_hat_cur - Q_in;
               res_U = (U_hat_cur - 4.0 * (c_hat - c0)) - W2_int;
             }
-          else if ((outlet_type == "RCR" ||
-                    outlet_type == "Single Resistance") &&
-                   rcr_map.count(bid) &&
+          else if (outlet_type == "RCR" && rcr_map.count(bid) &&
                    (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
 
             {
@@ -2182,7 +2184,7 @@ MetricFlowSystem<dim, spacedim>::assemble_trace_boundary_equations(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_rcr_capacitor_equations(
+BloodFlowSystem<dim, spacedim>::assemble_rcr_capacitor_equations(
   const VectorType &y,
   const VectorType &ydot,
   VectorType       &F)
@@ -2253,7 +2255,7 @@ MetricFlowSystem<dim, spacedim>::assemble_rcr_capacitor_equations(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_trace_junction_equations(
+BloodFlowSystem<dim, spacedim>::assemble_trace_junction_equations(
   const VectorType &y,
   VectorType       &F)
 {
@@ -2269,6 +2271,10 @@ MetricFlowSystem<dim, spacedim>::assemble_trace_junction_equations(
   // its ghost neighbours.
   const VectorType &y_cell = y_fe_relevant;
 
+  const FEValuesExtractors::Scalar area_extractor(0);
+  const FEValuesExtractors::Scalar velocity_extractor(1);
+  const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
+  const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
   const QGauss<dim - 1>       quad_face(1);
   FEFaceValues<dim, spacedim> fef(*fe, quad_face, update_values);
@@ -2414,7 +2420,7 @@ MetricFlowSystem<dim, spacedim>::assemble_trace_junction_equations(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_trace_continuity_equations(
+BloodFlowSystem<dim, spacedim>::assemble_trace_continuity_equations(
   const VectorType &y,
   VectorType       &F)
 {
@@ -2433,7 +2439,7 @@ MetricFlowSystem<dim, spacedim>::assemble_trace_continuity_equations(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_continuity_block()
+BloodFlowSystem<dim, spacedim>::assemble_jacobian_trace_continuity_block()
 {
   // Owned by construction: the duplicate side is a locally owned cell's own
   // pair.  The canonical column may belong to another rank, which is fine --
@@ -2457,10 +2463,10 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_continuity_block()
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_residual(const double      t,
-                                                   const VectorType &y,
-                                                   const VectorType &ydot,
-                                                   VectorType       &residual)
+BloodFlowSystem<dim, spacedim>::assemble_residual(const double      t,
+                                                  const VectorType &y,
+                                                  const VectorType &ydot,
+                                                  VectorType       &residual)
 {
   TimerOutput::Scope timer(computing_timer, "assemble_residual");
   if (verbosity > 1)
@@ -2531,10 +2537,10 @@ MetricFlowSystem<dim, spacedim>::assemble_residual(const double      t,
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_jacobian(const double      t,
-                                                   const VectorType &y,
-                                                   const VectorType & /*ydot*/,
-                                                   const double alpha)
+BloodFlowSystem<dim, spacedim>::assemble_jacobian(const double      t,
+                                                  const VectorType &y,
+                                                  const VectorType & /*ydot*/,
+                                                  const double alpha)
 {
   TimerOutput::Scope timer(computing_timer, "assemble_jacobian");
   if (verbosity > 1)
@@ -2589,7 +2595,7 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian(const double      t,
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_jacobian_cell_block(
+BloodFlowSystem<dim, spacedim>::assemble_jacobian_cell_block(
   const double t,
   const VectorType & /*y*/)
 {
@@ -2601,6 +2607,10 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_cell_block(
   // its ghost neighbours.
   const VectorType &y_cell = y_fe_relevant;
 
+  const FEValuesExtractors::Scalar area_extractor(0);
+  const FEValuesExtractors::Scalar velocity_extractor(1);
+  const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
+  const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
   const QGauss<dim>     quad_cell(fe->tensor_degree() + 1);
   const QGauss<dim - 1> quad_face(fe->tensor_degree() + 1);
@@ -2790,7 +2800,7 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_cell_block(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_interior_block(
+BloodFlowSystem<dim, spacedim>::assemble_jacobian_trace_interior_block(
   const VectorType &y)
 {
   TimerOutput::Scope timer(computing_timer,
@@ -2802,6 +2812,10 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_interior_block(
   // its ghost neighbours.
   const VectorType &y_cell = y_fe_relevant;
 
+  const FEValuesExtractors::Scalar area_extractor(0);
+  const FEValuesExtractors::Scalar velocity_extractor(1);
+  const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
+  const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
   const QGauss<dim - 1>       quad_face(1);
   FEFaceValues<dim, spacedim> fef(*fe,
@@ -3004,7 +3018,7 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_interior_block(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_boundary_block(
+BloodFlowSystem<dim, spacedim>::assemble_jacobian_trace_boundary_block(
   const double      t,
   const VectorType &y)
 {
@@ -3017,6 +3031,10 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_boundary_block(
   // its ghost neighbours.
   const VectorType &y_cell = y_fe_relevant;
 
+  const FEValuesExtractors::Scalar area_extractor(0);
+  const FEValuesExtractors::Scalar velocity_extractor(1);
+  const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
+  const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
   const QGauss<dim - 1>       quad_face(1);
   FEFaceValues<dim, spacedim> fef(*fe, quad_face, update_values);
@@ -3096,9 +3114,7 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_boundary_block(
                                       -(phi_U - 4.0 * dc_int * phi_A));
                 }
             }
-          else if ((outlet_type == "RCR" ||
-                    outlet_type == "Single Resistance") &&
-                   rcr_map.count(bid) &&
+          else if (outlet_type == "RCR" && rcr_map.count(bid) &&
                    (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
 
             {
@@ -3201,7 +3217,7 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_boundary_block(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_jacobian_rcr_capacitor_block(
+BloodFlowSystem<dim, spacedim>::assemble_jacobian_rcr_capacitor_block(
   const VectorType &y)
 {
   if (rcr_pc_dof.empty())
@@ -3242,7 +3258,7 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_rcr_capacitor_block(
 
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_junction_block(
+BloodFlowSystem<dim, spacedim>::assemble_jacobian_trace_junction_block(
   const VectorType &y)
 {
   TimerOutput::Scope timer(computing_timer,
@@ -3254,6 +3270,10 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_junction_block(
   // its ghost neighbours.
   const VectorType &y_cell = y_fe_relevant;
 
+  const FEValuesExtractors::Scalar area_extractor(0);
+  const FEValuesExtractors::Scalar velocity_extractor(1);
+  const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
+  const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
   const QGauss<dim - 1>       quad_face(1);
   FEFaceValues<dim, spacedim> fef(*fe, quad_face, update_values);
@@ -3390,8 +3410,8 @@ MetricFlowSystem<dim, spacedim>::assemble_jacobian_trace_junction_block(
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::compute_pressure(const VectorType &y,
-                                                  VectorType       &p) const
+BloodFlowSystem<dim, spacedim>::compute_pressure(const VectorType &y,
+                                                 VectorType       &p) const
 {
   TimerOutput::Scope timer(computing_timer, "compute_pressure");
 
@@ -3431,9 +3451,9 @@ MetricFlowSystem<dim, spacedim>::compute_pressure(const VectorType &y,
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::output_results(const VectorType  &y,
-                                                const VectorType  &pressure_vec,
-                                                const unsigned int cycle) const
+BloodFlowSystem<dim, spacedim>::output_results(const VectorType  &y,
+                                               const VectorType  &pressure_vec,
+                                               const unsigned int cycle) const
 {
   TimerOutput::Scope timer(computing_timer, "output_results");
 
@@ -3507,7 +3527,7 @@ MetricFlowSystem<dim, spacedim>::output_results(const VectorType  &y,
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::compute_errors(const unsigned int k)
+BloodFlowSystem<dim, spacedim>::compute_errors(const unsigned int k)
 {
   TimerOutput::Scope timer(computing_timer, "compute_errors");
 
@@ -3593,9 +3613,9 @@ MetricFlowSystem<dim, spacedim>::compute_errors(const unsigned int k)
 // ============================================================================
 template <int dim, int spacedim>
 void
-MetricFlowSystem<dim, spacedim>::run()
+BloodFlowSystem<dim, spacedim>::run()
 {
-  pcout << "=== Metric Flow HDG, polynomial degree p = " << fe_degree
+  pcout << "=== Blood Flow HDG, polynomial degree p = " << fe_degree
         << ", running on " << n_mpi_processes << " MPI rank(s) ===\n";
 
   for (unsigned int cycle = 0; cycle < n_refinement_cycles; ++cycle)
@@ -3805,4 +3825,4 @@ MetricFlowSystem<dim, spacedim>::run()
 }
 
 // Explicit instantiation
-template class MetricFlowSystem<1, 3>;
+template class BloodFlowSystem<1, 3>;

@@ -8,13 +8,14 @@
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/tria.h>
 
+#include <metric_flow_x/blood_flow_system.h>
+#include <metric_flow_x/io/vtk_utils.h>
+
 #include <filesystem>
 #include <fstream>
 #include <map>
 
-#include "metric_flow_system.h"
 #include "tests.h"
-#include "vtk_utils.h"
 
 using namespace dealii;
 

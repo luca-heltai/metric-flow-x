@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------
 
 
-#include "function.h"
+#include <metric_flow_x/parsed_tools/function.h>
 
 using namespace dealii;
 
