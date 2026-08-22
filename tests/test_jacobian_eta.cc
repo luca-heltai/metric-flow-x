@@ -48,6 +48,7 @@
 #include "tests.h"
 
 using namespace dealii;
+using namespace MetricFlowX;
 
 void
 test()
@@ -84,10 +85,10 @@ test()
   // the plain, locally-owned-only vectors those functions are actually
   // written against -- the same shape IDA itself hands them at runtime.
 
-  VectorType ydot(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType ydot(problem.locally_owned_dofs_, problem.mpi_communicator_);
   ydot = 0.0;
 
-  VectorType residual(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType residual(problem.locally_owned_dofs_, problem.mpi_communicator_);
 
   // ── Evaluate residual and Jacobian at the equilibrium ────────────────────
   // assemble_jacobian() resets jacobian_matrix to zero and reassembles every
@@ -102,22 +103,22 @@ test()
   // A parallel PETSc vector only allows direct indexing for entries this
   // rank owns (or holds as a ghost); looping the full global range with
   // operator[] on every rank, as the serial version did, isn't valid here,
-  // and summing beyond locally_owned_dofs would double-count anything also
+  // and summing beyond locally_owned_dofs_ would double-count anything also
   // visible as a ghost. There's no member named n_trace_end on
   // BloodFlowSystem (it doesn't exist -- checked against the header); the
   // actual FE/capacitor boundary the header documents is
-  // dof_handler.n_dofs(): rows before it are the cell (differential) and
+  // dof_handler_.n_dofs(): rows before it are the cell (differential) and
   // trace (algebraic) unknowns, rows at or after it are the RCR capacitor
   // pressures.
-  const types::global_dof_index first_pc    = problem.dof_handler.n_dofs();
+  const types::global_dof_index first_pc    = problem.dof_handler_.n_dofs();
   double                        pc_sq_local = 0.0, rest_sq_local = 0.0;
-  for (const auto i : problem.locally_owned_dofs)
+  for (const auto i : problem.locally_owned_dofs_)
     (i >= first_pc ? pc_sq_local : rest_sq_local) += residual(i) * residual(i);
 
   const double rest_sq =
-    Utilities::MPI::sum(rest_sq_local, problem.mpi_communicator);
+    Utilities::MPI::sum(rest_sq_local, problem.mpi_communicator_);
   const double pc_sq =
-    Utilities::MPI::sum(pc_sq_local, problem.mpi_communicator);
+    Utilities::MPI::sum(pc_sq_local, problem.mpi_communicator_);
 
   // residual.l2_norm(), unlike the manual split above, is a built-in PETSc
   // vector operation and is already a proper MPI-collective reduction --
@@ -125,9 +126,9 @@ test()
   const double residual_l2_norm = residual.l2_norm();
 
   // ── J · ones, dot with ones ──────────────────────────────────────────────
-  VectorType ones(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType ones(problem.locally_owned_dofs_, problem.mpi_communicator_);
   ones = 1.0;
-  VectorType Jdw(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType Jdw(problem.locally_owned_dofs_, problem.mpi_communicator_);
   problem.jacobian_matrix.vmult(Jdw, ones);
 
   // Vector::operator* (the dot product) is also a built-in PETSc collective
@@ -149,14 +150,14 @@ test()
     const double xi  = problem.par["xi"];
     const double eta = 2.0 * (xi + 2.0) * numbers::PI * mu / rho;
 
-    // Restricted to locally owned cells: the triangulation is a fully
+    // Restricted to locally owned cells: the triangulation_ is a fully
     // distributed one here, so each cell exists on exactly one rank (plus
     // possibly as a ghost elsewhere) -- unlike the mesh-wide metadata setup
     // in create_triangulation(), this is an integral, and every cell must
     // be counted exactly once, so the is_locally_owned() restriction is
     // correct. What was missing is reducing the resulting partial sums
     // across ranks before printing.
-    for (const auto &cell : problem.triangulation.active_cell_iterators())
+    for (const auto &cell : problem.triangulation_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
@@ -168,11 +169,11 @@ test()
       }
   }
   const double expected =
-    Utilities::MPI::sum(expected_local, problem.mpi_communicator);
+    Utilities::MPI::sum(expected_local, problem.mpi_communicator_);
 
   // Every quantity above is already a global, rank-identical value, so
   // print once instead of once per rank.
-  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
     {
       deallog << "rest residual=" << std::sqrt(rest_sq)
               << "  pc=" << std::sqrt(pc_sq) << std::endl;

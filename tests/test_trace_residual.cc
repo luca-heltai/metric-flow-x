@@ -18,8 +18,8 @@
 // This verifies that the Newton solve converged correctly and that
 // the initial condition is consistent before IDA even starts.
 //
-// Parallel: problem.triangulation is a parallel::fullydistributed
-// triangulation, so mesh loading goes through problem.create_triangulation()
+// Parallel: problem.triangulation_ is a parallel::fullydistributed
+// triangulation_, so mesh loading goes through problem.create_triangulation()
 // rather than attaching GridIn by hand. assemble_trace_*_equations() read
 // from the ghosted y_relevant member (populated via update_ghosted_vectors),
 // not directly from solution -- interior/junction equations touch DOFs on
@@ -39,6 +39,7 @@
 #include "tests.h"
 
 using namespace dealii;
+using namespace MetricFlowX;
 
 void
 test()
@@ -61,7 +62,7 @@ test()
   {
     problem.update_ghosted_vectors(problem.solution);
 
-    VectorType F_before(problem.locally_owned_dofs, problem.mpi_communicator);
+    VectorType F_before(problem.locally_owned_dofs_, problem.mpi_communicator_);
     F_before = 0.0;
     problem.assemble_trace_interior_equations(problem.y_relevant, F_before);
     problem.assemble_trace_boundary_equations(problem.time,
@@ -75,9 +76,9 @@ test()
       norm_before_local += F_before(i) * F_before(i);
 
     const double norm_before = std::sqrt(
-      Utilities::MPI::sum(norm_before_local, problem.mpi_communicator));
+      Utilities::MPI::sum(norm_before_local, problem.mpi_communicator_));
 
-    if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+    if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
       deallog << "Trace residual BEFORE initialize_trace_unknowns: "
               << norm_before << std::endl;
   }
@@ -89,7 +90,7 @@ test()
   {
     problem.update_ghosted_vectors(problem.solution);
 
-    VectorType F_after(problem.locally_owned_dofs, problem.mpi_communicator);
+    VectorType F_after(problem.locally_owned_dofs_, problem.mpi_communicator_);
     F_after = 0.0;
     problem.assemble_trace_interior_equations(problem.y_relevant, F_after);
     problem.assemble_trace_boundary_equations(problem.time,
@@ -103,9 +104,9 @@ test()
       norm_after_local += F_after(i) * F_after(i);
 
     const double norm_after = std::sqrt(
-      Utilities::MPI::sum(norm_after_local, problem.mpi_communicator));
+      Utilities::MPI::sum(norm_after_local, problem.mpi_communicator_));
 
-    if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+    if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
       deallog << "Trace residual AFTER initialize_trace_unknowns:  "
               << norm_after << std::endl;
 
@@ -114,7 +115,7 @@ test()
                            "trace residual is not zero."));
   }
 
-  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
     deallog << "initialize_trace_unknowns PASSED." << std::endl;
 }
 

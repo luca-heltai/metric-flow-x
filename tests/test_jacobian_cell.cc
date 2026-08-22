@@ -26,6 +26,7 @@
 #include "tests.h"
 
 using namespace dealii;
+using namespace MetricFlowX;
 
 void
 test()
@@ -65,14 +66,14 @@ test()
 
   const double eps = 1e-8;
 
-  VectorType yp(problem.locally_owned_dofs, problem.mpi_communicator);
-  VectorType ym(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType yp(problem.locally_owned_dofs_, problem.mpi_communicator_);
+  VectorType ym(problem.locally_owned_dofs_, problem.mpi_communicator_);
 
-  VectorType Fp(problem.locally_owned_dofs, problem.mpi_communicator);
-  VectorType Fm(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType Fp(problem.locally_owned_dofs_, problem.mpi_communicator_);
+  VectorType Fm(problem.locally_owned_dofs_, problem.mpi_communicator_);
 
-  VectorType ej(problem.locally_owned_dofs, problem.mpi_communicator);
-  VectorType Jcol(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType ej(problem.locally_owned_dofs_, problem.mpi_communicator_);
+  VectorType Jcol(problem.locally_owned_dofs_, problem.mpi_communicator_);
 
   double       l2_sq_local = 0.0;
   const double h           = eps;
@@ -92,7 +93,7 @@ test()
     {
       // ---- +h: perturb, ghost, assemble, all before touching -h ----------
       yp = problem.solution;
-      if (problem.locally_owned_dofs.is_element(j))
+      if (problem.locally_owned_dofs_.is_element(j))
         yp(j) = yp(j) + h;
       yp.compress(VectorOperation::insert);
       problem.update_ghosted_vectors(yp);
@@ -103,7 +104,7 @@ test()
 
       // ---- -h: perturb, ghost, assemble ------------------------------------
       ym = problem.solution;
-      if (problem.locally_owned_dofs.is_element(j))
+      if (problem.locally_owned_dofs_.is_element(j))
         ym(j) = ym(j) - h;
       ym.compress(VectorOperation::insert);
       problem.update_ghosted_vectors(ym);
@@ -114,7 +115,7 @@ test()
 
       // ---- j-th unit vector, then the analytic column via vmult -----------
       ej = 0.0;
-      if (problem.locally_owned_dofs.is_element(j))
+      if (problem.locally_owned_dofs_.is_element(j))
         ej(j) = 1.0;
       ej.compress(VectorOperation::insert);
 
@@ -126,7 +127,7 @@ test()
       // rows are never touched by either function, so checking them here
       // would just compare zero against zero and never actually exercise
       // the cell Jacobian block this test is named for.
-      for (const auto i : problem.locally_owned_dofs)
+      for (const auto i : problem.locally_owned_dofs_)
         {
           if (!problem.cell_dofs_owned.is_element(i))
             continue;
@@ -140,7 +141,7 @@ test()
     }
 
   const double l2_sq =
-    Utilities::MPI::sum(l2_sq_local, problem.mpi_communicator);
+    Utilities::MPI::sum(l2_sq_local, problem.mpi_communicator_);
 
   // Find the globally worst row via MPI_MAXLOC: each rank first finds its
   // own worst among the rows it owns, then one small reduction picks the
@@ -164,13 +165,13 @@ test()
                 1,
                 MPI_DOUBLE_INT,
                 MPI_MAXLOC,
-                problem.mpi_communicator);
+                problem.mpi_communicator_);
 
   const types::global_dof_index worst_row =
     static_cast<types::global_dof_index>(global_worst.index);
   const double row_l2_error = std::sqrt(global_worst.value);
 
-  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
     {
       deallog << "L2_error = " << std::scientific << std::setprecision(6)
               << std::sqrt(l2_sq) << std::endl;

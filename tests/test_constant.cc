@@ -31,6 +31,7 @@
 #include "tests.h"
 
 using namespace dealii;
+using namespace MetricFlowX;
 
 void
 test()
@@ -59,10 +60,10 @@ test()
 
   problem.time = problem.ida_parameters.initial_time;
 
-  VectorType ydot(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType ydot(problem.locally_owned_dofs_, problem.mpi_communicator_);
   ydot = 0.0;
 
-  VectorType residual(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType residual(problem.locally_owned_dofs_, problem.mpi_communicator_);
 
 
   problem.assemble_residual(problem.time, problem.solution, ydot, residual);
@@ -82,17 +83,17 @@ test()
     rcr_sq_local += residual(i) * residual(i);
 
   const double cell_sq =
-    Utilities::MPI::sum(cell_sq_local, problem.mpi_communicator);
+    Utilities::MPI::sum(cell_sq_local, problem.mpi_communicator_);
 
   const double trace_sq =
-    Utilities::MPI::sum(trace_sq_local, problem.mpi_communicator);
+    Utilities::MPI::sum(trace_sq_local, problem.mpi_communicator_);
 
   // Note: Pc is initialized to p_d rather than the steady-state RCR value.
   // Consequently, the initial RCR residual is expected to be nonzero.
   const double rcr_sq =
-    Utilities::MPI::sum(rcr_sq_local, problem.mpi_communicator);
+    Utilities::MPI::sum(rcr_sq_local, problem.mpi_communicator_);
 
-  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
     {
       deallog << "Cell residual  = " << std::sqrt(cell_sq) << std::endl;
 

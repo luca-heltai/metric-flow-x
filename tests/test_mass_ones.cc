@@ -41,6 +41,7 @@
 #include "tests.h"
 
 using namespace dealii;
+using namespace MetricFlowX;
 
 void
 test()
@@ -66,10 +67,10 @@ test()
   // cells -- then reduced across ranks.
 
   double             L_local = 0.0;
-  const unsigned int n_dofs  = problem.fe->n_dofs_per_cell();
+  const unsigned int n_dofs  = problem.fe_->n_dofs_per_cell();
   Vector<double>     local_v(n_dofs), local_Mv(n_dofs);
 
-  for (const auto &cell : problem.dof_handler.active_cell_iterators())
+  for (const auto &cell : problem.dof_handler_.active_cell_iterators())
     {
       if (!cell->is_locally_owned())
         continue;
@@ -86,9 +87,9 @@ test()
         L_local += local_v(i) * local_Mv(i);
     }
 
-  const double L = Utilities::MPI::sum(L_local, problem.mpi_communicator);
+  const double L = Utilities::MPI::sum(L_local, problem.mpi_communicator_);
 
-  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
     deallog << "0.241370 + 0.241370 = " << L << std::endl;
 }
 

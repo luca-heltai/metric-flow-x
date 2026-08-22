@@ -23,6 +23,7 @@
 #include <stdexcept> // for std::invalid_argument
 
 using namespace dealii;
+using namespace MetricFlowX;
 
 int
 main(int argc, char **argv)

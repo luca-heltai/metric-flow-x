@@ -23,6 +23,7 @@
 #include "tests.h"
 
 using namespace dealii;
+using namespace MetricFlowX;
 
 void
 test()
@@ -55,13 +56,13 @@ test()
   // v is a distributed, non-ghosted VectorType (matches every other
   // write-only vector in the class, e.g. solution/residual_F): only owned
   // cells are touched, and every DOF of a locally owned cell is itself
-  // locally owned (no cross-rank continuity constraints on the cell block),
+  // locally owned (no cross-rank continuity constraints_ on the cell block),
   // so direct local writes are safe without ghost communication.
-  VectorType v(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType v(problem.locally_owned_dofs_, problem.mpi_communicator_);
   v = 0.0;
 
-  const unsigned int n_dofs = problem.fe->n_dofs_per_cell();
-  for (const auto &cell : problem.dof_handler.active_cell_iterators())
+  const unsigned int n_dofs = problem.fe_->n_dofs_per_cell();
+  for (const auto &cell : problem.dof_handler_.active_cell_iterators())
     {
       if (!cell->is_locally_owned())
         continue;
@@ -71,7 +72,7 @@ test()
       for (unsigned int i = 0; i < n_dofs; ++i)
         {
           // Only set the area component (component 0) DOFs to 1
-          if (problem.fe->system_to_component_index(i).first == 0)
+          if (problem.fe_->system_to_component_index(i).first == 0)
             v(ldofs[i]) = 1.0;
         }
     }
@@ -82,7 +83,7 @@ test()
   //     reduce across ranks.
   double         L_local = 0.0;
   Vector<double> local_v(n_dofs), local_Mv(n_dofs);
-  for (const auto &cell : problem.dof_handler.active_cell_iterators())
+  for (const auto &cell : problem.dof_handler_.active_cell_iterators())
     {
       if (!cell->is_locally_owned())
         continue;
@@ -99,12 +100,12 @@ test()
         L_local += local_v(i) * local_Mv(i);
     }
 
-  const double L = Utilities::MPI::sum(L_local, problem.mpi_communicator);
+  const double L = Utilities::MPI::sum(L_local, problem.mpi_communicator_);
 
-  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
     {
       deallog << "n_active_cells = "
-              << problem.triangulation.n_global_active_cells() << std::endl;
+              << problem.triangulation_.n_global_active_cells() << std::endl;
       deallog << "L: total domain length = " << L << std::endl;
     }
 }
