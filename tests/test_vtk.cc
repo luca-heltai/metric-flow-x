@@ -107,7 +107,8 @@ main()
   deallog.depth_console(10);
   try
     {
-      test<1, 3>("../../../../notebooks/bifurcation_physics.vtk");
+      test<1, 3>(std::string(METRIC_FLOW_X_SOURCE_DIR) +
+                 "/notebooks/bifurcation_physics.vtk");
     }
   catch (std::exception &e)
     {

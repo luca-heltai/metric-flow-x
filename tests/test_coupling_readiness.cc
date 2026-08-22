@@ -12,6 +12,7 @@ test()
 {
   BloodFlowSystem<1, 3> flow;
   flow.initialize_params(PRM_DIR "constant.prm");
+  deallog.depth_file(10);
   flow.setup();
 
   auto y     = flow.make_state();
@@ -23,6 +24,42 @@ test()
   flow.assemble_residual(0.0, y, y_dot, F);
   flow.assemble_state_jacobian(0.0, y, y_dot);
   flow.assemble_derivative_jacobian(0.0, y, y_dot);
+
+  auto direction = flow.make_state();
+  direction      = 0.0;
+  for (const auto i : flow.locally_owned_dofs())
+    direction(i) = 0.25;
+  direction.compress(VectorOperation::insert);
+
+  constexpr double epsilon = 1.0e-6;
+  auto             yp      = y;
+  auto             ym      = y;
+  yp.add(epsilon, direction);
+  ym.add(-epsilon, direction);
+  auto Fp = flow.make_state();
+  auto Fm = flow.make_state();
+  flow.assemble_residual(0.0, yp, y_dot, Fp);
+  flow.assemble_residual(0.0, ym, y_dot, Fm);
+  Fp -= Fm;
+  Fp /= 2.0 * epsilon;
+  auto Jy_direction = flow.make_state();
+  flow.state_jacobian_matrix().vmult(Jy_direction, direction);
+  const double state_fd_scale = std::max(1.0, Jy_direction.l2_norm());
+  Fp -= Jy_direction;
+  AssertThrow(Fp.l2_norm() / state_fd_scale < 1.0e-6, ExcInternalError());
+
+  auto ydot_p = y_dot;
+  auto ydot_m = y_dot;
+  ydot_p.add(epsilon, direction);
+  ydot_m.add(-epsilon, direction);
+  flow.assemble_residual(0.0, y, ydot_p, Fp);
+  flow.assemble_residual(0.0, y, ydot_m, Fm);
+  Fp -= Fm;
+  Fp /= 2.0 * epsilon;
+  auto Jydot_direction = flow.make_state();
+  flow.derivative_jacobian_matrix().vmult(Jydot_direction, direction);
+  Fp -= Jydot_direction;
+  AssertThrow(Fp.l2_norm() < 1.0e-10, ExcInternalError());
 
   AssertThrow(flow.triangulation().n_active_cells() > 0, ExcInternalError());
   AssertThrow(flow.dof_handler().n_dofs() > 0, ExcInternalError());
@@ -58,5 +95,6 @@ main(int argc, char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   initlog();
+  deallog.depth_file(10);
   test();
 }

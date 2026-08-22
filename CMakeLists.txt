@@ -66,7 +66,10 @@ target_link_libraries(blood_flow MetricFlowX::metric_flow_x)
 set(TEST_LIBRARIES MetricFlowX::metric_flow_x)
 set(METRIC_FLOW_X_PARAMETER_DIR
   "${CMAKE_CURRENT_BINARY_DIR}/parameters/")
-add_compile_definitions(PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/")
+add_compile_definitions(
+  PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/"
+  METRIC_FLOW_X_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
 
 # Add tests
 add_subdirectory(tests)

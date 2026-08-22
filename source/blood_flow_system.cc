@@ -59,7 +59,9 @@ namespace MetricFlowX
   // ==========================================================================
   template <int dim, int spacedim>
   BloodFlowSystem<dim, spacedim>::BloodFlowSystem(const MPI_Comm comm)
-    : mpi_communicator_(comm)
+    : ParameterAcceptor("BloodFlowSystem<" + std::to_string(dim) + ", " +
+                        std::to_string(spacedim) + ">")
+    , mpi_communicator_(comm)
     , n_mpi_processes(Utilities::MPI::n_mpi_processes(comm))
     , this_mpi_process(Utilities::MPI::this_mpi_process(comm))
     , pcout(std::cout, this_mpi_process == 0)
@@ -2732,57 +2734,20 @@ namespace MetricFlowX
   void
   BloodFlowSystem<dim, spacedim>::assemble_jacobian(const double      t,
                                                     const VectorType &y,
-                                                    const VectorType & /*ydot*/,
-                                                    const double alpha)
+                                                    const VectorType &ydot,
+                                                    const double      alpha)
   {
     TimerOutput::Scope timer(computing_timer, "assemble_jacobian");
     if (verbosity > 1)
       deallog.push("assemble_jacobian");
     deallog << "t=" << t << std::endl;
 
-    update_ghosted_vectors(y);
+    assemble_state_jacobian(t, y, ydot);
+    assemble_derivative_jacobian(t, y, ydot);
 
-    jacobian_matrix = 0.0;
+    jacobian_matrix.copy_from(state_jacobian_matrix_);
+    jacobian_matrix.add(alpha, derivative_jacobian_matrix_);
 
-    // ---- raw dR/dy ----------------------------------------------------------
-    assemble_jacobian_cell_block(t, y_relevant);
-    assemble_jacobian_trace_interior_block(y_relevant);
-    assemble_jacobian_trace_boundary_block(t, y_relevant);
-    assemble_jacobian_trace_junction_block(y_relevant);
-    assemble_jacobian_trace_continuity_block();
-    assemble_jacobian_rcr_capacitor_block(y_relevant);
-    jacobian_matrix.compress(VectorOperation::add);
-
-    // ---- negate: F = M*ydot - R_cell (cell) and F = -R_trace (trace), so
-    //      dF/dy = -dR/dy for both blocks.
-    jacobian_matrix *= -1.0;
-
-    // ---- add alpha*M on the cell block --------------------------------------
-    // M is M_K on the cell rows and exactly zero on the trace rows, which is
-    // what keeps the trace rows algebraic.
-    const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
-    std::vector<types::global_dof_index> ldofs(n_dofs);
-
-    for (const auto &cell : dof_handler_.active_cell_iterators())
-      {
-        if (!cell->is_locally_owned())
-          continue;
-
-        cell->get_dof_indices(ldofs);
-        const FullMatrix<double> &M_K =
-          per_cell_mass[cell->active_cell_index()];
-
-        for (unsigned int i = 0; i < n_dofs; ++i)
-          for (unsigned int j = 0; j < n_dofs; ++j)
-            jacobian_matrix.add(ldofs[i], ldofs[j], alpha * M_K(i, j));
-      }
-
-    // alpha * C on the capacitor diagonal, on the owning rank only.
-    for (const auto &[bid, pc_dof] : rcr_pc_dof)
-      if (locally_owned_dofs_.is_element(pc_dof))
-        jacobian_matrix.add(pc_dof, pc_dof, alpha * rcr_map.at(bid).C);
-
-    jacobian_matrix.compress(VectorOperation::add);
     if (verbosity > 1)
       deallog.pop();
   }
@@ -2794,7 +2759,18 @@ namespace MetricFlowX
     const VectorType &y,
     const VectorType &ydot)
   {
-    assemble_jacobian(t, y, ydot, 0.0);
+    (void)ydot;
+    update_ghosted_vectors(y);
+    jacobian_matrix = 0.0;
+    assemble_jacobian_cell_block(t, y_relevant);
+    assemble_jacobian_trace_interior_block(y_relevant);
+    assemble_jacobian_trace_boundary_block(t, y_relevant);
+    assemble_jacobian_trace_junction_block(y_relevant);
+    assemble_jacobian_trace_continuity_block();
+    assemble_jacobian_rcr_capacitor_block(y_relevant);
+    jacobian_matrix.compress(VectorOperation::add);
+    jacobian_matrix *= -1.0;
+    jacobian_matrix.compress(VectorOperation::insert);
     state_jacobian_matrix_.copy_from(jacobian_matrix);
   }
 
@@ -2805,11 +2781,30 @@ namespace MetricFlowX
     const VectorType &y,
     const VectorType &ydot)
   {
-    assemble_state_jacobian(t, y, ydot);
-    assemble_jacobian(t, y, ydot, 1.0);
+    (void)t;
+    (void)y;
+    (void)ydot;
+    derivative_jacobian_matrix_ = 0.0;
 
-    derivative_jacobian_matrix_.copy_from(jacobian_matrix);
-    derivative_jacobian_matrix_.add(-1.0, state_jacobian_matrix_);
+    const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
+    std::vector<types::global_dof_index> ldofs(n_dofs);
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      {
+        if (!cell->is_locally_owned())
+          continue;
+        cell->get_dof_indices(ldofs);
+        const FullMatrix<double> &M_K =
+          per_cell_mass[cell->active_cell_index()];
+        for (unsigned int i = 0; i < n_dofs; ++i)
+          for (unsigned int j = 0; j < n_dofs; ++j)
+            derivative_jacobian_matrix_.add(ldofs[i], ldofs[j], M_K(i, j));
+      }
+
+    for (const auto &[bid, pc_dof] : rcr_pc_dof)
+      if (locally_owned_dofs_.is_element(pc_dof))
+        derivative_jacobian_matrix_.add(pc_dof, pc_dof, rcr_map.at(bid).C);
+
+    derivative_jacobian_matrix_.compress(VectorOperation::add);
   }
 
   template <int dim, int spacedim>
@@ -3901,7 +3896,7 @@ namespace MetricFlowX
           pcout << "\n--- Refinement cycle " << cycle << " ---\n";
 
         if (cycle == 0)
-          create_triangulation();
+          setup();
         else
           {
             // The coarse mesh is gone by now, so refine the distributed mesh in
@@ -3912,12 +3907,15 @@ namespace MetricFlowX
             triangulation_.refine_global(1);
           }
 
-        setup_system();
         open_csv_files();
-        initialize_terminal_capacitors();
-        build_per_cell_mass_inv();
-        compute_initial_solution(solution, ida_parameters.initial_time);
-        initialize_trace_unknowns(solution, ida_parameters.initial_time);
+        if (cycle > 0)
+          {
+            setup_system();
+            initialize_terminal_capacitors();
+            build_per_cell_mass_inv();
+          }
+        initialize_state(solution, ida_parameters.initial_time);
+        initialize_state_derivative(solution_dot, ida_parameters.initial_time);
         time = ida_parameters.initial_time;
 
         // ---- finite-difference Jacobian check
