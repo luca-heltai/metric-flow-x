@@ -89,7 +89,7 @@ namespace MetricFlowX
                      ",t")
     , exact_solution(
         "Functions",
-        "1e-4; 0.0",
+        "1e-4; 0.0; 0.0; 0.0",
         "Exact solution",
         par,
         dealii::FunctionParser<spacedim>::default_variable_names() + ",t")
@@ -3801,6 +3801,19 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::compute_errors(const unsigned int k)
   {
     TimerOutput::Scope timer(computing_timer, "compute_errors");
+
+    // Existing parameter files describe only the physical (A,U) fields.  The
+    // HDG state now also contains trace fields, so such an exact solution is
+    // not dimensionally compatible with the four-component finite element.
+    // Keep those runs usable and reserve error integration for a matching
+    // manufactured solution.
+    if (exact_solution.n_components != fe_->n_components())
+      {
+        pcout << "Skipping error computation: exact solution has "
+              << exact_solution.n_components << " components, while the finite"
+              << " element has " << fe_->n_components() << "." << std::endl;
+        return;
+      }
 
     // The FE has 4 components (A, U, A_hat, U_hat), so the masks select out of
     // 4 and `exact_solution` must be a 4-component Function; components 2,3 are
