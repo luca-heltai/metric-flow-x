@@ -8,8 +8,9 @@
 //
 // Output:
 //   L2_error       — ||J_an - J_fd||_F  over all (cell-row, any-col) entries
-//   worst_row      — row index with the largest per-row L2 error
-//   row_L2_error   — ||J_an[worst_row,:] - J_fd[worst_row,:]||_2
+//   row_L2_error   — largest per-row ||J_an - J_fd||_2; the row index is not
+//                    printed because equivalent maxima can have different
+//                    indices across MPI/architecture combinations
 // ---------------------------------------------------------------------
 
 #include <deal.II/base/mpi.h>
@@ -167,15 +168,12 @@ test()
                 MPI_MAXLOC,
                 problem.mpi_communicator_);
 
-  const types::global_dof_index worst_row =
-    static_cast<types::global_dof_index>(global_worst.index);
   const double row_l2_error = std::sqrt(global_worst.value);
 
   if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
     {
       deallog << "L2_error = " << std::scientific << std::setprecision(6)
               << std::sqrt(l2_sq) << std::endl;
-      deallog << "worst_row = " << worst_row << std::endl;
       deallog << "row_L2_error = " << std::scientific << std::setprecision(6)
               << row_l2_error << std::endl;
     }
