@@ -1,25 +1,40 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.23)
+cmake_minimum_required(VERSION 3.23)
 
-FIND_PACKAGE(deal.II 9.5.0
+project(MetricFlowX VERSION 0.1.0 LANGUAGES CXX)
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+find_package(deal.II 9.5.0
   HINTS ${deal.II_DIR} ${DEAL_II_DIR} ../ ../../ $ENV{DEAL_II_DIR}
   )
-IF(NOT ${deal.II_FOUND})
-  MESSAGE(FATAL_ERROR "\n"
+if(NOT ${deal.II_FOUND})
+  message(FATAL_ERROR "\n"
     "*** Could not locate a (sufficiently recent) version of deal.II. ***\n\n"
     "You may want to either pass a flag -DDEAL_II_DIR=/path/to/deal.II to cmake\n"
     "or set an environment variable \"DEAL_II_DIR\" that contains this path."
-    )
+  )
 ENDIF()
 
-DEAL_II_INITIALIZE_CACHED_VARIABLES()
-PROJECT(DG_advection_reaction_multi CXX)
+deal_II_initialize_cached_variables()
 
-file(GLOB LIB_SRC source/*.cc)
-ADD_LIBRARY(test_library SHARED ${LIB_SRC})
-set(TEST_LIBRARIES test_library)
-DEAL_II_SETUP_TARGET(test_library)
+set(METRIC_FLOW_X_SOURCES
+  source/blood_flow_system.cc
+  source/io/vtk_utils.cc
+  source/parsed_tools/constants.cc
+  source/parsed_tools/function.cc
+)
 
-INCLUDE_DIRECTORIES(include)
+add_library(metric_flow_x SHARED ${METRIC_FLOW_X_SOURCES})
+add_library(MetricFlowX::metric_flow_x ALIAS metric_flow_x)
+
+target_include_directories(metric_flow_x
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+deal_ii_setup_target(metric_flow_x)
+
 
 # Mirror parameters/ into the build tree so tests and examples always use
 # configured files.  Template files end in .prm.in and are expanded with the
@@ -42,18 +57,52 @@ foreach(parameter_file IN LISTS PARAMETER_FILES)
   endif()
 endforeach()
 
-# Create one executable per file in apps/.  The application filename defines
-# the target name (currently metric_flow_x).
-file(GLOB APP_SOURCES apps/*.cc)
-foreach(app_src ${APP_SOURCES})
-  get_filename_component(app_name ${app_src} NAME_WE)
-  add_executable(${app_name} ${app_src})
-  target_link_libraries(${app_name} test_library)
-  DEAL_II_SETUP_TARGET(${app_name})
-endforeach()
+add_executable(blood_flow apps/blood_flow.cc)
+target_compile_definitions(blood_flow PRIVATE
+  PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/")
+deal_ii_setup_target(blood_flow)
+target_link_libraries(blood_flow MetricFlowX::metric_flow_x)
 
-ADD_DEFINITIONS(-DPRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/")
+set(TEST_LIBRARIES MetricFlowX::metric_flow_x)
+set(METRIC_FLOW_X_PARAMETER_DIR
+  "${CMAKE_CURRENT_BINARY_DIR}/parameters/")
+add_compile_definitions(
+  PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/"
+  METRIC_FLOW_X_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
 
 # Add tests
-ADD_SUBDIRECTORY(tests)
-ENABLE_TESTING()
+add_subdirectory(tests)
+enable_testing()
+
+install(TARGETS metric_flow_x blood_flow
+  EXPORT MetricFlowXTargets
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(DIRECTORY include/metric_flow_x
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+configure_package_config_file(
+  cmake/MetricFlowXConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/MetricFlowXConfig.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MetricFlowX
+)
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/MetricFlowXConfigVersion.cmake
+  COMPATIBILITY SameMajorVersion
+)
+
+install(EXPORT MetricFlowXTargets
+  FILE MetricFlowXTargets.cmake
+  NAMESPACE MetricFlowX::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MetricFlowX
+)
+install(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/MetricFlowXConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/MetricFlowXConfigVersion.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MetricFlowX
+)

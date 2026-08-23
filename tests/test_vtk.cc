@@ -8,44 +8,46 @@
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/tria.h>
 
+#include <metric_flow_x/blood_flow_system.h>
+#include <metric_flow_x/io/vtk_utils.h>
+
 #include <filesystem>
 #include <fstream>
 #include <map>
 
-#include "metric_flow_system.h"
 #include "tests.h"
-#include "vtk_utils.h"
 
 using namespace dealii;
+using namespace MetricFlowX;
 
 template <int dim, int spacedim>
 void
 test(const std::string &filename)
 {
-  Triangulation<dim, spacedim> triangulation;
-  DoFHandler<dim, spacedim>    dof_handler(triangulation);
+  Triangulation<dim, spacedim> triangulation_;
+  DoFHandler<dim, spacedim>    dof_handler_(triangulation_);
   Vector<double>               output_vector;
   std::vector<std::string>     data_names;
 
   // -----------------------------
   // Read VTK
   // -----------------------------
-  // VTKWrappers::read_tria(filename, triangulation);
+  // VTKWrappers::read_tria(filename, triangulation_);
 
-  VTKUtils::read_vtk(filename, dof_handler, output_vector, data_names);
+  VTKUtils::read_vtk(filename, dof_handler_, output_vector, data_names);
 
   // -----------------------------
   // Basic checks
   // -----------------------------
-  deallog << "Cells:    " << triangulation.n_active_cells() << std::endl;
-  deallog << "Vertices: " << triangulation.n_vertices() << std::endl;
+  deallog << "Cells:    " << triangulation_.n_active_cells() << std::endl;
+  deallog << "Vertices: " << triangulation_.n_vertices() << std::endl;
 
   // -----------------------------
   // Compute vertex degree
   // -----------------------------
   std::map<unsigned int, unsigned int> vertex_degree;
 
-  for (const auto &cell : triangulation.active_cell_iterators())
+  for (const auto &cell : triangulation_.active_cell_iterators())
     for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v)
       vertex_degree[cell->vertex_index(v)]++;
 
@@ -63,7 +65,7 @@ test(const std::string &filename)
       const unsigned int deg = it.second;
 
       // Get the actual physical location of the vertex
-      Point<spacedim> pos = triangulation.get_vertices()[vid];
+      Point<spacedim> pos = triangulation_.get_vertices()[vid];
 
       if (deg == 1)
         {
@@ -105,7 +107,8 @@ main()
   deallog.depth_console(10);
   try
     {
-      test<1, 3>("../../../../notebooks/bifurcation_physics.vtk");
+      test<1, 3>(std::string(METRIC_FLOW_X_SOURCE_DIR) +
+                 "/notebooks/bifurcation_physics.vtk");
     }
   catch (std::exception &e)
     {

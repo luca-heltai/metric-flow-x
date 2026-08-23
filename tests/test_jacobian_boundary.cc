@@ -17,19 +17,21 @@
 
 #include <deal.II/base/mpi.h>
 
+#include <metric_flow_x/blood_flow_system.h>
+#include <metric_flow_x/io/vtk_utils.h>
+
 #include <cmath>
 #include <iomanip>
 
-#include "metric_flow_system.h"
 #include "tests.h"
-#include "vtk_utils.h"
 
 using namespace dealii;
+using namespace MetricFlowX;
 
 void
 test()
 {
-  MetricFlowSystem<1, 3> problem;
+  BloodFlowSystem<1, 3> problem;
   problem.initialize_params(PRM_DIR "constant.prm");
 
   // initialize_params() resets deallog depth according to the parameter file.
@@ -65,14 +67,14 @@ test()
 
   const double eps = 1e-8;
 
-  VectorType yp(problem.locally_owned_dofs, problem.mpi_communicator);
-  VectorType ym(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType yp(problem.locally_owned_dofs_, problem.mpi_communicator_);
+  VectorType ym(problem.locally_owned_dofs_, problem.mpi_communicator_);
 
-  VectorType Fp(problem.locally_owned_dofs, problem.mpi_communicator);
-  VectorType Fm(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType Fp(problem.locally_owned_dofs_, problem.mpi_communicator_);
+  VectorType Fm(problem.locally_owned_dofs_, problem.mpi_communicator_);
 
-  VectorType ej(problem.locally_owned_dofs, problem.mpi_communicator);
-  VectorType Jcol(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType ej(problem.locally_owned_dofs_, problem.mpi_communicator_);
+  VectorType Jcol(problem.locally_owned_dofs_, problem.mpi_communicator_);
 
   double       l2_sq_local = 0.0;
   const double h           = eps;
@@ -84,7 +86,7 @@ test()
     {
       // ---- +h: perturb, ghost, assemble, all before touching -h ----------
       yp = problem.solution;
-      if (problem.locally_owned_dofs.is_element(j))
+      if (problem.locally_owned_dofs_.is_element(j))
         yp(j) = yp(j) + h;
       yp.compress(VectorOperation::insert);
       problem.update_ghosted_vectors(yp);
@@ -95,7 +97,7 @@ test()
 
       // ---- -h: perturb, ghost, assemble ------------------------------------
       ym = problem.solution;
-      if (problem.locally_owned_dofs.is_element(j))
+      if (problem.locally_owned_dofs_.is_element(j))
         ym(j) = ym(j) - h;
       ym.compress(VectorOperation::insert);
       problem.update_ghosted_vectors(ym);
@@ -106,13 +108,13 @@ test()
 
       // ---- j-th unit vector, then the analytic column via vmult -----------
       ej = 0.0;
-      if (problem.locally_owned_dofs.is_element(j))
+      if (problem.locally_owned_dofs_.is_element(j))
         ej(j) = 1.0;
       ej.compress(VectorOperation::insert);
 
       problem.jacobian_matrix.vmult(Jcol, ej);
 
-      for (const auto i : problem.locally_owned_dofs)
+      for (const auto i : problem.locally_owned_dofs_)
         {
           if (!problem.trace_dofs_owned.is_element(i))
             continue;
@@ -125,9 +127,9 @@ test()
     }
 
   const double l2_sq =
-    Utilities::MPI::sum(l2_sq_local, problem.mpi_communicator);
+    Utilities::MPI::sum(l2_sq_local, problem.mpi_communicator_);
 
-  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
     deallog << "L2_error = " << std::scientific << std::setprecision(6)
             << std::sqrt(l2_sq) << std::endl;
 }

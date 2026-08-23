@@ -15,10 +15,10 @@
 // ---------------------------------------------------------------------
 // Test length of domain using per-cell mass matrix blocks.
 //
-// Parallel: problem.triangulation is a parallel::fullydistributed
-// triangulation, so mesh loading, partitioning, material/boundary IDs and
+// Parallel: problem.triangulation_ is a parallel::fullydistributed
+// triangulation_, so mesh loading, partitioning, material/boundary IDs and
 // rcr_map all go through problem.create_triangulation() -- attaching
-// GridIn directly to a fully-distributed triangulation (as a serial test
+// GridIn directly to a fully-distributed triangulation_ (as a serial test
 // might) does not work. per_cell_mass only holds entries for locally
 // owned cells, indexed by cell->active_cell_index(), so both assembly
 // loops are restricted to is_locally_owned() cells and the scalar results
@@ -29,16 +29,18 @@
 
 #include <deal.II/lac/vector.h>
 
-#include "metric_flow_system.h"
+#include <metric_flow_x/blood_flow_system.h>
+#include <metric_flow_x/io/vtk_utils.h>
+
 #include "tests.h"
-#include "vtk_utils.h"
 
 using namespace dealii;
+using namespace MetricFlowX;
 
 void
 test()
 {
-  MetricFlowSystem<1, 3> problem;
+  BloodFlowSystem<1, 3> problem;
   problem.initialize_params(PRM_DIR "constant.prm");
   // initialize_params() resets deallog depth according to the parameter file.
   deallog.depth_console(10);
@@ -46,7 +48,7 @@ test()
   // Handles VTK mesh read, cell/vertex data, material/boundary IDs,
   // rcr_map, partitioning across ranks, and n_global_refinements --
   // all internally, in a way that's safe for a fully-distributed
-  // triangulation. Do not reimplement this by hand.
+  // triangulation_. Do not reimplement this by hand.
   problem.create_triangulation();
 
   problem.setup_system();
@@ -61,11 +63,11 @@ test()
   // v is a distributed, non-ghosted VectorType (matches every other
   // write-only vector in the class): every DOF of a locally owned cell is
   // itself locally owned, so direct local writes need no ghost exchange.
-  VectorType v(problem.locally_owned_dofs, problem.mpi_communicator);
+  VectorType v(problem.locally_owned_dofs_, problem.mpi_communicator_);
   v = 0.0;
 
-  const unsigned int n_dofs = problem.fe->n_dofs_per_cell();
-  for (const auto &cell : problem.dof_handler.active_cell_iterators())
+  const unsigned int n_dofs = problem.fe_->n_dofs_per_cell();
+  for (const auto &cell : problem.dof_handler_.active_cell_iterators())
     {
       if (!cell->is_locally_owned())
         continue;
@@ -73,7 +75,7 @@ test()
       std::vector<types::global_dof_index> ldofs(n_dofs);
       cell->get_dof_indices(ldofs);
       for (unsigned int i = 0; i < n_dofs; ++i)
-        if (problem.fe->system_to_component_index(i).first ==
+        if (problem.fe_->system_to_component_index(i).first ==
             0) // area component
           v(ldofs[i]) = 1.0;
     }
@@ -84,7 +86,7 @@ test()
   double         L_local = 0.0;
   Vector<double> local_v(n_dofs), local_Mv(n_dofs);
 
-  for (const auto &cell : problem.dof_handler.active_cell_iterators())
+  for (const auto &cell : problem.dof_handler_.active_cell_iterators())
     {
       if (!cell->is_locally_owned())
         continue;
@@ -101,19 +103,19 @@ test()
         L_local += local_v(i) * local_Mv(i);
     }
 
-  const double L = Utilities::MPI::sum(L_local, problem.mpi_communicator);
+  const double L = Utilities::MPI::sum(L_local, problem.mpi_communicator_);
 
   // Independent check: sum physical cell measures over locally owned cells,
   // then reduce across ranks.
   double L_geom_local = 0.0;
-  for (const auto &cell : problem.triangulation.active_cell_iterators())
+  for (const auto &cell : problem.triangulation_.active_cell_iterators())
     if (cell->is_locally_owned())
       L_geom_local += cell->measure();
 
   const double L_geom =
-    Utilities::MPI::sum(L_geom_local, problem.mpi_communicator);
+    Utilities::MPI::sum(L_geom_local, problem.mpi_communicator_);
 
-  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
     {
       deallog << "L (mass matrix):   " << L << std::endl;
       deallog << "L (cell measures): " << L_geom << std::endl;
@@ -122,7 +124,7 @@ test()
   AssertThrow(std::abs(L - L_geom) / L_geom < 1e-10,
               ExcMessage("Mass matrix length integration FAILED."));
 
-  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator) == 0)
+  if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)
     deallog << "Mass matrix length integration PASSED." << std::endl;
 }
 

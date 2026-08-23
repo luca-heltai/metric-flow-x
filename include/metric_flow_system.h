@@ -38,6 +38,9 @@
 
 #include <deal.II/sundials/ida.h>
 
+#include <metric_flow_x/parsed_tools/constants.h>
+#include <metric_flow_x/parsed_tools/function.h>
+
 #include <array>
 #include <fstream>
 #include <map>
@@ -45,9 +48,6 @@
 #include <set>
 #include <utility>
 #include <vector>
-
-#include "constants.h"
-#include "function.h"
 
 using namespace dealii;
 
