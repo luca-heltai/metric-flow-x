@@ -59,7 +59,7 @@ namespace MetricFlowX
   // ==========================================================================
   template <int dim, int spacedim>
   BloodFlowSystem<dim, spacedim>::BloodFlowSystem(const MPI_Comm comm)
-    : ParameterAcceptor("BloodFlowSystem<" + std::to_string(dim) + ", " +
+    : ParameterAcceptor("MetricFlowSystem<" + std::to_string(dim) + ", " +
                         std::to_string(spacedim) + ">")
     , mpi_communicator_(comm)
     , n_mpi_processes(Utilities::MPI::n_mpi_processes(comm))
@@ -70,7 +70,7 @@ namespace MetricFlowX
                       TimerOutput::summary,
                       TimerOutput::wall_times)
     , direct_solver_control(1000, 1e-10)
-    , par("Blood Flow Parameters",
+    , par("Metric Flow Parameters",
           {"rho", "mu", "xi", "m", "Rt"},
           {1060, 0.004, 2.0, 0.5, 0.5},
           {"Density",
