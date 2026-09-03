@@ -59,14 +59,23 @@ change $dp/dA$, wave speed, the state Jacobian through a pressure derivative,
 or the derivative Jacobian.
 
 The provider is sampled at volume and face quadrature points, junction
-locations, boundary points, and cell centers for pressure output. It
+locations, boundary points, and cell centers for pressure output. Each
+evaluation also carries the incident centerline `CellId`; at a junction the
+same physical point may therefore be evaluated once for each incident vessel.
+It
 contributes to volume momentum fluxes, numerical momentum fluxes, RCR trace
 pressure equations, junction total-head equations, and pressure output. It
 deliberately does not enter mass fluxes, Riemann invariants/wave speeds, RCR
 capacitor dynamics, or inflow/reflection characteristic relations. A future
 coupled caller therefore needs only a deterministic function of time, physical
-point, and vessel id; MetricFlowX's global DoF numbering and any external
-coupling state remain outside this interface.
+point, vessel id, and incident cell id; MetricFlowX's global DoF numbering and
+any external coupling state remain outside this interface.
+
+For a coupled pressure field, `add_external_pressure_residual(t, y, provider,
+destination)` exposes the same native pressure contribution with additive
+semantics. It assembles the volume, numerical-flux, RCR, and junction terms
+directly; it does not assemble a second full residual and subtract it, and it
+does not mutate the installed provider.
 
 The provider is evaluated during residual assembly and pressure output. It is
 not evaluated during either Jacobian assembly: with the provider held fixed,

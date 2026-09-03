@@ -278,6 +278,7 @@ namespace MetricFlowX
       double          time = 0.0;
       Point<spacedim> point;
       unsigned int    vessel_id = numbers::invalid_unsigned_int;
+      CellId          cell_id;
     };
 
     /** A prescribed surrounding/external pressure, in the pressure units of
@@ -399,6 +400,21 @@ namespace MetricFlowX
                       const VectorType &ydot,
                       VectorType       &residual);
 
+    /** Add only the residual contribution of a prescribed external pressure.
+     *
+     * The contribution is evaluated at the supplied candidate state because
+     * the native numerical flux may select a state-dependent wave-speed
+     * branch.  The provider is passed explicitly and is never installed in
+     * the BloodFlowSystem.  The operation has additive semantics:
+     *
+     *   destination += F_external_pressure(t, y, provider).
+     */
+    void
+    add_external_pressure_residual(const double                    t,
+                                   const VectorType               &y,
+                                   const ExternalPressureProvider &provider,
+                                   VectorType &destination) const;
+
     // Jacobian dF/dy + alpha * dF/dydot.
     void
     assemble_jacobian(const double      t,
@@ -444,6 +460,12 @@ namespace MetricFlowX
     compute_pressure(const VectorType &y,
                      VectorType       &pressure_vec,
                      const double      t) const;
+
+    void
+    compute_pressure(const VectorType               &y,
+                     VectorType                     &pressure_vec,
+                     const double                    t,
+                     const ExternalPressureProvider &provider) const;
 
     void
     set_external_pressure_provider(ExternalPressureProvider provider);
@@ -790,7 +812,7 @@ namespace MetricFlowX
     mutable VectorType y_relevant;
     mutable VectorType y_fe_relevant;
     mutable VectorType y_fe_owned;
-    VectorType         residual_F;
+    mutable VectorType residual_F;
 
     void
     update_ghosted_vectors(const VectorType &y) const;
@@ -1045,12 +1067,27 @@ namespace MetricFlowX
                               const unsigned int     vid,
                               const double           a_d_local,
                               const double           t,
-                              const Point<spacedim> &point) const
+                              const Point<spacedim> &point,
+                              const CellId           cell_id = CellId()) const
     {
-      const PressureEvaluationPoint evaluation{t, point, vid};
+      const PressureEvaluationPoint evaluation{t, point, vid, cell_id};
       return compute_pressure_value(A, vid, a_d_local) +
              external_pressure(evaluation);
     }
+
+    double
+    external_pressure(const PressureEvaluationPoint        &evaluation,
+                      const ExternalPressureProvider *const provider) const
+    {
+      return provider != nullptr ? (*provider)(evaluation) :
+                                   external_pressure(evaluation);
+    }
+
+    void
+    compute_pressure_impl(const VectorType               &y,
+                          VectorType                     &pressure_vec,
+                          const double                    t,
+                          const ExternalPressureProvider *provider) const;
 
     double
     compute_pressure_derivative(const double A, const unsigned int vid) const
@@ -1260,6 +1297,20 @@ namespace MetricFlowX
     }
 
     std::array<double, 2>
+    numerical_external_pressure_flux(double       bn_L,
+                                     double       bn_R,
+                                     double       A_L,
+                                     double       U_L,
+                                     double       A_R,
+                                     double       U_R,
+                                     unsigned int vid_L,
+                                     unsigned int vid_R,
+                                     double       a_d_L,
+                                     double       a_d_R,
+                                     double       external_pressure_L,
+                                     double       external_pressure_R) const;
+
+    std::array<double, 2>
     hll_flux_jac(double       bn_L,
                  double       bn_R,
                  double       A_L,
@@ -1387,13 +1438,20 @@ namespace MetricFlowX
 
     // Cell residuals: volume integrals plus flux through the face traces.
     void
-    assemble_cell_residuals(const double t, const VectorType &y, VectorType &F);
+    assemble_cell_residuals(const double                    t,
+                            const VectorType               &y,
+                            VectorType                     &F,
+                            const ExternalPressureProvider *provider = nullptr,
+                            const bool pressure_only                 = false);
 
     // Trace equations for interior faces (Riemann-invariant continuity).
     void
-    assemble_trace_interior_equations(const double      t,
-                                      const VectorType &y,
-                                      VectorType       &F);
+    assemble_trace_interior_equations(
+      const double                    t,
+      const VectorType               &y,
+      VectorType                     &F,
+      const ExternalPressureProvider *provider      = nullptr,
+      const bool                      pressure_only = false);
 
     void
     assemble_trace_interior_equations(const VectorType &y, VectorType &F)
@@ -1403,16 +1461,22 @@ namespace MetricFlowX
 
     // Trace equations for boundary faces (inflow Q / RCR / reflection).
     void
-    assemble_trace_boundary_equations(const double      t,
-                                      const VectorType &y,
-                                      VectorType       &F);
+    assemble_trace_boundary_equations(
+      const double                    t,
+      const VectorType               &y,
+      VectorType                     &F,
+      const ExternalPressureProvider *provider      = nullptr,
+      const bool                      pressure_only = false);
 
     // Trace equations for junction faces (mass conservation, total-head
     // continuity, and Riemann compatibility per vessel).
     void
-    assemble_trace_junction_equations(const double      t,
-                                      const VectorType &y,
-                                      VectorType       &F);
+    assemble_trace_junction_equations(
+      const double                    t,
+      const VectorType               &y,
+      VectorType                     &F,
+      const ExternalPressureProvider *provider      = nullptr,
+      const bool                      pressure_only = false);
 
     void
     assemble_trace_junction_equations(const VectorType &y, VectorType &F)
