@@ -45,13 +45,20 @@ by an external multiphysics application. Constitutive access is provided by
 
 An optional prescribed surrounding pressure can be supplied with
 `set_external_pressure_provider()`. The provider receives time, physical
-point, and vessel id, and returns pressure in the same units as the network
-data. MetricFlowX uses
+point, vessel id, and the incident centerline `CellId`, and returns pressure
+in the same units as the network data. MetricFlowX uses
 `p_internal = p_tube(A) + p_external(t, x, vessel_id)` in momentum fluxes,
 RCR pressure relations, junction total-head equations, and pressure output.
 The default provider is zero; the provider is external data and is not
 linearized as part of either native Jacobian. It is called during residual
 assembly and pressure output, but not during Jacobian assembly.
+
+Embedding applications that own a pressure field can call
+`add_external_pressure_residual(t, y, provider, destination)`. This adds only
+the external-pressure part of the native residual, using additive semantics;
+it does not install or replace the system's provider. The candidate state is
+used for the state-dependent numerical-flux branch, while the supplied
+pressure remains independent of the native flow unknowns.
 
 The state layout is deliberately not split into separate area and velocity
 vectors. Component values are identified with

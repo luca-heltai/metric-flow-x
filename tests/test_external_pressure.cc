@@ -76,6 +76,17 @@ namespace
   {
     problem.assemble_residual(t, y, ydot, F);
   }
+
+  void
+  add_external_pressure(
+    BloodFlowSystem<1, 3>                                 &problem,
+    const double                                           t,
+    const VectorType                                      &y,
+    const BloodFlowSystem<1, 3>::ExternalPressureProvider &provider,
+    VectorType                                            &F)
+  {
+    problem.add_external_pressure_residual(t, y, provider, F);
+  }
 } // namespace
 
 void
@@ -96,6 +107,14 @@ test()
   problem.clear_external_pressure_provider();
   auto F0 = problem.make_state();
   assemble(problem, 0.0, y, ydot, F0);
+  auto F_zero_native = problem.make_state();
+  add_external_pressure(
+    problem,
+    0.0,
+    y,
+    [](const BloodFlowSystem<1, 3>::PressureEvaluationPoint &) { return 0.0; },
+    F_zero_native);
+  AssertThrow(F_zero_native.l2_norm() < tolerance, ExcInternalError());
   problem.assemble_state_jacobian(0.0, y, ydot);
   const auto J0 =
     snapshot(problem.state_jacobian_matrix(), problem.locally_owned_dofs_);
@@ -136,6 +155,17 @@ test()
   auto D_constant = F_constant;
   D_constant -= F0;
 
+  auto F_constant_native = problem.make_state();
+  add_external_pressure(
+    problem,
+    0.0,
+    y,
+    [](const BloodFlowSystem<1, 3>::PressureEvaluationPoint &) {
+      return delta_p;
+    },
+    F_constant_native);
+  assert_close(D_constant, F_constant_native, problem.mpi_communicator());
+
   types::global_dof_index outlet_area_row = numbers::invalid_dof_index;
   for (const auto &cell : problem.dof_handler_.active_cell_iterators())
     if (cell->is_locally_owned())
@@ -174,6 +204,23 @@ test()
       return 17.0 + 100.0 * evaluation.point[0] +
              3.0 * static_cast<double>(evaluation.vessel_id);
     });
+  auto F_spatial_full = problem.make_state();
+  assemble(problem, 0.0, y, ydot, F_spatial_full);
+  auto F_spatial_native = problem.make_state();
+  add_external_pressure(
+    problem,
+    0.0,
+    y,
+    [](const BloodFlowSystem<1, 3>::PressureEvaluationPoint &evaluation) {
+      return 17.0 + 100.0 * evaluation.point[0] +
+             3.0 * static_cast<double>(evaluation.vessel_id);
+    },
+    F_spatial_native);
+  F_spatial_full -= F0;
+  assert_close(F_spatial_full,
+               F_spatial_native,
+               problem.mpi_communicator(),
+               4.0e-10);
   auto p_with_spatial = problem.make_state();
   problem.compute_pressure(y, p_with_spatial, 0.0);
   for (const auto &cell : problem.dof_handler_.active_cell_iterators())
@@ -208,6 +255,16 @@ test()
   assemble(problem, 2.0, y, ydot, Ft1);
   auto Dt = Ft1;
   Dt -= Ft0;
+  auto Dt_native = problem.make_state();
+  add_external_pressure(
+    problem,
+    2.0,
+    y,
+    [](const BloodFlowSystem<1, 3>::PressureEvaluationPoint &evaluation) {
+      return 11.0 * evaluation.time;
+    },
+    Dt_native);
+  assert_close(Dt, Dt_native, problem.mpi_communicator());
   double time_error_local = 0.0;
   for (const auto i : problem.locally_owned_dofs_)
     {
@@ -230,14 +287,32 @@ test()
   problem.set_external_pressure_provider(p1);
   auto F1 = problem.make_state();
   assemble(problem, 0.75, y, ydot, F1);
+  auto F1_native = problem.make_state();
+  add_external_pressure(problem, 0.75, y, p1, F1_native);
   problem.set_external_pressure_provider(p2);
   auto F2 = problem.make_state();
   assemble(problem, 0.75, y, ydot, F2);
+  auto F2_native = problem.make_state();
+  add_external_pressure(problem, 0.75, y, p2, F2_native);
   problem.set_external_pressure_provider([p1, p2](const auto &evaluation) {
     return 2.0 * p1(evaluation) - 0.5 * p2(evaluation);
   });
   auto Fcombo = problem.make_state();
   assemble(problem, 0.75, y, ydot, Fcombo);
+  auto Fcombo_native = problem.make_state();
+  add_external_pressure(
+    problem,
+    0.75,
+    y,
+    [p1, p2](const auto &evaluation) {
+      return 2.0 * p1(evaluation) - 0.5 * p2(evaluation);
+    },
+    Fcombo_native);
+  auto native_difference = F1_native;
+  native_difference *= 2.0;
+  native_difference.add(-0.5, F2_native);
+  native_difference -= Fcombo_native;
+  AssertThrow(native_difference.l2_norm() < 1.0e-9, ExcInternalError());
   auto linearity_error = Fcombo;
   linearity_error -= F0;
   auto D1 = F1;

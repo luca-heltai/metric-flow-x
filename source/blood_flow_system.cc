@@ -1706,7 +1706,7 @@ namespace MetricFlowX
         const double U_cmps = U_val * 1.0e2;
 
         const double P_Pa = compute_physical_pressure(
-          A_val, vid, compute_a_d_local(cell), t, cell->center());
+          A_val, vid, compute_a_d_local(cell), t, cell->center(), cell->id());
         const double P_dynpcm2 = P_Pa * 10.0;
 
         const double Q_cm3ps = A_val * U_val * 1.0e6;
@@ -1962,6 +1962,55 @@ namespace MetricFlowX
              0.5 * (FUL + FUR) - 0.5 * alpha * (U_R - U_L)}};
   }
 
+  template <int dim, int spacedim>
+  std::array<double, 2>
+  BloodFlowSystem<dim, spacedim>::numerical_external_pressure_flux(
+    const double       bn_L,
+    const double       bn_R,
+    const double       A_L,
+    const double       U_L,
+    const double       A_R,
+    const double       U_R,
+    const unsigned int vid_L,
+    const unsigned int vid_R,
+    const double       a_d_L,
+    const double       a_d_R,
+    const double       external_pressure_L,
+    const double       external_pressure_R) const
+  {
+    const double pressure_flux_L = external_pressure_L / par["rho"] * bn_L;
+    const double pressure_flux_R = external_pressure_R / par["rho"] * bn_R;
+
+    if (numerical_flux_type == NumericalFluxType::HLL_HDG)
+      {
+        // HLL-HDG evaluates the physical momentum flux at the trace state;
+        // the stabilization is independent of prescribed pressure.
+        return {{0.0, pressure_flux_R}};
+      }
+
+    if (numerical_flux_type == NumericalFluxType::HLL)
+      {
+        const double c_L   = compute_wave_speed(A_L, vid_L, a_d_L);
+        const double c_R   = compute_wave_speed(A_R, vid_R, a_d_R);
+        const double U_bar = 0.5 * (U_L + U_R);
+        const double c_bar = 0.5 * (c_L + c_R);
+        const double s_L   = U_bar - c_bar;
+        const double s_R   = U_bar + c_bar;
+
+        if (s_L >= 0.0)
+          return {{0.0, pressure_flux_L}};
+        if (s_R <= 0.0)
+          return {{0.0, pressure_flux_R}};
+
+        const double inv = 1.0 / (s_R - s_L);
+        return {{0.0, (s_R * pressure_flux_L - s_L * pressure_flux_R) * inv}};
+      }
+
+    // Lax--Friedrichs stabilization acts only on the state jump and therefore
+    // has no prescribed-pressure contribution.
+    return {{0.0, 0.5 * (pressure_flux_L + pressure_flux_R)}};
+  }
+
   // ============================================================================
   // Lax–Friedrichs flux Jacobian
   // ============================================================================
@@ -2004,7 +2053,9 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::assemble_cell_residuals(
     const double t,
     const VectorType & /*y*/,
-    VectorType &F)
+    VectorType                     &F,
+    const ExternalPressureProvider *provider,
+    const bool                      pressure_only)
   {
     TimerOutput::Scope timer(computing_timer, "assemble_cell_residuals");
 
@@ -2065,11 +2116,16 @@ namespace MetricFlowX
             const double A = std::max(A_h[q], 1e-10);
             const double U = U_h[q];
             const double P =
-              compute_physical_pressure(A,
-                                        vid,
-                                        compute_a_d_local(cell),
-                                        t,
-                                        fev.get_quadrature_points()[q]);
+              pressure_only ?
+                external_pressure(
+                  {t, fev.get_quadrature_points()[q], vid, cell->id()},
+                  provider) :
+                compute_physical_pressure(A,
+                                          vid,
+                                          compute_a_d_local(cell),
+                                          t,
+                                          fev.get_quadrature_points()[q],
+                                          cell->id());
             const Tensor<1, spacedim> b = compute_directional_vector(cell);
 
             const double rhs_A =
@@ -2082,22 +2138,27 @@ namespace MetricFlowX
                 const unsigned int comp =
                   fe_->system_to_component_index(i).first;
 
-                if (comp == 0)
+                if (comp == 0 && !pressure_only)
                   {
                     cell_rhs(i) +=
                       (rhs_A * fev[area_extractor].value(i, q) +
                        A * U * (b * fev[area_extractor].gradient(i, q))) *
                       JxW[q];
                   }
-                else
+                else if (comp != 0)
                   {
                     const double phi_u = fev[velocity_extractor].value(i, q);
-                    cell_rhs(i) +=
-                      (rhs_U * phi_u +
-                       (0.5 * U * U + P / rho) *
-                         (b * fev[velocity_extractor].gradient(i, q)) -
-                       eta * U / A * phi_u) *
-                      JxW[q];
+                    if (pressure_only)
+                      cell_rhs(i) +=
+                        (P / rho) *
+                        (b * fev[velocity_extractor].gradient(i, q)) * JxW[q];
+                    else
+                      cell_rhs(i) +=
+                        (rhs_U * phi_u +
+                         (0.5 * U * U + P / rho) *
+                           (b * fev[velocity_extractor].gradient(i, q)) -
+                         eta * U / A * phi_u) *
+                        JxW[q];
                   }
               }
           }
@@ -2139,24 +2200,38 @@ namespace MetricFlowX
                 const double bn =
                   compute_tangent_normal_product(cell, normals[q]);
                 const Point<spacedim> &point = fef.get_quadrature_points()[q];
-                const double external_p = external_pressure({t, point, vid});
+                const double           external_p =
+                  external_pressure({t, point, vid, cell->id()}, provider);
 
                 // numerical_flux designed for left/right states.
                 // In current implementation there is no physical
                 // neighbour cell on the other side so we are ;
 
-                const auto [FA, FU] = numerical_flux(bn,
-                                                     bn,
-                                                     A_in,
-                                                     U_in,
-                                                     A_hat,
-                                                     U_hat,
-                                                     vid,
-                                                     vid,
-                                                     ad_local,
-                                                     ad_face,
-                                                     external_p,
-                                                     external_p);
+                const auto [FA, FU] =
+                  pressure_only ? numerical_external_pressure_flux(bn,
+                                                                   bn,
+                                                                   A_in,
+                                                                   U_in,
+                                                                   A_hat,
+                                                                   U_hat,
+                                                                   vid,
+                                                                   vid,
+                                                                   ad_local,
+                                                                   ad_face,
+                                                                   external_p,
+                                                                   external_p) :
+                                  numerical_flux(bn,
+                                                 bn,
+                                                 A_in,
+                                                 U_in,
+                                                 A_hat,
+                                                 U_hat,
+                                                 vid,
+                                                 vid,
+                                                 ad_local,
+                                                 ad_face,
+                                                 external_p,
+                                                 external_p);
 
                 for (unsigned int i = 0; i < n_dofs; ++i)
                   {
@@ -2184,9 +2259,11 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::assemble_trace_interior_equations(
-    const double      t,
-    const VectorType &y,
-    VectorType       &F)
+    const double                    t,
+    const VectorType               &y,
+    VectorType                     &F,
+    const ExternalPressureProvider *provider,
+    const bool                      pressure_only)
   {
     TimerOutput::Scope timer(computing_timer,
                              "assemble_trace_interior_equations");
@@ -2267,9 +2344,9 @@ namespace MetricFlowX
             const double           U_R   = U_R_v[0];
             const Point<spacedim> &point = fef.get_quadrature_points()[0];
             const double           external_pressure_L =
-              external_pressure({t, point, vid_L});
+              external_pressure({t, point, vid_L, cell->id()}, provider);
             const double external_pressure_R =
-              external_pressure({t, point, vid_R});
+              external_pressure({t, point, vid_R, nb->id()}, provider);
 
             // Trace state
             double A_hat = 0.0, U_hat = 0.0;
@@ -2281,33 +2358,61 @@ namespace MetricFlowX
             // designed for left/right states. The trace acts as the
             // exterior state, therefore use opposite orientation on
             // the trace side.
-            const auto [FA_L, FU_L] = numerical_flux(bn_L,
-                                                     bn_L,
-                                                     A_L,
-                                                     U_L,
-                                                     A_hat,
-                                                     U_hat,
-                                                     vid_L,
-                                                     vid_R,
-                                                     ad_L,
-                                                     ad_face,
-                                                     external_pressure_L,
-                                                     external_pressure_R);
+            const auto [FA_L, FU_L] =
+              pressure_only ?
+                numerical_external_pressure_flux(bn_L,
+                                                 bn_L,
+                                                 A_L,
+                                                 U_L,
+                                                 A_hat,
+                                                 U_hat,
+                                                 vid_L,
+                                                 vid_R,
+                                                 ad_L,
+                                                 ad_face,
+                                                 external_pressure_L,
+                                                 external_pressure_R) :
+                numerical_flux(bn_L,
+                               bn_L,
+                               A_L,
+                               U_L,
+                               A_hat,
+                               U_hat,
+                               vid_L,
+                               vid_R,
+                               ad_L,
+                               ad_face,
+                               external_pressure_L,
+                               external_pressure_R);
 
             // Right HDG type flux residuals (face integrals with
             // interior state from right cell)
-            const auto [FA_R, FU_R] = numerical_flux(bn_R,
-                                                     bn_R,
-                                                     A_R,
-                                                     U_R,
-                                                     A_hat,
-                                                     U_hat,
-                                                     vid_R,
-                                                     vid_L,
-                                                     ad_R,
-                                                     ad_face,
-                                                     external_pressure_R,
-                                                     external_pressure_L);
+            const auto [FA_R, FU_R] =
+              pressure_only ?
+                numerical_external_pressure_flux(bn_R,
+                                                 bn_R,
+                                                 A_R,
+                                                 U_R,
+                                                 A_hat,
+                                                 U_hat,
+                                                 vid_R,
+                                                 vid_L,
+                                                 ad_R,
+                                                 ad_face,
+                                                 external_pressure_R,
+                                                 external_pressure_L) :
+                numerical_flux(bn_R,
+                               bn_R,
+                               A_R,
+                               U_R,
+                               A_hat,
+                               U_hat,
+                               vid_R,
+                               vid_L,
+                               ad_R,
+                               ad_face,
+                               external_pressure_R,
+                               external_pressure_L);
 
             // Trace dofs
             const FaceTraceDof &td = trace_it->second;
@@ -2323,9 +2428,11 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::assemble_trace_boundary_equations(
-    const double      t,
-    const VectorType &y,
-    VectorType       &F)
+    const double                    t,
+    const VectorType               &y,
+    VectorType                     &F,
+    const ExternalPressureProvider *provider,
+    const bool                      pressure_only)
   {
     TimerOutput::Scope timer(computing_timer,
                              "assemble_trace_boundary_equations");
@@ -2363,11 +2470,26 @@ namespace MetricFlowX
             const types::boundary_id bid = cell->face(f)->boundary_id();
             const unsigned int       vid = cell->material_id();
 
-
             // Interior cell value at face — use y_cell, not y
             fef.reinit(cell, f);
             const Point<spacedim> &point = fef.get_quadrature_points()[0];
-            std::vector<double>    A_int_v(1), U_int_v(1);
+
+            if (pressure_only)
+              {
+                if (outlet_type == "RCR" && rcr_map.count(bid) &&
+                    (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
+                  {
+                    const FaceTraceDof &td =
+                      face_dof_map.at(canonical_face_key(cell, f));
+                    Assert(locally_owned_dofs_.is_element(td.a_hat_dof),
+                           ExcInternalError());
+                    F(td.a_hat_dof) +=
+                      external_pressure({t, point, vid, cell->id()}, provider);
+                  }
+                continue;
+              }
+
+            std::vector<double> A_int_v(1), U_int_v(1);
             fef[area_extractor].get_function_values(y_cell, A_int_v);
             fef[velocity_extractor].get_function_values(y_cell, U_int_v);
 
@@ -2408,13 +2530,13 @@ namespace MetricFlowX
                     //   a_d_local) - (rcr.R1 * Q + Pc);
                     const double Pc = y(rcr_pc_dof.at(bid));
                     res_A           = compute_physical_pressure(
-                              A_hat, vid, a_d_local, t, point) -
+                              A_hat, vid, a_d_local, t, point, cell->id()) -
                             (rcr.R1 * Q + Pc);
                   }
                 else
                   { // single R: P = R2*Q + P_out
                     res_A = compute_physical_pressure(
-                              A_hat, vid, a_d_local, t, point) -
+                              A_hat, vid, a_d_local, t, point, cell->id()) -
                             (rcr.R2 * Q + rcr.P_out);
                   }
                 const double W1_int = U_int + 4.0 * (c_int - c0);
@@ -2518,9 +2640,11 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::assemble_trace_junction_equations(
-    const double      t,
-    const VectorType &y,
-    VectorType       &F)
+    const double                    t,
+    const VectorType               &y,
+    VectorType                     &F,
+    const ExternalPressureProvider *provider,
+    const bool                      pressure_only)
   {
     TimerOutput::Scope timer(computing_timer,
                              "assemble_trace_junction_equations");
@@ -2619,6 +2743,29 @@ namespace MetricFlowX
             c_hat[i] = compute_wave_speed(A_hat[i], vid, a_d_face);
           }
 
+        if (pressure_only)
+          {
+            const double external_pressure_0 =
+              external_pressure({t,
+                                 J.location,
+                                 J.half_faces[0].cell->material_id(),
+                                 J.half_faces[0].cell->id()},
+                                provider);
+            for (unsigned int i = 1; i < K; ++i)
+              if (locally_owned_dofs_.is_element(u_idx[i - 1]))
+                {
+                  const double external_pressure_i =
+                    external_pressure({t,
+                                       J.location,
+                                       J.half_faces[i].cell->material_id(),
+                                       J.half_faces[i].cell->id()},
+                                      provider);
+                  F(u_idx[i - 1]) +=
+                    (external_pressure_0 - external_pressure_i) / rho;
+                }
+            continue;
+          }
+
         // (a) Mass conservation -> row a_idx[0].
         //
         // The 2K rows of a junction are spread over its K half-faces, so a
@@ -2646,7 +2793,8 @@ namespace MetricFlowX
                                       J.half_faces[0].cell->material_id(),
                                       a_d0,
                                       t,
-                                      J.location) /
+                                      J.location,
+                                      J.half_faces[0].cell->id()) /
               rho;
 
           for (unsigned int i = 1; i < K; ++i)
@@ -2659,7 +2807,8 @@ namespace MetricFlowX
                                           J.half_faces[i].cell->material_id(),
                                           a_di,
                                           t,
-                                          J.location) /
+                                          J.location,
+                                          J.half_faces[i].cell->id()) /
                   rho;
 
               if (locally_owned_dofs_.is_element(u_idx[i - 1]))
@@ -2792,6 +2941,47 @@ namespace MetricFlowX
     residual.compress(VectorOperation::add);
     if (verbosity > 1)
       deallog.pop();
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::add_external_pressure_residual(
+    const double                    t,
+    const VectorType               &y,
+    const ExternalPressureProvider &provider,
+    VectorType                     &destination)
+  {
+    TimerOutput::Scope timer(computing_timer, "add_external_pressure_residual");
+    AssertThrow(provider,
+                ExcMessage("An external-pressure provider cannot be empty."));
+    AssertDimension(destination.size(), n_total_dofs);
+
+    update_ghosted_vectors(y);
+    residual_F = 0.0;
+    assemble_cell_residuals(t, y_relevant, residual_F, &provider, true);
+    assemble_trace_interior_equations(
+      t, y_relevant, residual_F, &provider, true);
+    assemble_trace_boundary_equations(
+      t, y_relevant, residual_F, &provider, true);
+    assemble_trace_junction_equations(
+      t, y_relevant, residual_F, &provider, true);
+    residual_F.compress(VectorOperation::add);
+
+    // The native residual is F = M*ydot - R.  The pressure-only routines
+    // assemble their contribution to the raw R vector, so this is the exact
+    // additive pressure contribution to F.  Capacitor and trace-continuity
+    // rows have no prescribed-pressure term.
+    const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
+    std::vector<types::global_dof_index> ldofs(n_dofs);
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      {
+        if (!cell->is_locally_owned())
+          continue;
+        cell->get_dof_indices(ldofs);
+        for (const auto dof : ldofs)
+          destination(dof) -= residual_F(dof);
+      }
+    destination.compress(VectorOperation::add);
   }
 
   // ============================================================================
@@ -3733,6 +3923,30 @@ namespace MetricFlowX
                                                    VectorType       &p,
                                                    const double      t) const
   {
+    compute_pressure_impl(y, p, t, nullptr);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::compute_pressure(
+    const VectorType               &y,
+    VectorType                     &p,
+    const double                    t,
+    const ExternalPressureProvider &provider) const
+  {
+    AssertThrow(provider,
+                ExcMessage("An external-pressure provider cannot be empty."));
+    compute_pressure_impl(y, p, t, &provider);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::compute_pressure_impl(
+    const VectorType               &y,
+    VectorType                     &p,
+    const double                    t,
+    const ExternalPressureProvider *provider) const
+  {
     TimerOutput::Scope timer(computing_timer, "compute_pressure");
 
     p = 0.0;
@@ -3750,11 +3964,15 @@ namespace MetricFlowX
           if (fe_->system_to_component_index(i).first == 0)
             {
               const double A = y(ldofs[i]);
-              p(ldofs[i])    = compute_physical_pressure(A,
-                                                      cell->material_id(),
-                                                      compute_a_d_local(cell),
-                                                      t,
-                                                      cell->center());
+              const double base_pressure =
+                compute_pressure_value(A,
+                                       cell->material_id(),
+                                       compute_a_d_local(cell));
+              p(ldofs[i]) =
+                base_pressure +
+                external_pressure(
+                  {t, cell->center(), cell->material_id(), cell->id()},
+                  provider);
             }
       }
 
