@@ -43,6 +43,16 @@ by an external multiphysics application. Constitutive access is provided by
 `vessel_properties()`, `pressure()`, `pressure_derivative()`, and
 `wave_speed()`.
 
+An optional prescribed surrounding pressure can be supplied with
+`set_external_pressure_provider()`. The provider receives time, physical
+point, and vessel id, and returns pressure in the same units as the network
+data. MetricFlowX uses
+`p_internal = p_tube(A) + p_external(t, x, vessel_id)` in momentum fluxes,
+RCR pressure relations, junction total-head equations, and pressure output.
+The default provider is zero; the provider is external data and is not
+linearized as part of either native Jacobian. It is called during residual
+assembly and pressure output, but not during Jacobian assembly.
+
 The state layout is deliberately not split into separate area and velocity
 vectors. Component values are identified with
 `BloodFlowSystem<1, 3>::Component`, preserving the native distributed layout.

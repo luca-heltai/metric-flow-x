@@ -43,9 +43,11 @@
 
 #include <array>
 #include <fstream>
+#include <functional>
 #include <map>
 #include <memory>
 #include <set>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -265,6 +267,41 @@ namespace MetricFlowX
       velocity_trace
     };
 
+    /** Context passed to the externally supplied pressure provider.
+     *
+     * The point is a physical point in the embedded vessel geometry.  The
+     * provider is evaluated independently on each MPI rank for the local
+     * quadrature points, faces, and junctions needed by assembly.
+     */
+    struct PressureEvaluationPoint
+    {
+      double          time = 0.0;
+      Point<spacedim> point;
+      unsigned int    vessel_id = numbers::invalid_unsigned_int;
+    };
+
+    /** A prescribed surrounding/external pressure, in the pressure units of
+     * the input data (Pa in the supplied SI fixtures).
+     *
+     * The callable is copied into BloodFlowSystem, so it may be a temporary or
+     * a stateful value object.  It may be replaced between nonlinear residual
+     * or Jacobian evaluations, but must not be modified concurrently with an
+     * assembly.  MPI ranks must provide equivalent deterministic functions;
+     * no pressure field communication is performed by this class.
+     *
+     * The returned value is added to the tube-law pressure:
+     *
+     *   p_internal(A) = p_tube(A) + p_external(t, x, vessel_id).
+     *
+     * This is an external datum, not a BloodFlowSystem state variable.  Its
+     * derivative with respect to A, y, and ydot is therefore zero.
+     * The provider is called while assembling residuals (and while computing
+     * pressure output), but state and derivative Jacobian assembly does not
+     * call it because its value is held fixed and has zero native derivative.
+     */
+    using ExternalPressureProvider =
+      std::function<double(const PressureEvaluationPoint &)>;
+
     struct VesselProperties
     {
       double a0     = 0.0;
@@ -403,8 +440,29 @@ namespace MetricFlowX
     void
     compute_pressure(const VectorType &y, VectorType &pressure_vec) const;
 
+    void
+    compute_pressure(const VectorType &y,
+                     VectorType       &pressure_vec,
+                     const double      t) const;
+
+    void
+    set_external_pressure_provider(ExternalPressureProvider provider);
+
+    void
+    clear_external_pressure_provider();
+
+    double
+    external_pressure(const PressureEvaluationPoint &evaluation) const;
+
     double
     pressure(const double area, const unsigned int vessel_id) const;
+
+    // Physical pressure including the installed external-pressure provider.
+    double
+    pressure(const double           area,
+             const unsigned int     vessel_id,
+             const double           t,
+             const Point<spacedim> &point) const;
 
     double
     pressure_derivative(const double area, const unsigned int vessel_id) const;
@@ -480,6 +538,8 @@ namespace MetricFlowX
     // -----------------------------------------------------------------------
     using VesselPhysicalProperties = VesselProperties;
     std::map<unsigned int, VesselPhysicalProperties> vessel_map;
+
+    ExternalPressureProvider external_pressure_provider;
 
     struct RCRPhysics
     {
@@ -885,6 +945,9 @@ namespace MetricFlowX
                            const unsigned int vid,
                            const double       a_d_local) const
     {
+      // This is the vessel tube/transmural law supplied by the network data.
+      // The physical pressure used by assembly is this value plus the
+      // prescribed external pressure, through compute_physical_pressure().
       const auto  &vpp  = vessel_map.at(vid);
       const double beta = compute_beta_p(vpp.E, vpp.h_wall);
       return vpp.p0 + beta / a_d_local * (std::sqrt(A) - std::sqrt(a_d_local)) +
@@ -975,6 +1038,18 @@ namespace MetricFlowX
     compute_pressure_value(const double A, const unsigned int vid) const
     {
       return compute_pressure_value(A, vid, vessel_map.at(vid).a_d);
+    }
+
+    double
+    compute_physical_pressure(const double           A,
+                              const unsigned int     vid,
+                              const double           a_d_local,
+                              const double           t,
+                              const Point<spacedim> &point) const
+    {
+      const PressureEvaluationPoint evaluation{t, point, vid};
+      return compute_pressure_value(A, vid, a_d_local) +
+             external_pressure(evaluation);
     }
 
     double
@@ -1091,7 +1166,9 @@ namespace MetricFlowX
              unsigned int vid_L,
              unsigned int vid_R,
              double       a_d_L,
-             double       a_d_R) const;
+             double       a_d_R,
+             double       external_pressure_L,
+             double       external_pressure_R) const;
 
     std::array<double, 2>
     hll_hdg_flux(double bn_L,
@@ -1103,7 +1180,9 @@ namespace MetricFlowX
                  unsigned int /*vid_L*/,
                  unsigned int vid_R,
                  double /*a_d_L*/,
-                 double a_d_R) const;
+                 double a_d_R,
+                 double /*external_pressure_L*/,
+                 double external_pressure_R) const;
 
     std::array<double, 2>
     lf_flux(double       bn_L,
@@ -1115,7 +1194,9 @@ namespace MetricFlowX
             unsigned int vid_L,
             unsigned int vid_R,
             double       a_d_L,
-            double       a_d_R) const;
+            double       a_d_R,
+            double       external_pressure_L,
+            double       external_pressure_R) const;
 
     std::array<double, 2>
     numerical_flux(double       bn_L,
@@ -1127,22 +1208,54 @@ namespace MetricFlowX
                    unsigned int vid_L,
                    unsigned int vid_R,
                    double       a_d_L,
-                   double       a_d_R) const
+                   double       a_d_R,
+                   double       external_pressure_L = 0.0,
+                   double       external_pressure_R = 0.0) const
     {
       if (numerical_flux_type == NumericalFluxType::HLL)
         {
-          return hll_flux(
-            bn_L, bn_R, A_L, U_L, A_R, U_R, vid_L, vid_R, a_d_L, a_d_R);
+          return hll_flux(bn_L,
+                          bn_R,
+                          A_L,
+                          U_L,
+                          A_R,
+                          U_R,
+                          vid_L,
+                          vid_R,
+                          a_d_L,
+                          a_d_R,
+                          external_pressure_L,
+                          external_pressure_R);
         }
       else if (numerical_flux_type == NumericalFluxType::HLL_HDG)
         {
-          return hll_hdg_flux(
-            bn_L, bn_R, A_L, U_L, A_R, U_R, vid_L, vid_R, a_d_L, a_d_R);
+          return hll_hdg_flux(bn_L,
+                              bn_R,
+                              A_L,
+                              U_L,
+                              A_R,
+                              U_R,
+                              vid_L,
+                              vid_R,
+                              a_d_L,
+                              a_d_R,
+                              external_pressure_L,
+                              external_pressure_R);
         }
       else
         {
-          return lf_flux(
-            bn_L, bn_R, A_L, U_L, A_R, U_R, vid_L, vid_R, a_d_L, a_d_R);
+          return lf_flux(bn_L,
+                         bn_R,
+                         A_L,
+                         U_L,
+                         A_R,
+                         U_R,
+                         vid_L,
+                         vid_R,
+                         a_d_L,
+                         a_d_R,
+                         external_pressure_L,
+                         external_pressure_R);
         }
     }
 
@@ -1278,7 +1391,15 @@ namespace MetricFlowX
 
     // Trace equations for interior faces (Riemann-invariant continuity).
     void
-    assemble_trace_interior_equations(const VectorType &y, VectorType &F);
+    assemble_trace_interior_equations(const double      t,
+                                      const VectorType &y,
+                                      VectorType       &F);
+
+    void
+    assemble_trace_interior_equations(const VectorType &y, VectorType &F)
+    {
+      assemble_trace_interior_equations(time, y, F);
+    }
 
     // Trace equations for boundary faces (inflow Q / RCR / reflection).
     void
@@ -1289,7 +1410,15 @@ namespace MetricFlowX
     // Trace equations for junction faces (mass conservation, total-head
     // continuity, and Riemann compatibility per vessel).
     void
-    assemble_trace_junction_equations(const VectorType &y, VectorType &F);
+    assemble_trace_junction_equations(const double      t,
+                                      const VectorType &y,
+                                      VectorType       &F);
+
+    void
+    assemble_trace_junction_equations(const VectorType &y, VectorType &F)
+    {
+      assemble_trace_junction_equations(time, y, F);
+    }
 
     // Continuity rows for the duplicate side of each ordinary interior face:
     // F[a_dup] = A_hat_dup - A_hat_canon, likewise for U.

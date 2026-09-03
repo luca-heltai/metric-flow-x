@@ -1435,9 +1435,9 @@ namespace MetricFlowX
 
         // ---- G(yhat) = F_trace(y_cell^0, yhat) ------------------------------
         G = 0.0;
-        assemble_trace_interior_equations(y_relevant, G);
+        assemble_trace_interior_equations(t, y_relevant, G);
         assemble_trace_boundary_equations(t, y_relevant, G);
-        assemble_trace_junction_equations(y_relevant, G);
+        assemble_trace_junction_equations(t, y_relevant, G);
         assemble_trace_continuity_equations(y_relevant, G);
         G.compress(VectorOperation::add);
 
@@ -1705,8 +1705,8 @@ namespace MetricFlowX
         const double A_cm2  = A_val * 1.0e4;
         const double U_cmps = U_val * 1.0e2;
 
-        const double P_Pa =
-          compute_pressure_value(A_val, vid, compute_a_d_local(cell));
+        const double P_Pa = compute_physical_pressure(
+          A_val, vid, compute_a_d_local(cell), t, cell->center());
         const double P_dynpcm2 = P_Pa * 10.0;
 
         const double Q_cm3ps = A_val * U_val * 1.0e6;
@@ -1734,16 +1734,19 @@ namespace MetricFlowX
   // ============================================================================
   template <int dim, int spacedim>
   std::array<double, 2>
-  BloodFlowSystem<dim, spacedim>::hll_flux(const double       bn_L,
-                                           const double       bn_R,
-                                           const double       A_L,
-                                           const double       U_L,
-                                           const double       A_R,
-                                           const double       U_R,
-                                           const unsigned int vid_L,
-                                           const unsigned int vid_R,
-                                           const double       ad_L,
-                                           const double       ad_R) const
+  BloodFlowSystem<dim, spacedim>::hll_flux(
+    const double       bn_L,
+    const double       bn_R,
+    const double       A_L,
+    const double       U_L,
+    const double       A_R,
+    const double       U_R,
+    const unsigned int vid_L,
+    const unsigned int vid_R,
+    const double       ad_L,
+    const double       ad_R,
+    const double       external_pressure_L,
+    const double       external_pressure_R) const
   {
     const double c_L   = compute_wave_speed(A_L, vid_L, ad_L);
     const double c_R   = compute_wave_speed(A_R, vid_R, ad_R);
@@ -1756,11 +1759,19 @@ namespace MetricFlowX
     // const double s_R = std::max(U_L + c_L, U_R + c_R);
 
     const double FAL = scalar_area_flux(bn_L, A_L, U_L);
-    const double FUL = scalar_momentum_flux(
-      bn_L, U_L, compute_pressure_value(A_L, vid_L, ad_L), par["rho"]);
+    const double FUL =
+      scalar_momentum_flux(bn_L,
+                           U_L,
+                           compute_pressure_value(A_L, vid_L, ad_L) +
+                             external_pressure_L,
+                           par["rho"]);
     const double FAR = scalar_area_flux(bn_R, A_R, U_R);
-    const double FUR = scalar_momentum_flux(
-      bn_R, U_R, compute_pressure_value(A_R, vid_R, ad_R), par["rho"]);
+    const double FUR =
+      scalar_momentum_flux(bn_R,
+                           U_R,
+                           compute_pressure_value(A_R, vid_R, ad_R) +
+                             external_pressure_R,
+                           par["rho"]);
 
     if (s_L >= 0.0)
       return {{FAL, FUL}};
@@ -1828,16 +1839,19 @@ namespace MetricFlowX
 
   template <int dim, int spacedim>
   std::array<double, 2>
-  BloodFlowSystem<dim, spacedim>::hll_hdg_flux(const double bn_L,
-                                               const double /*bn_R*/,
-                                               const double A_L,
-                                               const double U_L, // interior U_e
-                                               const double A_R,
-                                               const double U_R, // trace U_b
-                                               const unsigned int /*vid_L*/,
-                                               const unsigned int vid_R,
-                                               const double /*ad_L*/,
-                                               const double ad_R) const
+  BloodFlowSystem<dim, spacedim>::hll_hdg_flux(
+    const double bn_L,
+    const double /*bn_R*/,
+    const double A_L,
+    const double U_L, // interior U_e
+    const double A_R,
+    const double U_R, // trace U_b
+    const unsigned int /*vid_L*/,
+    const unsigned int vid_R,
+    const double /*ad_L*/,
+    const double ad_R,
+    const double /*external_pressure_L*/,
+    const double external_pressure_R) const
   {
     // Stabilization from TRACE state only (eq. 37 of Vila-Perez et
     // al.)
@@ -1846,8 +1860,12 @@ namespace MetricFlowX
 
     // Physical flux at TRACE (F(U_b)·n)
     const double FA_b = scalar_area_flux(bn_L, A_R, U_R);
-    const double FU_b = scalar_momentum_flux(
-      bn_L, U_R, compute_pressure_value(A_R, vid_R, ad_R), par["rho"]);
+    const double FU_b =
+      scalar_momentum_flux(bn_L,
+                           U_R,
+                           compute_pressure_value(A_R, vid_R, ad_R) +
+                             external_pressure_R,
+                           par["rho"]);
 
     // Stabilization term: s⁺(U_e - U_b)
     const double FA = FA_b + s_plus * (A_L - A_R);
@@ -1908,23 +1926,34 @@ namespace MetricFlowX
   // ============================================================================
   template <int dim, int spacedim>
   std::array<double, 2>
-  BloodFlowSystem<dim, spacedim>::lf_flux(const double       bn_L,
-                                          const double       bn_R,
-                                          const double       A_L,
-                                          const double       U_L,
-                                          const double       A_R,
-                                          const double       U_R,
-                                          const unsigned int vid_L,
-                                          const unsigned int vid_R,
-                                          const double       ad_L,
-                                          const double       ad_R) const
+  BloodFlowSystem<dim, spacedim>::lf_flux(
+    const double       bn_L,
+    const double       bn_R,
+    const double       A_L,
+    const double       U_L,
+    const double       A_R,
+    const double       U_R,
+    const unsigned int vid_L,
+    const unsigned int vid_R,
+    const double       ad_L,
+    const double       ad_R,
+    const double       external_pressure_L,
+    const double       external_pressure_R) const
   {
     const double FAL = scalar_area_flux(bn_L, A_L, U_L);
-    const double FUL = scalar_momentum_flux(
-      bn_L, U_L, compute_pressure_value(A_L, vid_L, ad_L), par["rho"]);
+    const double FUL =
+      scalar_momentum_flux(bn_L,
+                           U_L,
+                           compute_pressure_value(A_L, vid_L, ad_L) +
+                             external_pressure_L,
+                           par["rho"]);
     const double FAR = scalar_area_flux(bn_R, A_R, U_R);
-    const double FUR = scalar_momentum_flux(
-      bn_R, U_R, compute_pressure_value(A_R, vid_R, ad_R), par["rho"]);
+    const double FUR =
+      scalar_momentum_flux(bn_R,
+                           U_R,
+                           compute_pressure_value(A_R, vid_R, ad_R) +
+                             external_pressure_R,
+                           par["rho"]);
     const double alpha =
       theta * compute_LF_penalty(
                 A_L, A_R, U_L, U_R, bn_L, bn_R, vid_L, vid_R, ad_L, ad_R);
@@ -2000,7 +2029,8 @@ namespace MetricFlowX
     FEFaceValues<dim, spacedim> fef(*fe_,
                                     quad_face,
                                     update_values | update_JxW_values |
-                                      update_normal_vectors);
+                                      update_normal_vectors |
+                                      update_quadrature_points);
 
     rhs_function.set_time(t);
 
@@ -2035,9 +2065,11 @@ namespace MetricFlowX
             const double A = std::max(A_h[q], 1e-10);
             const double U = U_h[q];
             const double P =
-              compute_pressure_value(A, vid, compute_a_d_local(cell));
-            // const double              P =
-            // compute_pressure_value(A, vid);
+              compute_physical_pressure(A,
+                                        vid,
+                                        compute_a_d_local(cell),
+                                        t,
+                                        fev.get_quadrature_points()[q]);
             const Tensor<1, spacedim> b = compute_directional_vector(cell);
 
             const double rhs_A =
@@ -2106,6 +2138,8 @@ namespace MetricFlowX
                 const double U_hat = Uhat_q[q];
                 const double bn =
                   compute_tangent_normal_product(cell, normals[q]);
+                const Point<spacedim> &point = fef.get_quadrature_points()[q];
+                const double external_p = external_pressure({t, point, vid});
 
                 // numerical_flux designed for left/right states.
                 // In current implementation there is no physical
@@ -2120,7 +2154,9 @@ namespace MetricFlowX
                                                      vid,
                                                      vid,
                                                      ad_local,
-                                                     ad_face);
+                                                     ad_face,
+                                                     external_p,
+                                                     external_p);
 
                 for (unsigned int i = 0; i < n_dofs; ++i)
                   {
@@ -2148,6 +2184,7 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::assemble_trace_interior_equations(
+    const double      t,
     const VectorType &y,
     VectorType       &F)
   {
@@ -2168,7 +2205,8 @@ namespace MetricFlowX
     const QGauss<dim - 1> quad_face(1); // each 1-D face is a single 0-D point
     FEFaceValues<dim, spacedim> fef(*fe_,
                                     quad_face,
-                                    update_values | update_normal_vectors);
+                                    update_values | update_normal_vectors |
+                                      update_quadrature_points);
 
     // Avoid double assembly of the same face from the left and the right
     // cell.  The set is per rank, which is enough: the ownership guard below
@@ -2223,10 +2261,15 @@ namespace MetricFlowX
             fef[area_extractor].get_function_values(y_cell, A_R_v);
             fef[velocity_extractor].get_function_values(y_cell, U_R_v);
 
-            const double A_L = std::max(A_L_v[0], 1e-10);
-            const double U_L = U_L_v[0];
-            const double A_R = std::max(A_R_v[0], 1e-10);
-            const double U_R = U_R_v[0];
+            const double           A_L   = std::max(A_L_v[0], 1e-10);
+            const double           U_L   = U_L_v[0];
+            const double           A_R   = std::max(A_R_v[0], 1e-10);
+            const double           U_R   = U_R_v[0];
+            const Point<spacedim> &point = fef.get_quadrature_points()[0];
+            const double           external_pressure_L =
+              external_pressure({t, point, vid_L});
+            const double external_pressure_R =
+              external_pressure({t, point, vid_R});
 
             // Trace state
             double A_hat = 0.0, U_hat = 0.0;
@@ -2238,13 +2281,33 @@ namespace MetricFlowX
             // designed for left/right states. The trace acts as the
             // exterior state, therefore use opposite orientation on
             // the trace side.
-            const auto [FA_L, FU_L] = numerical_flux(
-              bn_L, bn_L, A_L, U_L, A_hat, U_hat, vid_L, vid_R, ad_L, ad_face);
+            const auto [FA_L, FU_L] = numerical_flux(bn_L,
+                                                     bn_L,
+                                                     A_L,
+                                                     U_L,
+                                                     A_hat,
+                                                     U_hat,
+                                                     vid_L,
+                                                     vid_R,
+                                                     ad_L,
+                                                     ad_face,
+                                                     external_pressure_L,
+                                                     external_pressure_R);
 
             // Right HDG type flux residuals (face integrals with
             // interior state from right cell)
-            const auto [FA_R, FU_R] = numerical_flux(
-              bn_R, bn_R, A_R, U_R, A_hat, U_hat, vid_R, vid_L, ad_R, ad_face);
+            const auto [FA_R, FU_R] = numerical_flux(bn_R,
+                                                     bn_R,
+                                                     A_R,
+                                                     U_R,
+                                                     A_hat,
+                                                     U_hat,
+                                                     vid_R,
+                                                     vid_L,
+                                                     ad_R,
+                                                     ad_face,
+                                                     external_pressure_R,
+                                                     external_pressure_L);
 
             // Trace dofs
             const FaceTraceDof &td = trace_it->second;
@@ -2279,7 +2342,9 @@ namespace MetricFlowX
     const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
     const QGauss<dim - 1>       quad_face(1);
-    FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
+    FEFaceValues<dim, spacedim> fef(*fe_,
+                                    quad_face,
+                                    update_values | update_quadrature_points);
 
     inflow_function.set_time(t);
 
@@ -2301,7 +2366,8 @@ namespace MetricFlowX
 
             // Interior cell value at face — use y_cell, not y
             fef.reinit(cell, f);
-            std::vector<double> A_int_v(1), U_int_v(1);
+            const Point<spacedim> &point = fef.get_quadrature_points()[0];
+            std::vector<double>    A_int_v(1), U_int_v(1);
             fef[area_extractor].get_function_values(y_cell, A_int_v);
             fef[velocity_extractor].get_function_values(y_cell, U_int_v);
 
@@ -2341,12 +2407,14 @@ namespace MetricFlowX
                     //   compute_pressure_value(A_hat, vid,
                     //   a_d_local) - (rcr.R1 * Q + Pc);
                     const double Pc = y(rcr_pc_dof.at(bid));
-                    res_A = compute_pressure_value(A_hat, vid, a_d_local) -
+                    res_A           = compute_physical_pressure(
+                              A_hat, vid, a_d_local, t, point) -
                             (rcr.R1 * Q + Pc);
                   }
                 else
                   { // single R: P = R2*Q + P_out
-                    res_A = compute_pressure_value(A_hat, vid, a_d_local) -
+                    res_A = compute_physical_pressure(
+                              A_hat, vid, a_d_local, t, point) -
                             (rcr.R2 * Q + rcr.P_out);
                   }
                 const double W1_int = U_int + 4.0 * (c_int - c0);
@@ -2450,6 +2518,7 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::assemble_trace_junction_equations(
+    const double      t,
     const VectorType &y,
     VectorType       &F)
   {
@@ -2573,9 +2642,11 @@ namespace MetricFlowX
             compute_a_d_at_face(J.half_faces[0].cell, J.half_faces[0].face_no);
           const double H0 =
             0.5 * gamma * U_hat[0] * U_hat[0] +
-            compute_pressure_value(A_hat[0],
-                                   J.half_faces[0].cell->material_id(),
-                                   a_d0) /
+            compute_physical_pressure(A_hat[0],
+                                      J.half_faces[0].cell->material_id(),
+                                      a_d0,
+                                      t,
+                                      J.location) /
               rho;
 
           for (unsigned int i = 1; i < K; ++i)
@@ -2584,9 +2655,11 @@ namespace MetricFlowX
                                                       J.half_faces[i].face_no);
               const double Hi =
                 0.5 * gamma * U_hat[i] * U_hat[i] +
-                compute_pressure_value(A_hat[i],
-                                       J.half_faces[i].cell->material_id(),
-                                       a_di) /
+                compute_physical_pressure(A_hat[i],
+                                          J.half_faces[i].cell->material_id(),
+                                          a_di,
+                                          t,
+                                          J.location) /
                   rho;
 
               if (locally_owned_dofs_.is_element(u_idx[i - 1]))
@@ -2675,9 +2748,9 @@ namespace MetricFlowX
     // ---- raw residuals R(y) -------------------------------------------------
     residual_F = 0.0;
     assemble_cell_residuals(t, y_relevant, residual_F);
-    assemble_trace_interior_equations(y_relevant, residual_F);
+    assemble_trace_interior_equations(t, y_relevant, residual_F);
     assemble_trace_boundary_equations(t, y_relevant, residual_F);
-    assemble_trace_junction_equations(y_relevant, residual_F);
+    assemble_trace_junction_equations(t, y_relevant, residual_F);
     assemble_trace_continuity_equations(y_relevant, residual_F);
     residual_F.compress(VectorOperation::add);
 
@@ -3651,6 +3724,15 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::compute_pressure(const VectorType &y,
                                                    VectorType       &p) const
   {
+    compute_pressure(y, p, time);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::compute_pressure(const VectorType &y,
+                                                   VectorType       &p,
+                                                   const double      t) const
+  {
     TimerOutput::Scope timer(computing_timer, "compute_pressure");
 
     p = 0.0;
@@ -3668,9 +3750,11 @@ namespace MetricFlowX
           if (fe_->system_to_component_index(i).first == 0)
             {
               const double A = y(ldofs[i]);
-              p(ldofs[i])    = compute_pressure_value(A,
-                                                   cell->material_id(),
-                                                   compute_a_d_local(cell));
+              p(ldofs[i])    = compute_physical_pressure(A,
+                                                      cell->material_id(),
+                                                      compute_a_d_local(cell),
+                                                      t,
+                                                      cell->center());
             }
       }
 
@@ -3683,6 +3767,42 @@ namespace MetricFlowX
                                            const unsigned int vessel_id) const
   {
     return compute_pressure_value(area, vessel_id);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::set_external_pressure_provider(
+    ExternalPressureProvider provider)
+  {
+    external_pressure_provider = std::move(provider);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::clear_external_pressure_provider()
+  {
+    external_pressure_provider = {};
+  }
+
+  template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::external_pressure(
+    const PressureEvaluationPoint &evaluation) const
+  {
+    if (!external_pressure_provider)
+      return 0.0;
+    return external_pressure_provider(evaluation);
+  }
+
+  template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::pressure(const double           area,
+                                           const unsigned int     vessel_id,
+                                           const double           t,
+                                           const Point<spacedim> &point) const
+  {
+    return compute_physical_pressure(
+      area, vessel_id, vessel_map.at(vessel_id).a_d, t, point);
   }
 
   template <int dim, int spacedim>
