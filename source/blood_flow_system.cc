@@ -2949,21 +2949,22 @@ namespace MetricFlowX
     const double                    t,
     const VectorType               &y,
     const ExternalPressureProvider &provider,
-    VectorType                     &destination)
+    VectorType                     &destination) const
   {
     TimerOutput::Scope timer(computing_timer, "add_external_pressure_residual");
     AssertThrow(provider,
                 ExcMessage("An external-pressure provider cannot be empty."));
     AssertDimension(destination.size(), n_total_dofs);
 
-    update_ghosted_vectors(y);
+    auto *self = const_cast<BloodFlowSystem *>(this);
+    self->update_ghosted_vectors(y);
     residual_F = 0.0;
-    assemble_cell_residuals(t, y_relevant, residual_F, &provider, true);
-    assemble_trace_interior_equations(
+    self->assemble_cell_residuals(t, y_relevant, residual_F, &provider, true);
+    self->assemble_trace_interior_equations(
       t, y_relevant, residual_F, &provider, true);
-    assemble_trace_boundary_equations(
+    self->assemble_trace_boundary_equations(
       t, y_relevant, residual_F, &provider, true);
-    assemble_trace_junction_equations(
+    self->assemble_trace_junction_equations(
       t, y_relevant, residual_F, &provider, true);
     residual_F.compress(VectorOperation::add);
 

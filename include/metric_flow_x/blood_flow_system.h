@@ -413,7 +413,7 @@ namespace MetricFlowX
     add_external_pressure_residual(const double                    t,
                                    const VectorType               &y,
                                    const ExternalPressureProvider &provider,
-                                   VectorType                     &destination);
+                                   VectorType &destination) const;
 
     // Jacobian dF/dy + alpha * dF/dydot.
     void
@@ -812,7 +812,7 @@ namespace MetricFlowX
     mutable VectorType y_relevant;
     mutable VectorType y_fe_relevant;
     mutable VectorType y_fe_owned;
-    VectorType         residual_F;
+    mutable VectorType residual_F;
 
     void
     update_ghosted_vectors(const VectorType &y) const;
