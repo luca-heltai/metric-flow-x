@@ -2101,6 +2101,17 @@ namespace MetricFlowX
 
     rhs_function.set_time(t);
 
+    std::vector<double> A_h(fev.n_quadrature_points);
+    std::vector<double> U_h(fev.n_quadrature_points);
+    std::vector<double> Ah_q(fef.n_quadrature_points);
+    std::vector<double> Uh_q(fef.n_quadrature_points);
+    std::vector<double> Ahat_q(fef.n_quadrature_points);
+    std::vector<double> Uhat_q(fef.n_quadrature_points);
+
+    const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
+    Vector<double>                       cell_rhs(n_dofs);
+    std::vector<types::global_dof_index> ldofs(n_dofs);
+
     const double rho = par["rho"];
     const double eta = 2.0 * (par["xi"] + 2.0) * numbers::PI * par["mu"] / rho;
 
@@ -2109,21 +2120,18 @@ namespace MetricFlowX
         if (!cell->is_locally_owned())
           continue;
 
-        const unsigned int vid    = cell->material_id();
-        const unsigned int n_dofs = fe_->n_dofs_per_cell();
+        const auto         cell_id = cell->id();
+        const unsigned int vid     = cell->material_id();
         fev.reinit(cell);
 
-        std::vector<types::global_dof_index> ldofs(n_dofs);
         cell->get_dof_indices(ldofs);
 
         const auto &JxW = fev.get_JxW_values();
 
-        std::vector<double> A_h(fev.n_quadrature_points);
-        std::vector<double> U_h(fev.n_quadrature_points);
         fev[area_extractor].get_function_values(y_cell, A_h);
         fev[velocity_extractor].get_function_values(y_cell, U_h);
 
-        Vector<double> cell_rhs(n_dofs);
+        cell_rhs = 0;
 
         // ---- Volume integral
         // --------------------------------------------------
@@ -2141,7 +2149,7 @@ namespace MetricFlowX
                                           compute_a_d_local(cell),
                                           t,
                                           fev.get_quadrature_points()[q],
-                                          cell->id());
+                                          cell_id);
             const Tensor<1, spacedim> b = compute_directional_vector(cell);
 
             const double rhs_A =
@@ -2190,8 +2198,6 @@ namespace MetricFlowX
             const auto  &JxW     = fef.get_JxW_values();
 
             // Interior cell values at the face quadrature point
-            std::vector<double> Ah_q(fef.n_quadrature_points);
-            std::vector<double> Uh_q(fef.n_quadrature_points);
             fef[area_extractor].get_function_values(y_cell, Ah_q);
             fef[velocity_extractor].get_function_values(y_cell, Uh_q);
 
@@ -2202,8 +2208,6 @@ namespace MetricFlowX
             // on an ordinary interior (or 2-way) face it is tied to
             // the canonical side by the continuity rows, so the
             // converged value is identical to the canonical one.
-            std::vector<double> Ahat_q(fef.n_quadrature_points);
-            std::vector<double> Uhat_q(fef.n_quadrature_points);
             fef[a_hat_extractor].get_function_values(y_cell, Ahat_q);
             fef[u_hat_extractor].get_function_values(y_cell, Uhat_q);
 
@@ -2217,7 +2221,7 @@ namespace MetricFlowX
                   compute_tangent_normal_product(cell, normals[q]);
                 const Point<spacedim> &point = fef.get_quadrature_points()[q];
                 const double           external_p =
-                  external_pressure({t, point, vid, cell->id()}, provider);
+                  external_pressure({t, point, vid, cell_id}, provider);
 
                 // numerical_flux designed for left/right states.
                 // In current implementation there is no physical
