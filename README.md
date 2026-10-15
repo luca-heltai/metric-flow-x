@@ -94,6 +94,32 @@ find_package(MetricFlowX CONFIG REQUIRED)
 target_link_libraries(application PRIVATE MetricFlowX::metric_flow_x)
 ```
 
+To build and install both variants in one single-config build tree (Ninja or
+Unix Makefiles), use a deal.II installation providing both Debug and Release:
+
+```bash
+cmake -S . -B build-metric-flow-x -DCMAKE_BUILD_TYPE=DebugRelease
+cmake --build build-metric-flow-x -j
+ctest --test-dir build-metric-flow-x --output-on-failure
+cmake --install build-metric-flow-x --prefix /path/to/install
+```
+
+In this mode, `metric_flow_x` and `blood_flow` are Release targets;
+`metric_flow_x_debug` and `blood_flow_debug` are Debug targets. Tests run
+against both libraries. Ordinary `Debug` and `Release` builds retain the
+unsuffixed target names.
+
+The installed `MetricFlowX::metric_flow_x` target provides both imported
+configurations and selects the library matching the consumer's build type.
+Configure ImmersX with `-DCMAKE_BUILD_TYPE=Debug` or `Release` and
+`-DCMAKE_PREFIX_PATH=/path/to/install`; both builds can use the same prefix.
+Consumers building both variants as separate targets in a single-config tree
+can link explicitly to `MetricFlowX::metric_flow_x_Debug` and
+`MetricFlowX::metric_flow_x_Release` instead of relying on the global build type.
+ImmersX's combined `DebugRelease` build currently needs this explicit selection
+([ImmersX #266](https://github.com/luca-heltai/immersx/issues/266)); separate
+ImmersX Debug and Release builds already select the correct variant.
+
 Headers are installed below `include/metric_flow_x/`, libraries below `lib/`,
 and the standalone executable below `bin/`.
 
