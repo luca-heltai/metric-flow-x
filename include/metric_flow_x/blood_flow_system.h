@@ -85,18 +85,18 @@ namespace MetricFlowX
   using dealii::UpdateFlags;
   using dealii::Vector;
   using dealii::VectorOperation;
-  namespace DoFTools              = dealii::DoFTools;
-  namespace FEValuesExtractors    = dealii::FEValuesExtractors;
-  namespace LinearAlgebraPETSc    = dealii::LinearAlgebraPETSc;
-  namespace LinearAlgebraTrilinos = dealii::LinearAlgebraTrilinos;
-  namespace PETScWrappers         = dealii::PETScWrappers;
-  namespace SUNDIALS              = dealii::SUNDIALS;
-  namespace SparsityTools         = dealii::SparsityTools;
-  namespace TrilinosWrappers      = dealii::TrilinosWrappers;
-  namespace numbers               = dealii::numbers;
-  namespace parallel              = dealii::parallel;
-  namespace types                 = dealii::types;
-  namespace Utilities             = dealii::Utilities;
+  namespace DoFTools           = dealii::DoFTools;
+  namespace FEValuesExtractors = dealii::FEValuesExtractors;
+  namespace LinearAlgebraPETSc = dealii::LinearAlgebraPETSc;
+  // namespace LinearAlgebraTrilinos = dealii::LinearAlgebraTrilinos;
+  namespace PETScWrappers = dealii::PETScWrappers;
+  namespace SUNDIALS      = dealii::SUNDIALS;
+  namespace SparsityTools = dealii::SparsityTools;
+  // namespace TrilinosWrappers      = dealii::TrilinosWrappers;
+  namespace numbers   = dealii::numbers;
+  namespace parallel  = dealii::parallel;
+  namespace types     = dealii::types;
+  namespace Utilities = dealii::Utilities;
 
   // ---------------------------------------------------------------------------
   // Linear algebra backend.
@@ -109,7 +109,7 @@ namespace MetricFlowX
   // ---------------------------------------------------------------------------
   namespace LA
   {
-#define FORCE_USE_OF_TRILINOS
+// #define FORCE_USE_OF_TRILINOS
 #if defined(DEAL_II_WITH_PETSC) && !defined(DEAL_II_PETSC_WITH_COMPLEX) && \
   !(defined(DEAL_II_WITH_TRILINOS) && defined(FORCE_USE_OF_TRILINOS))
     namespace MPI     = dealii::LinearAlgebraPETSc::MPI;
@@ -501,6 +501,55 @@ namespace MetricFlowX
     void
     compute_errors(const unsigned int k);
 
+    // -----------------------------------------------------------------------
+    // CSV diagnostics (ported from the pre-MetricFlowX run() loop)
+    //
+    //   HDG_IDA_Vessel_<vid>.csv : P, Q, A, U at each vessel midpoint
+    //   mass_conservation.csv    : dV/dt vs. net boundary flux
+    //   ida_statistics.csv       : IDA step / failure counts + BDF-order
+    //                              histogram (one row per simulation)
+    //   scaling_timings.csv      : TimerOutput wall time per section,
+    //                              tagged with the MPI process count
+    //
+    // Call sequence from the time-integration driver:
+    //   open_output_files();                     // before ida.solve_dae()
+    //   record_ida_step(ida);                    // first line of output_step
+    //   write_output_step(t, sol);               // inside output_step
+    //   finalize_output(ida, solve_wall_time);   // after ida.solve_dae()
+    //   write_scaling_timings();                 // once, at program end
+    //
+    // Every one of these is collective: call it on all ranks.
+    // -----------------------------------------------------------------------
+    void
+    open_output_files();
+
+    void
+    write_output_step(const double t, const VectorType &sol);
+
+    void
+    record_ida_step(const SUNDIALS::IDA<VectorType> &ida);
+
+    void
+    finalize_output(const SUNDIALS::IDA<VectorType> &ida,
+                    const double                     solve_wall_time);
+
+    void
+    write_ida_statistics(const SUNDIALS::IDA<VectorType> &ida,
+                         const double solve_wall_time) const;
+
+    void
+    write_scaling_timings() const;
+
+    void
+    check_mass_conservation(const VectorType &y, const double t) const;
+
+    void
+    open_csv_files();
+    void
+    write_csv_row(const double t, const VectorType &sol);
+    void
+    close_csv_files();
+
     enum class NumericalFluxType
     {
       HLL,
@@ -861,12 +910,18 @@ namespace MetricFlowX
                 typename DoFHandler<dim, spacedim>::active_cell_iterator>>
       probe_targets;
 
-    void
-    open_csv_files();
-    void
-    write_csv_row(const double t, const VectorType &sol);
-    void
-    close_csv_files();
+    // mass_conservation.csv state (rank 0 writes the file; every rank keeps
+    // the running values because the reductions are collective).
+    mutable std::ofstream mass_log;
+    mutable double        mass_prev_volume = 0.0;
+    mutable double        mass_prev_t      = 0.0;
+    mutable double        mass_flow_scale  = 0.0;
+    mutable bool          mass_initialized = false;
+
+    // ida_statistics.csv state: bdf_steps[k] = accepted steps at BDF order k
+    // (k = 1..5), attributed at each output_step callback.
+    std::array<long int, 6> bdf_steps{};
+    long int                bdf_prev_nst = 0;
 
     // -----------------------------------------------------------------------
     // Internal helpers — geometry

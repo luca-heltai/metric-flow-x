@@ -99,24 +99,35 @@ and the standalone executable below `bin/`.
 
 ## Large network datasets
 
-The generated vascular-network datasets are distributed as a GitHub Release
-asset so they do not inflate the Git checkout. The archive is about 399 MB; its
-contents occupy about 555 MB when extracted.
+The generated vascular-network datasets are distributed as GitHub Release
+assets on [the datasets release](https://github.com/luca-heltai/metric-flow-x/releases/tag/datasets-final-version-v1)
+so they do not inflate the Git checkout. The original network archive is about
+399 MB (555 MB extracted); the additional cerebral archive is about 2.7 MB
+(8.7 MB extracted).
 
 From the repository root, run:
 
 ```bash
-bash scripts/download_datasets.sh
+./scripts/download_datasets.sh
 ```
 
-The script downloads `blood-flow-datasets-v0.1.0.tar.gz` from release
-`v0.1.0` and extracts the files into their expected `notebooks/` paths. The
-downloaded data paths are ignored by Git.
+The script downloads both `blood-flow-datasets-v0.1.0.tar.gz` and
+`cerebral-datasets-v1.tar.gz` from release `datasets-final-version-v1` in
+`luca-heltai/metric-flow-x`. It verifies pinned SHA-256 checksums before
+extracting each archive into its expected `notebooks/` paths. The original
+archive is mirrored unchanged from `devi-raksha/blood-flow` release `v0.1.0`.
+The cerebral archive adds:
+
+- `notebooks/cerebral-data/ccoParietal_hc_wData.vtk`
+- `notebooks/cerebral-data/standard_cco.vtk`
+
+All downloaded data paths are ignored by Git. `curl`, `tar`, and either
+`shasum` or `sha256sum` are required.
 
 To extract into another directory, pass it as the first argument:
 
 ```bash
-bash scripts/download_datasets.sh /path/to/dataset-root
+./scripts/download_datasets.sh /path/to/dataset-root
 ```
 
 ## Testing
