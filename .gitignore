@@ -60,3 +60,5 @@ doc/api/
 /notebooks/graphExport.xml
 /notebooks/vascular_tree_physics.vtk
 /notebooks/very_large_vascular_tree_physics.vtk
+/notebooks/cerebral-data/ccoParietal_hc_wData.vtk
+/notebooks/cerebral-data/standard_cco.vtk

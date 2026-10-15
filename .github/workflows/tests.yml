@@ -7,6 +7,13 @@ on:
     branches: [main]
 
 jobs:
+  datasets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test release dataset downloader
+        run: python3 -m unittest discover -s tests -p test_download_datasets.py -v
+
   debug:
     runs-on: ubuntu-latest
     container:
