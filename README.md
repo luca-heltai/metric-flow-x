@@ -269,7 +269,9 @@ external pressure. Flow is outward: negative at a conventionally oriented inlet
 and positive at an outlet. Each boundary ID must identify exactly one terminal;
 only its owning MPI rank writes the file. Existing midpoint probe CSVs retain
 their original names and units. Mass-conservation and solver-summary files are
-also finalized by the standalone runner.
+also finalized by the standalone runner. BDF order counts attribute the steps
+since each IDA output callback to its last reported order; their sum equals the
+total accepted steps, but they are not an exact per-step order history.
 
 The PETSc direct path uses MUMPS when available and native serial LU otherwise.
 Parallel direct runs require PETSc built with MUMPS. Set `Use direct solver = false`

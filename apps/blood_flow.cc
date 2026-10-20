@@ -299,6 +299,7 @@ namespace MetricFlowX
           unsigned int output_number     = 0;
           ida.output_step =
             [&problem,
+             &ida,
              initial_output_time,
              final_output_time,
              &next_output_time,
@@ -307,6 +308,7 @@ namespace MetricFlowX
                              const VectorType & /*ydot*/,
                              const unsigned int /*step_number*/) {
               problem.time = t;
+              problem.record_ida_step(ida);
 
               const double tolerance =
                 16.0 * std::numeric_limits<double>::epsilon() *
