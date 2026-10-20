@@ -1,7 +1,7 @@
 """
 Convert an svVascularize .tree(.npz) network into a legacy ASCII VTK file
 
-Geometry, length and radius come straight from svVascularize.
+Geometry, lengths, radii and flows are converted from the stored unit system to SI.
 Everything else is derived with standard 1-D hemodynamics relations so the
 file carries the same fields as the reference:
 
@@ -16,16 +16,30 @@ Outlet model:
     USE_RCR = False -> single resistor (R1 = 0, R2 = R_total, C = 0)
 """
 
+import argparse
+
 import numpy as np
-from svv.tree.tree import Tree
-import matplotlib.pyplot as plt
 
 # ==================================================================
 # Files
 # ==================================================================
 
-input_file  = "./trees/network_50000.tree.npz"
-output_file = "./trees/network_100k_adnr.vtk"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("input_file", help="Trusted svVascularize .tree.npz archive")
+parser.add_argument("output_file", help="Legacy ASCII VTK output, in SI units")
+parser.add_argument("--length-unit", choices=("m", "cm", "mm"),
+                    help="Explicit override for missing/incorrect source metadata")
+parser.add_argument("--time-unit", choices=("s", "ms"),
+                    help="Explicit override for missing/incorrect source metadata")
+parser.add_argument("--rcr", action="store_true", help="Use RCR outlets")
+parser.add_argument("--young-modulus", type=float, default=2.25e4, help="Young modulus in Pa")
+parser.add_argument("--diastolic-pressure", type=float, default=0.0, help="Diastolic pressure in Pa")
+parser.add_argument("--reference-pressure", type=float, default=0.0, help="Reference pressure in Pa")
+parser.add_argument("--perfusion-pressure", type=float, default=1.25e5, help="Outlet driving pressure in Pa")
+parser.add_argument("--reference-inflow", type=float, default=1e-3, help="Diagnostic inflow in m^3/s")
+args = parser.parse_args()
+input_file = args.input_file
+output_file = args.output_file
 dataset_title = "svVascularize vessel network"
 
 
@@ -34,9 +48,9 @@ dataset_title = "svVascularize vessel network"
 # ==================================================================
 
 # --- wall material -------------------------------------------------
-E_YOUNG = 2.25e4          # Young's modulus  [Pa]   -> field "E"
-P_D     = 0.0        # diastolic pressure [Pa] -> field "p_d"
-P_0     = 0.0             # reference pressure [Pa] -> field "p0"
+E_YOUNG = args.young_modulus          # Young's modulus  [Pa]   -> field "E"
+P_D     = args.diastolic_pressure        # diastolic pressure [Pa] -> field "p_d"
+P_0     = args.reference_pressure             # reference pressure [Pa] -> field "p0"
 
 # --- wall-thickness law:  E*h/r = k1*exp(k2*r) + k3 ----------------
 #     => h = (r / E) * (k1*exp(k2*r) + k3)
@@ -50,8 +64,8 @@ WALL_K3 = 2.632577e4
 #     DELTA_P is the driving/perfusion pressure used ONLY to scale the
 #     outlet resistance. It is kept independent of P_D / P_0 on purpose,
 #     so setting p_d = 0 and p0 = 0 does NOT force the resistances to 0.
-USE_RCR     = False      # False -> single resistor (R1 = 0, C = 0)
-DELTA_P     = 1.25e5      # perfusion pressure across the outlet bed [Pa]
+USE_RCR     = args.rcr      # False -> single resistor (R1 = 0, C = 0)
+DELTA_P     = args.perfusion_pressure      # perfusion pressure across the outlet bed [Pa]
 R1_FRACTION = 0.2          # only used when USE_RCR is True
 TAU         = 0.283        # RC time constant [s]  (only used when USE_RCR)
 P_OUT       = 0.0          # outlet pressure  [Pa] -> field "P_out"
@@ -59,7 +73,7 @@ P_OUT       = 0.0          # outlet pressure  [Pa] -> field "P_out"
 # Diagnostic only: the steady inflow you drive in the solver, so the script
 # can report the mean pressure drop this network will actually produce.
 # Set this to match your parameter-file "Inflow function" plateau.
-REFERENCE_INFLOW = 1.0e-3  # [m^3/s]
+REFERENCE_INFLOW = args.reference_inflow  # [m^3/s]
 
 # ##########
 
@@ -103,9 +117,7 @@ REFERENCE_INFLOW = 1.0e-3  # [m^3/s]
 # boundary_id codes
 #   root      -> 0
 #   outlets   -> 1, 2, 3, ...  (one per terminal, in node-id order)
-#   junctions -> 255           (matches 56_adnr_new.vtk convention; not a
-#                                real outlet, so it must sit outside the
-#                                1..n_outlets range used above)
+#   junctions -> 300655 (representable as uint32 and above all outlet IDs)
 BID_ROOT     = 0
 BID_INTERIOR = 300655
 
@@ -127,20 +139,33 @@ COL_FLOW          = 22
 # Load tree
 # ==================================================================
 
-tree = Tree.load(input_file)
-data = np.asarray(tree.data)
+# The archive contains pickled dictionaries; use only trusted tree files.
+with np.load(input_file, allow_pickle=True) as archive:
+    data = np.array(archive["data"], dtype=float, copy=True)
+    parameters = archive["parameters"].item() if "parameters" in archive else {}
+units = parameters.get("unit_system", {})
+length_unit = args.length_unit or units.get("length")
+time_unit = args.time_unit or units.get("time")
+length_factors = {"m": 1.0, "cm": 1e-2, "mm": 1e-3}
+time_factors = {"s": 1.0, "ms": 1e-3}
+if length_unit not in length_factors or time_unit not in time_factors:
+    raise ValueError("Missing or unsupported unit_system: supply --length-unit "
+                     "and --time-unit explicitly; source units are never inferred.")
+length_scale = length_factors[length_unit]
+flow_scale = length_scale**3 / time_factors[time_unit]
+print(f"Source units: length={length_unit}, time={time_unit}; output: SI")
 
 print("Tree loaded successfully!")
-print("Number of vessel segments:", tree.segment_count)
+print("Number of vessel segments:", len(data))
 print("Data shape:", data.shape)
 
-proximal      = data[:, COL_PROXIMAL]
-distal        = data[:, COL_DISTAL]
+proximal      = data[:, COL_PROXIMAL] * length_scale
+distal        = data[:, COL_DISTAL] * length_scale
 proximal_node = data[:, COL_PROXIMAL_NODE].astype(int)
 distal_node   = data[:, COL_DISTAL_NODE].astype(int)
-length        = data[:, COL_LENGTH].astype(float)
-radius        = data[:, COL_RADIUS].astype(float)
-flow          = np.abs(data[:, COL_FLOW].astype(float))
+length        = data[:, COL_LENGTH].astype(float) * length_scale
+radius        = data[:, COL_RADIUS].astype(float) * length_scale
+flow          = np.abs(data[:, COL_FLOW].astype(float)) * flow_scale
 
 n_vessels = len(data)
 
@@ -311,7 +336,7 @@ with open(output_file, "w") as f:
 
     # ---- point data ----
     f.write(f"POINT_DATA {n_points}\n")
-    f.write("SCALARS boundary_id double 1\n")
+    f.write("SCALARS boundary_id unsigned_int 1\n")
     f.write("LOOKUP_TABLE default\n")
     for v in boundary_id:
         f.write(f"{int(v)}\n")

@@ -11,6 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install converter test dependency
+        run: python3 -m pip install numpy
+      - name: Test svVascularize SI conversion
+        run: |
+          python3 -m unittest discover -s tests -p test_svv_conversion.py -v
+          python3 -m unittest discover -s tests -p test_repair_svv_units.py -v
       - name: Test release dataset downloader
         run: python3 -m unittest discover -s tests -p test_download_datasets.py -v
 

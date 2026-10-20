@@ -42,4 +42,7 @@ download_and_extract() {
 
 download_and_extract "${NETWORK_ASSET}" "${NETWORK_SHA256}"
 download_and_extract "${CEREBRAL_ASSET}" "${CEREBRAL_SHA256}"
+# The checksum-pinned archive predates the svVascularize SI unit fix.
+python3 "${REPOSITORY_ROOT}/tools/repair_legacy_svv_units.py" "${DESTINATION}"
 echo "Datasets extracted to ${DESTINATION}."
+

@@ -1,3 +1,4 @@
+import shutil
 """Exercise the real downloader with tiny local release-asset fixtures."""
 
 import hashlib
@@ -26,6 +27,9 @@ class DownloadDatasetsTest(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.repo = self.root / "repository with spaces"
         (self.repo / "scripts").mkdir(parents=True)
+        (self.repo / "tools").mkdir()
+        for name in ("repair_legacy_svv_units.py", "validate_vtk_network.py"):
+            shutil.copyfile(SCRIPT.parents[1] / "tools" / name, self.repo / "tools" / name)
         source = SCRIPT.read_text()
         for asset, member, checksum in ASSETS:
             archive = self.root / asset
