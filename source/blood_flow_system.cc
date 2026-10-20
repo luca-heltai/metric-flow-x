@@ -62,36 +62,34 @@ namespace MetricFlowX
   //
   // SUNDIALS::IDA keeps its `ida_mem` handle private, but IDAGetNumSteps and
   // friends need it.  An explicit instantiation may name a private member, so
-  // Planter<..., &IDA::ida_mem> captures the pointer-to-member and exposes it
+  // Planter<&IDA::ida_mem> captures the pointer-to-member and exposes it
   // through the ADL-found friend steal().  Same trick as the pre-MetricFlowX
   // driver; it lives in exactly one translation unit.
   // ===========================================================================
   namespace internal_ida_access
   {
-    template <typename VecType>
     struct IdaMemAccessor
     {
-      using type = void *dealii::SUNDIALS::IDA<VecType>::*;
+      using type = void *dealii::SUNDIALS::IDA<VectorType>::*;
       friend type        steal(IdaMemAccessor);
     };
 
-    template <typename VecType, typename IdaMemAccessor<VecType>::type M>
+    template <IdaMemAccessor::type M>
     struct Planter
     {
-      friend typename IdaMemAccessor<VecType>::type
-      steal(IdaMemAccessor<VecType>)
+      friend IdaMemAccessor::type
+      steal(IdaMemAccessor)
       {
         return M;
       }
     };
 
-    template struct Planter<VectorType,
-                            &dealii::SUNDIALS::IDA<VectorType>::ida_mem>;
+    template struct Planter<&dealii::SUNDIALS::IDA<VectorType>::ida_mem>;
 
     inline void *
     get_ida_mem(const dealii::SUNDIALS::IDA<VectorType> &ida)
     {
-      return ida.*steal(IdaMemAccessor<VectorType>{});
+      return ida.*steal(IdaMemAccessor{});
     }
   } // namespace internal_ida_access
 
@@ -1306,10 +1304,10 @@ namespace MetricFlowX
       trace_dofs_owned.compress();
 
       const std::array<ComponentMask, 4> component_masks = {
-        ComponentMask({true, false, false, false}),
-        ComponentMask({false, true, false, false}),
-        ComponentMask({false, false, true, false}),
-        ComponentMask({false, false, false, true})};
+        {ComponentMask({true, false, false, false}),
+         ComponentMask({false, true, false, false}),
+         ComponentMask({false, false, true, false}),
+         ComponentMask({false, false, false, true})}};
       for (unsigned int c = 0; c < component_masks.size(); ++c)
         {
           component_dofs_[c].clear();

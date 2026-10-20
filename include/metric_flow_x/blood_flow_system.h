@@ -1,6 +1,8 @@
 #ifndef METRIC_FLOW_X_BLOOD_FLOW_SYSTEM_H
 #define METRIC_FLOW_X_BLOOD_FLOW_SYSTEM_H
 
+#include <deal.II/base/config.h>
+
 #include <deal.II/base/conditional_ostream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/function_parser.h>
@@ -27,7 +29,18 @@
 
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
-#include <deal.II/lac/generic_linear_algebra.h>
+// Include only the selected backend: the generic header also pulls in the
+// deprecated Epetra package when PETSc is used.
+#if defined(DEAL_II_WITH_PETSC) && !defined(DEAL_II_PETSC_WITH_COMPLEX) && \
+  !(defined(DEAL_II_WITH_TRILINOS) && defined(FORCE_USE_OF_TRILINOS))
+#  include <deal.II/lac/petsc_precondition.h>
+#  include <deal.II/lac/petsc_solver.h>
+#  include <deal.II/lac/petsc_sparse_matrix.h>
+#  include <deal.II/lac/petsc_vector.h>
+#  define USE_PETSC_LA
+#else
+#  include <deal.II/lac/generic_linear_algebra.h>
+#endif
 #include <deal.II/lac/solver_control.h>
 #include <deal.II/lac/solver_gmres.h>
 #include <deal.II/lac/sparsity_tools.h>
@@ -87,11 +100,9 @@ namespace MetricFlowX
   using dealii::VectorOperation;
   namespace DoFTools           = dealii::DoFTools;
   namespace FEValuesExtractors = dealii::FEValuesExtractors;
-  namespace LinearAlgebraPETSc = dealii::LinearAlgebraPETSc;
-  // namespace LinearAlgebraTrilinos = dealii::LinearAlgebraTrilinos;
-  namespace PETScWrappers = dealii::PETScWrappers;
-  namespace SUNDIALS      = dealii::SUNDIALS;
-  namespace SparsityTools = dealii::SparsityTools;
+  namespace PETScWrappers      = dealii::PETScWrappers;
+  namespace SUNDIALS           = dealii::SUNDIALS;
+  namespace SparsityTools      = dealii::SparsityTools;
   // namespace TrilinosWrappers      = dealii::TrilinosWrappers;
   namespace numbers   = dealii::numbers;
   namespace parallel  = dealii::parallel;
@@ -109,12 +120,14 @@ namespace MetricFlowX
   // ---------------------------------------------------------------------------
   namespace LA
   {
-// #define FORCE_USE_OF_TRILINOS
-#if defined(DEAL_II_WITH_PETSC) && !defined(DEAL_II_PETSC_WITH_COMPLEX) && \
-  !(defined(DEAL_II_WITH_TRILINOS) && defined(FORCE_USE_OF_TRILINOS))
-    namespace MPI     = dealii::LinearAlgebraPETSc::MPI;
-    using SolverGMRES = dealii::LinearAlgebraPETSc::SolverGMRES;
-#  define USE_PETSC_LA
+#ifdef USE_PETSC_LA
+    namespace MPI
+    {
+      using Vector          = dealii::PETScWrappers::MPI::Vector;
+      using SparseMatrix    = dealii::PETScWrappers::MPI::SparseMatrix;
+      using PreconditionILU = dealii::PETScWrappers::PreconditionILU;
+    } // namespace MPI
+    using SolverGMRES = dealii::PETScWrappers::SolverGMRES;
 #elif defined(DEAL_II_WITH_TRILINOS)
     namespace MPI     = dealii::LinearAlgebraTrilinos::MPI;
     using SolverGMRES = dealii::LinearAlgebraTrilinos::SolverGMRES;
