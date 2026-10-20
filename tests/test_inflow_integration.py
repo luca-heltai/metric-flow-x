@@ -68,17 +68,19 @@ def validate(executable, destination, mpi):
                 assert abs(actual["time_s"] - expected["time_s"]) < 1e-14
                 assert abs(actual["flow_m3_s"] - expected["flow_m3_s"]) < 1e-12, key
                 assert abs(actual["pressure_Pa"] - expected["pressure_Pa"]) < 1e-3, key
-    # Coverage errors must be diagnosed before the runner opens terminal files.
+    # Reject insufficient coverage before the runner creates terminal files.
     bad = destination / "uncovered"
     bad.mkdir(exist_ok=True)
-    (bad / "short.csv").write_text("time_s,flow_m3_s\n0,0\n0.005,1e-8\n")
-    extra = f"  set Inflow CSV file = {bad / short.csv}\n  set Write terminal CSV files = true\n  set Output directory = {bad / output}\n"
+    csv_path = bad / "short.csv"
+    output_path = bad / "output"
+    csv_path.write_text("time_s,flow_m3_s\n0,0\n0.005,1e-8\n")
+    extra = f"  set Inflow CSV file = {csv_path}\n  set Write terminal CSV files = true\n  set Output directory = {output_path}\n"
     (bad / "parameters.prm").write_text(source.replace("  set Output filename", extra + "  set Output filename"))
     result = subprocess.run([str(executable), "parameters.prm"], cwd=bad,
                             env=environment, capture_output=True, text=True, timeout=30)
     assert result.returncode != 0
     assert "extrapolation" in result.stdout + result.stderr
-    assert not list((bad / "output").glob("terminal_*.csv"))
+    assert not list(output_path.glob("terminal_*.csv"))
     print(f"Analytic/CSV inflow and terminal traces agree for MPI ranks {ranks_to_check}; inlet flow is nonzero.")
 
 
