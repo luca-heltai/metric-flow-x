@@ -342,8 +342,6 @@ def validate_network(parsed: LegacyVtk) -> dict[str, Any]:
                 errors.append(f"C at terminal boundary {boundary_id} must be nonnegative")
             if capacitance > 0 and r1 <= 0:
                 errors.append(f"RCR terminal boundary {boundary_id} requires R1 > 0 when C > 0")
-            if capacitance <= 0 and r1 > 0:
-                errors.append(f"single-resistance terminal boundary {boundary_id} requires R1 = 0 when C = 0")
 
     if diagnostics:
         errors.extend(f"{item['kind']} diagnostic: {item}" for item in diagnostics)

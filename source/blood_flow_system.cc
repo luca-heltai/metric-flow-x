@@ -2135,7 +2135,7 @@ namespace MetricFlowX
     const QGauss<dim>     quad_cell(fe_->tensor_degree() + 1);
     const QGauss<dim - 1> quad_face(fe_->tensor_degree() + 1);
 
-    FEValues<dim, spacedim>     fev(*fe_,
+    FEValues<dim, spacedim> fev(*fe_,
                                 quad_cell,
                                 update_values | update_gradients |
                                   update_quadrature_points | update_JxW_values);
@@ -2596,14 +2596,14 @@ namespace MetricFlowX
                     //   a_d_local) - (rcr.R1 * Q + Pc);
                     const double Pc = y(rcr_pc_dof.at(bid));
                     res_A           = compute_physical_pressure(
-                              A_hat, vid, a_d_local, t, point, cell->id()) -
-                            (rcr.R1 * Q + Pc);
+                                        A_hat, vid, a_d_local, t, point, cell->id()) -
+                                      (rcr.R1 * Q + Pc);
                   }
                 else
-                  { // single R: P = R2*Q + P_out
+                  { // C=0: the two resistances remain in series.
                     res_A = compute_physical_pressure(
                               A_hat, vid, a_d_local, t, point, cell->id()) -
-                            (rcr.R2 * Q + rcr.P_out);
+                            ((rcr.R1 + rcr.R2) * Q + rcr.P_out);
                   }
                 const double W1_int = U_int + 4.0 * (c_int - c0);
                 res_U               = (U_hat_cur + 4.0 * (c_hat - c0)) - W1_int;
@@ -3714,20 +3714,12 @@ namespace MetricFlowX
                   }
                 else
                   {
-                    // Single R
-                    // -------------------------------------------------------
-                    // res_A = P(A_hat) - R2*(A_hat*U_hat) - P_out
-                    // res_U = U_hat + 4(c_hat - c0) - W1_int
-                    //
-                    // dres_A/dA_hat = dP/dA_hat - R2*U_hat   (same
-                    // form as RCR with R2) dres_A/dU_hat =
-                    // -R2*A_hat               (R2 replaces R1) Pc
-                    // term drops out (no capacitor, no time
-                    // derivative)
+                    // C=0: P = (R1 + R2)*Q + P_out; no capacitor unknown.
+                    const double resistance = rcr.R1 + rcr.R2;
                     jacobian_matrix.add(a_row,
                                         a_row,
-                                        dPdA_hat - rcr.R2 * U_hat_cur);
-                    jacobian_matrix.add(a_row, u_row, -rcr.R2 * A_hat);
+                                        dPdA_hat - resistance * U_hat_cur);
+                    jacobian_matrix.add(a_row, u_row, -resistance * A_hat);
 
                     // dres_U/dA_hat = 4*dc_hat
                     // dres_U/dU_hat = 1
