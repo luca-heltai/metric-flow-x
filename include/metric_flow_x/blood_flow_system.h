@@ -326,6 +326,20 @@ namespace MetricFlowX
     VectorType
     make_state() const;
 
+    /** Absolute IDA tolerances in area, velocity and capacitor-pressure units.
+     */
+    VectorType
+    make_absolute_tolerances() const;
+
+    /** Sampled maximum |U|/c per vessel, including boundary traces. Collective.
+     */
+    std::map<unsigned int, double>
+    maximum_mach_numbers(const VectorType &state);
+
+    void
+    report_flow_regime(const VectorType &state, const double t);
+
+
     void
     reinit_state(VectorType &state) const;
 
@@ -582,6 +596,16 @@ namespace MetricFlowX
     ConditionalOStream  pcout;
     mutable TimerOutput computing_timer;
     SolverControl       direct_solver_control;
+
+    bool                   use_componentwise_tolerances     = false;
+    double                 area_absolute_tolerance_fraction = 1e-3;
+    double                 velocity_absolute_tolerance      = 1e-4;
+    double                 capacitor_absolute_tolerance     = 1.0;
+    bool                   write_flow_regime_diagnostics    = false;
+    double                 mach_warning_threshold           = 0.8;
+    std::ofstream          flow_regime_log;
+    std::set<unsigned int> mach_warning_active;
+
 
     // -----------------------------------------------------------------------
     // Physical parameters

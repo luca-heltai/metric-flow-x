@@ -202,6 +202,16 @@ namespace MetricFlowX
             v.reinit(problem.locally_owned_dofs_, problem.mpi_communicator_);
           };
 
+          auto absolute_tolerances = problem.make_state();
+          if (problem.use_componentwise_tolerances)
+            {
+              absolute_tolerances = problem.make_absolute_tolerances();
+              ida.get_local_tolerances =
+                [&absolute_tolerances]() -> VectorType & {
+                return absolute_tolerances;
+              };
+            }
+
           ida.differential_components = [&problem]() -> IndexSet {
             IndexSet is(problem.n_total_dofs);
             is.add_indices(problem.cell_dofs_owned);
@@ -309,6 +319,7 @@ namespace MetricFlowX
               problem.compute_pressure(sol, problem.pressure_);
               problem.output_results(sol, problem.pressure_, output_number++);
               problem.write_csv_row(t, sol);
+              problem.report_flow_regime(sol, t);
 
               if (problem.time_interval > 0.0)
                 {

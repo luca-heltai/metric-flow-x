@@ -140,6 +140,17 @@ namespace MetricFlowX
     add_parameter("Problem constants", constants);
     add_parameter("Output filename", output_filename);
     add_parameter("Use direct solver", use_direct_solver);
+    add_parameter("Use componentwise absolute tolerances",
+                  use_componentwise_tolerances);
+    add_parameter("Area absolute tolerance fraction",
+                  area_absolute_tolerance_fraction);
+    add_parameter("Velocity absolute tolerance", velocity_absolute_tolerance);
+    add_parameter("Capacitor pressure absolute tolerance",
+                  capacitor_absolute_tolerance);
+    add_parameter("Write flow regime diagnostics",
+                  write_flow_regime_diagnostics);
+    add_parameter("Mach warning threshold", mach_warning_threshold);
+
     add_parameter("Number of refinement cycles", n_refinement_cycles);
     add_parameter("Number of global refinement", n_global_refinements);
     add_parameter("Theta (penalty parameter)", theta);
@@ -196,6 +207,15 @@ namespace MetricFlowX
     deallog.depth_console(this_mpi_process == 0 ? verbosity : 0);
     deallog.depth_file(this_mpi_process == 0 ? verbosity : 0);
 
+    for (const double value : {area_absolute_tolerance_fraction,
+                               velocity_absolute_tolerance,
+                               capacitor_absolute_tolerance,
+                               mach_warning_threshold})
+      AssertThrow(
+        std::isfinite(value) && value > 0.0,
+        ExcMessage(
+          "Component tolerance scales and Mach threshold must be finite and positive."));
+
     exact_solution.update_constants(par);
     rhs_function.update_constants(par);
     inflow_function.update_constants(par);
@@ -227,6 +247,120 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::make_state() const
   {
     return VectorType(locally_owned_dofs_, mpi_communicator_);
+  }
+
+  template <int dim, int spacedim>
+  VectorType
+  BloodFlowSystem<dim, spacedim>::make_absolute_tolerances() const
+  {
+    auto result = make_state();
+    result      = velocity_absolute_tolerance;
+    std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          cell->get_dof_indices(indices);
+          const double reference_area = std::min(compute_a_d_at_face(cell, 0),
+                                                 compute_a_d_at_face(cell, 1));
+          for (unsigned int i = 0; i < indices.size(); ++i)
+            {
+              const auto component = fe_->system_to_component_index(i).first;
+              if (component == 0 || component == 2)
+                result(indices[i]) =
+                  area_absolute_tolerance_fraction * reference_area;
+            }
+        }
+    for (const auto index : rcr_dofs_owned)
+      result(index) = capacitor_absolute_tolerance;
+    result.compress(VectorOperation::insert);
+    return result;
+  }
+
+  template <int dim, int spacedim>
+  std::map<unsigned int, double>
+  BloodFlowSystem<dim, spacedim>::maximum_mach_numbers(const VectorType &state)
+  {
+    update_ghosted_vectors(state);
+    std::map<unsigned int, unsigned int> offsets;
+    for (const auto &[id, vessel] : vessel_map)
+      {
+        (void)vessel;
+        const unsigned int next = offsets.size();
+        offsets.emplace(id, next);
+      }
+    std::vector<double>     local(offsets.size(), 0.0), global(offsets.size());
+    const QGauss<dim>       quadrature(fe_degree + 2);
+    FEValues<dim, spacedim> values(*fe_, quadrature, update_values);
+    const FEValuesExtractors::Scalar area(0), velocity(1);
+    std::vector<double> areas(quadrature.size()), velocities(quadrature.size());
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          const unsigned int id   = cell->material_id();
+          double            &peak = local[offsets.at(id)];
+          values.reinit(cell);
+          values[area].get_function_values(y_fe_relevant, areas);
+          values[velocity].get_function_values(y_fe_relevant, velocities);
+          for (unsigned int q = 0; q < quadrature.size(); ++q)
+            peak = std::max(peak,
+                            std::abs(velocities[q]) /
+                              compute_wave_speed(areas[q], cell));
+          for (const auto face : cell->face_indices())
+            {
+              double a, u;
+              get_face_trace(y_relevant, cell, face, a, u);
+              peak = std::max(
+                peak,
+                std::abs(u) /
+                  compute_wave_speed(a, id, compute_a_d_at_face(cell, face)));
+            }
+        }
+    Utilities::MPI::max(ArrayView<const double>(local),
+                        mpi_communicator_,
+                        ArrayView<double>(global));
+    std::map<unsigned int, double> result;
+    for (const auto &[id, offset] : offsets)
+      result.emplace(id, global[offset]);
+    return result;
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::report_flow_regime(const VectorType &state,
+                                                     const double      t)
+  {
+    if (!write_flow_regime_diagnostics)
+      return;
+    const auto maxima = maximum_mach_numbers(state);
+    if (this_mpi_process == 0 && !flow_regime_log.is_open())
+      {
+        const std::string dir =
+          output_directory.empty() ? "." : output_directory;
+        std::filesystem::create_directories(dir);
+        flow_regime_log.open(dir + "/flow_regime.csv");
+        flow_regime_log << "time_s,vessel_id,max_abs_U_over_c\n";
+      }
+    const unsigned int writable =
+      this_mpi_process != 0 || flow_regime_log.good();
+    AssertThrow(Utilities::MPI::min(writable, mpi_communicator_) != 0,
+                ExcMessage("Cannot open flow_regime.csv"));
+    for (const auto &[id, peak] : maxima)
+      {
+        if (this_mpi_process == 0)
+          flow_regime_log << std::setprecision(17) << t << ',' << id << ','
+                          << peak << '\n';
+        if (peak >= mach_warning_threshold)
+          {
+            if (mach_warning_active.insert(id).second)
+              pcout << "WARNING: vessel " << id << " reaches |U|/c=" << peak
+                    << " at t=" << t
+                    << "; subsonic trace equations approach a sonic fold.\n";
+          }
+        else
+          mach_warning_active.erase(id);
+      }
+    if (this_mpi_process == 0)
+      flow_regime_log.flush();
   }
 
   template <int dim, int spacedim>
@@ -383,6 +517,15 @@ namespace MetricFlowX
     VTKUtils::read_cell_data(vtk_file_path, "p0", cell_p0);
     VTKUtils::read_cell_data(vtk_file_path, "L", cell_L);
     VTKUtils::read_cell_data(vtk_file_path, "r_d", cell_r_d);
+
+    if (write_flow_regime_diagnostics)
+      for (unsigned int i = 0; i < cell_a_d.size(); ++i)
+        {
+          const double from_radius = numbers::PI * cell_r_d[i] * cell_r_d[i];
+          if (std::abs(cell_a_d[i] - from_radius) > 0.02 * from_radius)
+            pcout << "WARNING: vessel " << cell_vessel_ids[i]
+                  << " has a_d inconsistent with pi*r_d^2 by more than 2%.\n";
+        }
 
     // Tapered radii are optional.
     try
@@ -1675,6 +1818,7 @@ namespace MetricFlowX
 
     close_csv_files();
     csv_vessel.clear();
+    mach_warning_active.clear();
     probe_targets.clear();
 
     const std::string hdr = "time_s,P_dynpcm2,Q_cm3ps,A_cm2,U_cmps\n";
@@ -1786,6 +1930,7 @@ namespace MetricFlowX
   void
   BloodFlowSystem<dim, spacedim>::close_csv_files()
   {
+    flow_regime_log.close();
     for (auto &kv : csv_vessel)
       if (kv.second.is_open())
         kv.second.close();
