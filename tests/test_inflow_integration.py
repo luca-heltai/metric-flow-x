@@ -57,10 +57,6 @@ def validate(executable, destination, mpi):
                 assert all(math.isfinite(value) for row in numeric for value in row.values())
                 assert abs(numeric[-1]["time_s"] - 0.01) < 1e-14
                 traces[kind, ranks][path.name] = numeric
-            with (folder / "output/ida_statistics.csv").open() as stream:
-                statistics = list(csv.DictReader(stream))[-1]
-            assert int(statistics["n_steps"]) > 0
-            assert sum(int(statistics[f"bdf{order}_steps"]) for order in range(1, 6)) == int(statistics["n_steps"])
             inlet = traces[kind, ranks]["terminal_0.csv"]
             error = max(abs(row["flow_m3_s"] + max(0, 1e-8 - 2e-6 * abs(row["time_s"] - 0.005))) for row in inlet)
             assert error < 5e-11, (kind, ranks, error)

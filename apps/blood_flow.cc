@@ -22,7 +22,6 @@
 #include <metric_flow_x/blood_flow_system.h> // header exposing BloodFlowSystem
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -70,7 +69,7 @@ namespace MetricFlowX
               problem.initialize_terminal_capacitors();
               problem.build_per_cell_mass_inv();
             }
-          problem.open_output_files();
+          problem.open_csv_files();
           problem.initialize_state(problem.solution,
                                    problem.ida_parameters.initial_time);
           problem.initialize_state_derivative(
@@ -242,6 +241,14 @@ namespace MetricFlowX
                 problem.direct_lu =
                   std::make_unique<PETScWrappers::PreconditionLU>(
                     problem.linear_system_matrix);
+                // Inflow trace rows can have a zero diagonal at rest.
+                const PetscErrorCode error = PCFactorReorderForNonzeroDiagonal(
+                  problem.direct_lu->get_pc(),
+                  PETScWrappers::PreconditionLU::AdditionalData().zero_pivot);
+                AssertThrow(error == 0,
+                            ExcMessage(
+                              "Cannot reorder the native PETSc LU diagonal."));
+
 #  endif
 #else
                 problem.direct_solver =
@@ -299,7 +306,6 @@ namespace MetricFlowX
           unsigned int output_number     = 0;
           ida.output_step =
             [&problem,
-             &ida,
              initial_output_time,
              final_output_time,
              &next_output_time,
@@ -308,7 +314,6 @@ namespace MetricFlowX
                              const VectorType & /*ydot*/,
                              const unsigned int /*step_number*/) {
               problem.time = t;
-              problem.record_ida_step(ida);
 
               const double tolerance =
                 16.0 * std::numeric_limits<double>::epsilon() *
@@ -325,7 +330,7 @@ namespace MetricFlowX
 
               problem.compute_pressure(sol, problem.pressure_);
               problem.output_results(sol, problem.pressure_, output_number++);
-              problem.write_output_step(t, sol);
+              problem.write_csv_row(t, sol);
 
               if (problem.time_interval > 0.0)
                 {
@@ -344,15 +349,10 @@ namespace MetricFlowX
                 }
             };
 
-          problem.solution_dot   = 0.0;
-          problem.time           = problem.ida_parameters.initial_time;
-          const auto solve_start = std::chrono::steady_clock::now();
+          problem.solution_dot = 0.0;
+          problem.time         = problem.ida_parameters.initial_time;
           ida.solve_dae(problem.solution, problem.solution_dot);
-          const double solve_seconds =
-            std::chrono::duration<double>(std::chrono::steady_clock::now() -
-                                          solve_start)
-              .count();
-          problem.finalize_output(ida, solve_seconds);
+          problem.close_csv_files();
           problem.compute_pressure(problem.solution, problem.pressure_);
           problem.compute_errors(cycle);
         }

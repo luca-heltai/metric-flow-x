@@ -1746,6 +1746,11 @@ namespace MetricFlowX
                 ExcMessage(
                   "Parallel direct solves require PETSc with MUMPS. Set Use direct solver = false for GMRES with block Jacobi."));
               PETScWrappers::PreconditionLU factorization(linear_system_matrix);
+              const PetscErrorCode error = PCFactorReorderForNonzeroDiagonal(
+                factorization.get_pc(),
+                PETScWrappers::PreconditionLU::AdditionalData().zero_pivot);
+              AssertThrow(error == 0,
+                          ExcMessage("Cannot reorder the trace LU diagonal."));
               factorization.vmult(delta, rhs);
 #  endif
 #else
@@ -1766,6 +1771,10 @@ namespace MetricFlowX
                                   preconditioner);
             }
         }
+
+        AssertThrow(std::isfinite(delta.l2_norm()),
+                    ExcMessage(
+                      "Trace linear solve returned a non-finite correction."));
 
         for (const auto i : trace_dofs_owned)
           sol(i) += delta(i);
