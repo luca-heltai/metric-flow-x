@@ -1600,7 +1600,7 @@ namespace MetricFlowX
     per_cell_mass_inv.assign(n_local_cells, FullMatrix<double>());
 
     const QGauss<dim>       quad(fe_degree + 1);
-    FEValues<dim, spacedim> fev(*fe_, quad, update_values | update_JxW_values);
+    FEValues<dim, spacedim>     fev(*fe_, quad, update_values | update_JxW_values);
 
     const unsigned int n_dofs = fe_->n_dofs_per_cell();
 
@@ -2133,7 +2133,7 @@ namespace MetricFlowX
     const QGauss<dim>     quad_cell(fe_->tensor_degree() + 1);
     const QGauss<dim - 1> quad_face(fe_->tensor_degree() + 1);
 
-    FEValues<dim, spacedim> fev(*fe_,
+    FEValues<dim, spacedim>     fev(*fe_,
                                 quad_cell,
                                 update_values | update_gradients |
                                   update_quadrature_points | update_JxW_values);
@@ -2594,8 +2594,8 @@ namespace MetricFlowX
                     //   a_d_local) - (rcr.R1 * Q + Pc);
                     const double Pc = y(rcr_pc_dof.at(bid));
                     res_A           = compute_physical_pressure(
-                                        A_hat, vid, a_d_local, t, point, cell->id()) -
-                                      (rcr.R1 * Q + Pc);
+                              A_hat, vid, a_d_local, t, point, cell->id()) -
+                            (rcr.R1 * Q + Pc);
                   }
                 else
                   { // single R: P = R2*Q + P_out
@@ -4318,7 +4318,7 @@ namespace MetricFlowX
 
     const FEValuesExtractors::Scalar area_extr(0);
     const QGauss<dim>                quad(fe_degree + 2);
-    FEValues<dim, spacedim> fev(*fe_, quad, update_values | update_JxW_values);
+    FEValues<dim, spacedim>     fev(*fe_, quad, update_values | update_JxW_values);
 
     std::vector<double> A_q(quad.size());
     double              local_volume = 0.0;
