@@ -29,6 +29,7 @@
 #  include <vtkUnstructuredGrid.h>
 #  include <vtkUnstructuredGridReader.h>
 
+#  include <fstream>
 #  include <stdexcept>
 
 namespace MetricFlowX
@@ -37,18 +38,36 @@ namespace MetricFlowX
 
   namespace VTKUtils
   {
+    Reader::Reader(const std::string &filename)
+      : vtk_filename(filename)
+    {
+      std::ifstream input(filename);
+      AssertThrow(input, ExcMessage("Cannot open VTK file: " + filename));
+      auto reader = vtkSmartPointer<vtkUnstructuredGridReader>::New();
+      reader->SetFileName(filename.c_str());
+      reader->ReadAllScalarsOn();
+      reader->ReadAllVectorsOn();
+      reader->ReadAllFieldsOn();
+      reader->Update();
+      dataset = reader->GetOutput();
+      AssertThrow(dataset && dataset->GetPoints() &&
+                    dataset->GetNumberOfCells() > 0,
+                  ExcMessage("Failed to read VTK file: " + filename));
+    }
+
+    bool
+    Reader::has_cell_data(const std::string &name) const
+    {
+      return dataset->GetCellData()->GetArray(name.c_str()) != nullptr;
+    }
+
     template <int dim, int spacedim>
     void
-    read_vtk(const std::string            &vtk_filename,
-             Triangulation<dim, spacedim> &tria,
-             const bool                    cleanup)
+    Reader::read_vtk(Triangulation<dim, spacedim> &tria,
+                     const bool                    cleanup) const
     {
       (void)cleanup;
-      auto reader = vtkSmartPointer<vtkUnstructuredGridReader>::New();
-      reader->SetFileName(vtk_filename.c_str());
-      reader->Update();
-      vtkUnstructuredGrid *grid = reader->GetOutput();
-      AssertThrow(grid, ExcMessage("Failed to read VTK file: " + vtk_filename));
+      vtkUnstructuredGrid *grid = dataset;
 
       // Read points
       vtkPoints                   *vtk_points = grid->GetPoints();
@@ -186,19 +205,11 @@ namespace MetricFlowX
     }
 
     void
-    read_cell_data(const std::string &vtk_filename,
-                   const std::string &cell_data_name,
-                   Vector<double>    &output_vector)
+    Reader::read_cell_data(const std::string &cell_data_name,
+                           Vector<double>    &output_vector) const
     {
-      auto reader = vtkSmartPointer<vtkUnstructuredGridReader>::New();
-      reader->SetFileName(vtk_filename.c_str());
-      reader->ReadAllScalarsOn();
-      reader->ReadAllVectorsOn();
-      reader->ReadAllFieldsOn();
-      reader->Update();
-      vtkUnstructuredGrid *grid = reader->GetOutput();
-      AssertThrow(grid, ExcMessage("Failed to read VTK file: " + vtk_filename));
-      vtkDataArray *data_array =
+      vtkUnstructuredGrid *grid = dataset;
+      vtkDataArray        *data_array =
         grid->GetCellData()->GetArray(cell_data_name.c_str());
       AssertThrow(data_array,
                   ExcMessage("Cell data array '" + cell_data_name +
@@ -212,19 +223,11 @@ namespace MetricFlowX
     }
 
     void
-    read_vertex_data(const std::string &vtk_filename,
-                     const std::string &point_data_name,
-                     Vector<double>    &output_vector)
+    Reader::read_vertex_data(const std::string &point_data_name,
+                             Vector<double>    &output_vector) const
     {
-      auto reader = vtkSmartPointer<vtkUnstructuredGridReader>::New();
-      reader->SetFileName(vtk_filename.c_str());
-      reader->ReadAllScalarsOn();
-      reader->ReadAllVectorsOn();
-      reader->ReadAllFieldsOn();
-      reader->Update();
-      vtkUnstructuredGrid *grid = reader->GetOutput();
-      AssertThrow(grid, ExcMessage("Failed to read VTK file: " + vtk_filename));
-      vtkDataArray *data_array =
+      vtkUnstructuredGrid *grid = dataset;
+      vtkDataArray        *data_array =
         grid->GetPointData()->GetArray(point_data_name.c_str());
       AssertThrow(data_array,
                   ExcMessage("Point data array '" + point_data_name +
@@ -235,6 +238,31 @@ namespace MetricFlowX
       for (vtkIdType i = 0; i < n_tuples; ++i)
         for (int j = 0; j < n_components; ++j)
           output_vector[i * n_components + j] = data_array->GetComponent(i, j);
+    }
+
+    template <int dim, int spacedim>
+    void
+    read_vtk(const std::string            &filename,
+             Triangulation<dim, spacedim> &tria,
+             const bool                    cleanup)
+    {
+      Reader(filename).read_vtk(tria, cleanup);
+    }
+
+    void
+    read_cell_data(const std::string &filename,
+                   const std::string &name,
+                   Vector<double>    &values)
+    {
+      Reader(filename).read_cell_data(name, values);
+    }
+
+    void
+    read_vertex_data(const std::string &filename,
+                     const std::string &name,
+                     Vector<double>    &values)
+    {
+      Reader(filename).read_vertex_data(name, values);
     }
 
     void
@@ -487,6 +515,20 @@ namespace MetricFlowX
       return distributed_to_serial_vertex_indices;
     }
   } // namespace VTKUtils
+
+  template void
+  VTKUtils::Reader::read_vtk(Triangulation<1, 1> &, const bool) const;
+  template void
+  VTKUtils::Reader::read_vtk(Triangulation<1, 2> &, const bool) const;
+  template void
+  VTKUtils::Reader::read_vtk(Triangulation<1, 3> &, const bool) const;
+  template void
+  VTKUtils::Reader::read_vtk(Triangulation<2, 2> &, const bool) const;
+  template void
+  VTKUtils::Reader::read_vtk(Triangulation<2, 3> &, const bool) const;
+  template void
+  VTKUtils::Reader::read_vtk(Triangulation<3, 3> &, const bool) const;
+
 } // namespace MetricFlowX
 
 
@@ -613,6 +655,7 @@ namespace MetricFlowX
   template std::vector<types::global_vertex_index>
   VTKUtils::distributed_to_serial_vertex_indices(const Triangulation<3, 3> &,
                                                  const Triangulation<3, 3> &);
+
 
 } // namespace MetricFlowX
 

@@ -173,3 +173,43 @@ The formulation and derivation remain documented in `doc/math.md` and
 ## License
 
 This project is licensed under the MIT License (see `LICENSE.md`).
+
+
+### Terminal RCR defaults and CSV overrides
+
+Existing parameter files keep `Terminal parameter source = VTK`: terminal R1,
+R2, C and P_out are read from the mesh exactly as before. To migrate explicitly,
+set the following in `MetricFlowSystem<1, 3>`:
+
+```text
+set Terminal parameter source = Parameters
+set Default terminal R1 = 2e7
+set Default terminal R2 = 3e7
+set Default terminal C = 0
+set Default terminal P_out = 0
+set Terminal parameters CSV file = terminals.csv
+```
+
+The CSV header is exactly `boundary_id,R1,R2,C`. A matching row overrides all
+three values for that terminal. Omitted terminal IDs use all three defaults;
+with no CSV configured, every terminal uses the defaults. Resistances are in
+Pa*s/m3, compliance in m3/Pa, and P_out in Pa. P_out is the global default in
+Parameters mode; CSV rows do not override it. VTK mode preserves existing
+per-terminal P_out values. No pressure datum is inferred.
+
+Parameters mode requires geometry, vessel fields and boundary IDs in VTK, but
+no R1/R2/C/P_out arrays. Actual graph endpoints identify terminals, excluding
+junctions and inlet boundary 0. CSV IDs must identify these terminals uniquely;
+unreadable/malformed files, duplicate/unknown IDs, nonfinite or invalid physical
+values cause an error. A configured CSV requires Parameters mode. Each C>0
+terminal gets one capacitor unknown across MPI ranks; C=0 gets none and uses
+the series resistance R1+R2 (PR #18).
+
+Geometry and arrays now share one VTK reader per rank. On lnx3 with GCC 13.2,
+deal.II 9.8.0 and the 20001-cell, degree-1 SI 10k tree, the measured setup time
+fell from 3.697 s to 1.340 s in a paired run. Whole-process peak RSS, including
+subsequent assembly, was 657904/656936 KiB; this is not a measurement of memory
+per initialization phase. Nonzero-state residual norms/checksums agree, and
+CSV/legacy residuals and both Jacobian blocks are regression-tested with one
+and two ranks. Rank-zero reading/distribution remains a profiling follow-up;
+each rank currently loads one dataset.

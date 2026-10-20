@@ -25,7 +25,6 @@
 
 #include <deal.II/dofs/dof_renumbering.h>
 
-#include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_description.h>
@@ -157,6 +156,18 @@ namespace MetricFlowX
     add_parameter("Use junction mesh", use_junction_mesh);
     add_parameter("Outlet boundary condition type", outlet_type);
     add_parameter("Vtk file path for mesh input", vtk_file_path);
+    add_parameter(
+      "Terminal parameter source",
+      terminal_parameter_source,
+      "VTK preserves legacy mesh values; Parameters uses defaults and optional CSV overrides.",
+      this->prm,
+      Patterns::Selection("VTK|Parameters"));
+    add_parameter("Terminal parameters CSV file", terminal_parameters_csv_file);
+    add_parameter("Default terminal R1", default_terminal_r1);
+    add_parameter("Default terminal R2", default_terminal_r2);
+    add_parameter("Default terminal C", default_terminal_c);
+    add_parameter("Default terminal P_out", default_terminal_p_out);
+
 
     this->enter_subsection("IDA parameters");
     this->enter_my_subsection(this->prm);
@@ -195,6 +206,12 @@ namespace MetricFlowX
     // the console is readable and the log file is not written K times over.
     deallog.depth_console(this_mpi_process == 0 ? verbosity : 0);
     deallog.depth_file(this_mpi_process == 0 ? verbosity : 0);
+
+    AssertThrow(
+      terminal_parameter_source == "Parameters" ||
+        terminal_parameters_csv_file.empty(),
+      ExcMessage(
+        "Terminal parameters CSV file requires Terminal parameter source = Parameters."));
 
     exact_solution.update_constants(par);
     rhs_function.update_constants(par);
@@ -354,6 +371,76 @@ namespace MetricFlowX
   // create_description_from_triangulation_in_groups().
   // ============================================================================
   template <int dim, int spacedim>
+  std::map<types::boundary_id,
+           typename BloodFlowSystem<dim, spacedim>::RCRPhysics>
+  BloodFlowSystem<dim, spacedim>::read_terminal_parameters(
+    const std::set<types::boundary_id> &terminal_ids) const
+  {
+    const auto validate = [](const RCRPhysics &rcr) {
+      AssertThrow(
+        std::isfinite(rcr.R1) && std::isfinite(rcr.R2) &&
+          std::isfinite(rcr.C) && std::isfinite(rcr.P_out) && rcr.R1 >= 0.0 &&
+          rcr.R2 >= 0.0 && rcr.C >= 0.0 && rcr.R1 + rcr.R2 > 0.0 &&
+          std::isfinite(rcr.R1 + rcr.R2) && (rcr.C == 0.0 || rcr.R2 > 0.0),
+        ExcMessage(
+          "Terminal RCR values must be finite, resistances and compliance nonnegative, total resistance positive, and R2 positive when C > 0."));
+    };
+    RCRPhysics defaults;
+    defaults.R1    = default_terminal_r1;
+    defaults.R2    = default_terminal_r2;
+    defaults.C     = default_terminal_c;
+    defaults.P_out = default_terminal_p_out;
+    validate(defaults);
+    std::map<types::boundary_id, RCRPhysics> result;
+    for (const auto id : terminal_ids)
+      result.emplace(id, defaults);
+    if (terminal_parameters_csv_file.empty())
+      return result;
+    std::ifstream input(terminal_parameters_csv_file);
+    AssertThrow(input,
+                ExcMessage("Cannot open terminal CSV: " +
+                           terminal_parameters_csv_file));
+    std::string line;
+    std::getline(input, line);
+    if (!line.empty() && line.back() == '\r')
+      line.pop_back();
+    AssertThrow(line == "boundary_id,R1,R2,C",
+                ExcMessage("Expected terminal CSV header boundary_id,R1,R2,C"));
+    std::set<types::boundary_id> seen;
+    unsigned int                 line_number = 1;
+    while (std::getline(input, line))
+      {
+        ++line_number;
+        std::istringstream row(line);
+        row >> std::ws;
+        const bool         unsigned_id = row.peek() >= '0' && row.peek() <= '9';
+        unsigned long long raw_id      = 0;
+        char               first, second, third;
+        RCRPhysics         value = defaults;
+        AssertThrow(unsigned_id &&
+                      static_cast<bool>(row >> raw_id >> first >> value.R1 >>
+                                        second >> value.R2 >> third >>
+                                        value.C) &&
+                      first == ',' && second == ',' && third == ',' &&
+                      (row >> std::ws).eof() &&
+                      raw_id <= std::numeric_limits<types::boundary_id>::max(),
+                    ExcMessage("Malformed terminal CSV row " +
+                               std::to_string(line_number)));
+        const auto id = static_cast<types::boundary_id>(raw_id);
+        AssertThrow(result.count(id) != 0,
+                    ExcMessage(
+                      "Terminal CSV references non-terminal boundary ID " +
+                      std::to_string(id)));
+        AssertThrow(seen.insert(id).second,
+                    ExcMessage("Duplicate boundary ID in terminal CSV: " +
+                               std::to_string(id)));
+        validate(value);
+        result.at(id) = value;
+      }
+    return result;
+  }
+
+  template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::create_triangulation()
   {
@@ -361,52 +448,44 @@ namespace MetricFlowX
 
     Triangulation<dim, spacedim> serial_triangulation;
 
-    {
-      GridIn<dim, spacedim> grid_in;
-      grid_in.attach_triangulation(serial_triangulation);
-      if (verbosity > 0)
-        pcout << "Reading VTK file: " << vtk_file_path << std::endl;
-      std::ifstream mesh_file(vtk_file_path);
-      AssertThrow(mesh_file, ExcMessage("Cannot open " + vtk_file_path));
-      grid_in.read_vtk(mesh_file);
-    }
+    VTKUtils::Reader vtk(vtk_file_path);
+    vtk.read_vtk(serial_triangulation, false);
     if (verbosity > 0)
       pcout << "Coarse cells = " << serial_triangulation.n_active_cells()
             << std::endl;
 
-    VTKUtils::read_cell_data(vtk_file_path, "vessel_id", cell_vessel_ids);
-    VTKUtils::read_cell_data(vtk_file_path, "a0", cell_a0);
-    VTKUtils::read_cell_data(vtk_file_path, "a_d", cell_a_d);
-    VTKUtils::read_cell_data(vtk_file_path, "E", cell_E);
-    VTKUtils::read_cell_data(vtk_file_path, "h_wall", cell_h_wall);
-    VTKUtils::read_cell_data(vtk_file_path, "p_d", cell_p_d);
-    VTKUtils::read_cell_data(vtk_file_path, "p0", cell_p0);
-    VTKUtils::read_cell_data(vtk_file_path, "L", cell_L);
-    VTKUtils::read_cell_data(vtk_file_path, "r_d", cell_r_d);
+    vtk.read_cell_data("vessel_id", cell_vessel_ids);
+    vtk.read_cell_data("a0", cell_a0);
+    vtk.read_cell_data("a_d", cell_a_d);
+    vtk.read_cell_data("E", cell_E);
+    vtk.read_cell_data("h_wall", cell_h_wall);
+    vtk.read_cell_data("p_d", cell_p_d);
+    vtk.read_cell_data("p0", cell_p0);
+    vtk.read_cell_data("L", cell_L);
+    vtk.read_cell_data("r_d", cell_r_d);
 
-    // Tapered radii are optional.
-    try
-      {
-        VTKUtils::read_cell_data(vtk_file_path, "r_in", cell_r_in);
-      }
-    catch (...)
-      {
-        cell_r_in.reinit(0);
-      }
-    try
-      {
-        VTKUtils::read_cell_data(vtk_file_path, "r_out", cell_r_out);
-      }
-    catch (...)
-      {
-        cell_r_out.reinit(0);
-      }
+    // Missing taper arrays are optional; malformed arrays still report errors.
+    cell_r_in.reinit(0);
+    cell_r_out.reinit(0);
+    if (vtk.has_cell_data("r_in"))
+      vtk.read_cell_data("r_in", cell_r_in);
+    if (vtk.has_cell_data("r_out"))
+      vtk.read_cell_data("r_out", cell_r_out);
 
-    VTKUtils::read_vertex_data(vtk_file_path, "R1", point_R1);
-    VTKUtils::read_vertex_data(vtk_file_path, "R2", point_R2);
-    VTKUtils::read_vertex_data(vtk_file_path, "C", point_C);
-    VTKUtils::read_vertex_data(vtk_file_path, "P_out", point_P_out);
-    VTKUtils::read_vertex_data(vtk_file_path, "boundary_id", point_boundary_id);
+    if (terminal_parameter_source == "VTK")
+      {
+        vtk.read_vertex_data("R1", point_R1);
+        vtk.read_vertex_data("R2", point_R2);
+        vtk.read_vertex_data("C", point_C);
+        vtk.read_vertex_data("P_out", point_P_out);
+      }
+    vtk.read_vertex_data("boundary_id", point_boundary_id);
+
+    std::vector<unsigned int> vertex_degree(serial_triangulation.n_vertices(),
+                                            0);
+    for (const auto &cell : serial_triangulation.active_cell_iterators())
+      for (const auto vertex : cell->vertex_indices())
+        ++vertex_degree[cell->vertex_index(vertex)];
 
     // Material IDs + boundary IDs from VTK.  These are attributes of the coarse
     // cells and are inherited by their children through refinement and carried
@@ -431,23 +510,42 @@ namespace MetricFlowX
 
     // RCR map, keyed by boundary id: global data, identical on every rank
     // because every rank reads the same file.
-    rcr_map.clear();
-    for (const auto &cell : serial_triangulation.active_cell_iterators())
-      for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
-        if (cell->face(f)->at_boundary())
-          {
-            const types::boundary_id bid = cell->face(f)->boundary_id();
-            if (bid == 0)
-              continue; // inflow
-            const unsigned int v = cell->face(f)->vertex_index(0);
-            RCRPhysics         rcr;
-            rcr.R1    = point_R1[v];
-            rcr.R2    = point_R2[v];
-            rcr.C     = point_C[v];
-            rcr.P_out = point_P_out[v];
-            if (rcr.R2 > 0.0)
-              rcr_map[bid] = rcr;
-          }
+    if (terminal_parameter_source == "Parameters")
+      {
+        std::set<types::boundary_id> terminals;
+        for (const auto &cell : serial_triangulation.active_cell_iterators())
+          for (const auto face : cell->face_indices())
+            if (cell->face(face)->at_boundary() &&
+                vertex_degree[cell->face(face)->vertex_index(0)] == 1)
+              {
+                const auto id = cell->face(face)->boundary_id();
+                if (id != 0)
+                  AssertThrow(terminals.insert(id).second,
+                              ExcMessage(
+                                "Duplicate terminal boundary ID in mesh."));
+              }
+        rcr_map = read_terminal_parameters(terminals);
+      }
+    else
+      {
+        rcr_map.clear();
+        for (const auto &cell : serial_triangulation.active_cell_iterators())
+          for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+            if (cell->face(f)->at_boundary())
+              {
+                const types::boundary_id bid = cell->face(f)->boundary_id();
+                if (bid == 0)
+                  continue; // inflow
+                const unsigned int v = cell->face(f)->vertex_index(0);
+                RCRPhysics         rcr;
+                rcr.R1    = point_R1[v];
+                rcr.R2    = point_R2[v];
+                rcr.C     = point_C[v];
+                rcr.P_out = point_P_out[v];
+                if (rcr.R2 > 0.0)
+                  rcr_map[bid] = rcr;
+              }
+      }
 
     serial_triangulation.refine_global(n_global_refinements);
 
