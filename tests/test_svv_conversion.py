@@ -79,11 +79,19 @@ class SvvConversionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             for options in (("--young-modulus", "0"),
                             ("--perfusion-pressure", "nan"),
-                            ("--diastolic-pressure", "inf")):
+                            ("--diastolic-pressure", "inf"),
+                            ("--outlet-pressure", "nan")):
                 result, mesh = self.convert(Path(folder), {"length": "cm", "time": "s"}, options=options)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("must be finite", result.stderr)
                 self.assertIsNone(mesh)
+
+    def test_outlet_pressure_is_si(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result, mesh = self.convert(Path(folder), {"length": "cm", "time": "s"},
+                                        options=("--outlet-pressure", "432.6"))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(mesh.point_arrays["P_out"], [432.6] * 4)
 
     def test_explicit_overrides(self):
         with tempfile.TemporaryDirectory() as folder:

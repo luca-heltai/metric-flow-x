@@ -1,4 +1,3 @@
-import shutil
 """Exercise the real downloader with tiny local release-asset fixtures."""
 
 import hashlib
@@ -13,8 +12,8 @@ import unittest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/download_datasets.sh"
 ASSETS = (
-    ("blood-flow-datasets-v0.1.0.tar.gz", "notebooks/binary_tree_255.vtk",
-     "a9bef4aa466cb263d8c0bdf7503f175a659c7b22a3a812d2a9d95d3ed0988f47"),
+    ("metric-flow-x-datasets-si-v1.tar.gz", "notebooks/binary_tree_255.vtk",
+     "eef8d8cee8974da8f9f5f77dfc3362a94b32f3720ce009228969f8f0af0de2fd"),
     ("cerebral-datasets-v1.tar.gz", "notebooks/cerebral-data/standard_cco.vtk",
      "49a1d6a6789975ffb4f8657f8a725e3ce5664e2997a7a239c041719329380b09"),
 )
@@ -27,9 +26,6 @@ class DownloadDatasetsTest(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.repo = self.root / "repository with spaces"
         (self.repo / "scripts").mkdir(parents=True)
-        (self.repo / "tools").mkdir()
-        for name in ("repair_legacy_svv_units.py", "validate_vtk_network.py"):
-            shutil.copyfile(SCRIPT.parents[1] / "tools" / name, self.repo / "tools" / name)
         source = SCRIPT.read_text()
         for asset, member, checksum in ASSETS:
             archive = self.root / asset

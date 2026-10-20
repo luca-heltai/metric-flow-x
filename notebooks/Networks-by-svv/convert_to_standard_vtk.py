@@ -35,6 +35,7 @@ parser.add_argument("--rcr", action="store_true", help="Use RCR outlets")
 parser.add_argument("--young-modulus", type=float, default=2.25e4, help="Young modulus in Pa")
 parser.add_argument("--diastolic-pressure", type=float, default=0.0, help="Diastolic pressure in Pa")
 parser.add_argument("--reference-pressure", type=float, default=0.0, help="Reference pressure in Pa")
+parser.add_argument("--outlet-pressure", type=float, default=0.0, help="Outlet pressure in Pa")
 parser.add_argument("--perfusion-pressure", type=float, default=1.25e5, help="Outlet driving pressure in Pa")
 parser.add_argument("--reference-inflow", type=float, default=1e-3, help="Diagnostic inflow in m^3/s")
 args = parser.parse_args()
@@ -42,7 +43,7 @@ for name in ("young_modulus", "perfusion_pressure"):
     if not np.isfinite(getattr(args, name)) or getattr(args, name) <= 0:
         option = name.replace("_", "-")
         parser.error(f"--{option} must be finite and positive")
-for name in ("diastolic_pressure", "reference_pressure", "reference_inflow"):
+for name in ("diastolic_pressure", "reference_pressure", "reference_inflow", "outlet_pressure"):
     if not np.isfinite(getattr(args, name)):
         option = name.replace("_", "-")
         parser.error(f"--{option} must be finite")
@@ -76,7 +77,7 @@ USE_RCR     = args.rcr      # False -> single resistor (R1 = 0, C = 0)
 DELTA_P     = args.perfusion_pressure      # perfusion pressure across the outlet bed [Pa]
 R1_FRACTION = 0.2          # only used when USE_RCR is True
 TAU         = 0.283        # RC time constant [s]  (only used when USE_RCR)
-P_OUT       = 0.0          # outlet pressure  [Pa] -> field "P_out"
+P_OUT       = args.outlet_pressure          # outlet pressure  [Pa] -> field "P_out"
 
 # Diagnostic only: the steady inflow you drive in the solver, so the script
 # can report the mean pressure drop this network will actually produce.

@@ -3,8 +3,8 @@ set -euo pipefail
 
 REPOSITORY="luca-heltai/metric-flow-x"
 RELEASE_TAG="datasets-final-version-v1"
-NETWORK_ASSET="blood-flow-datasets-v0.1.0.tar.gz"
-NETWORK_SHA256="a9bef4aa466cb263d8c0bdf7503f175a659c7b22a3a812d2a9d95d3ed0988f47"
+NETWORK_ASSET="metric-flow-x-datasets-si-v1.tar.gz"
+NETWORK_SHA256="eef8d8cee8974da8f9f5f77dfc3362a94b32f3720ce009228969f8f0af0de2fd"
 CEREBRAL_ASSET="cerebral-datasets-v1.tar.gz"
 CEREBRAL_SHA256="49a1d6a6789975ffb4f8657f8a725e3ce5664e2997a7a239c041719329380b09"
 
@@ -42,7 +42,4 @@ download_and_extract() {
 
 download_and_extract "${NETWORK_ASSET}" "${NETWORK_SHA256}"
 download_and_extract "${CEREBRAL_ASSET}" "${CEREBRAL_SHA256}"
-# The checksum-pinned archive predates the svVascularize SI unit fix.
-python3 "${REPOSITORY_ROOT}/tools/repair_legacy_svv_units.py" "${DESTINATION}"
 echo "Datasets extracted to ${DESTINATION}."
-

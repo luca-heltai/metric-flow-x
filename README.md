@@ -127,9 +127,9 @@ and the standalone executable below `bin/`.
 
 The generated vascular-network datasets are distributed as GitHub Release
 assets on [the datasets release](https://github.com/luca-heltai/metric-flow-x/releases/tag/datasets-final-version-v1)
-so they do not inflate the Git checkout. The original network archive is about
-399 MB (555 MB extracted); the additional cerebral archive is about 2.7 MB
-(8.7 MB extracted).
+so they do not inflate the Git checkout. The network archive contains the
+corrected SI solver meshes and the original source trees; the cerebral archive
+is about 2.7 MB (8.7 MB extracted).
 
 From the repository root, run:
 
@@ -137,11 +137,12 @@ From the repository root, run:
 ./scripts/download_datasets.sh
 ```
 
-The script downloads both `blood-flow-datasets-v0.1.0.tar.gz` and
+The script downloads both `metric-flow-x-datasets-si-v1.tar.gz` and
 `cerebral-datasets-v1.tar.gz` from release `datasets-final-version-v1` in
 `luca-heltai/metric-flow-x`. It verifies pinned SHA-256 checksums before
-extracting each archive into its expected `notebooks/` paths. The original
-archive is mirrored unchanged from `devi-raksha/blood-flow` release `v0.1.0`.
+extracting each archive into its expected `notebooks/` paths. The network archive ships corrected SI meshes directly. No post-extraction
+conversion or Python dependency is needed. Dataset contents, units and hashes
+are recorded in [the release manifest](datasets/network-datasets-si-v1.json).
 The cerebral archive adds:
 
 - `notebooks/cerebral-data/ccoParietal_hc_wData.vtk`
@@ -197,18 +198,9 @@ and radii scaled by 0.01 and design flow by 1e-6 before deriving areas, wall
 thickness, resistances and capacitances. The interior boundary marker is 300655,
 within the unsigned 32-bit range and above the outlet IDs in these datasets.
 
-The checksum-pinned release archive predates the unit fix. The downloader now
-repairs its legacy `*_adnr*.vtk` files after extraction, using Python 3 without
-additional packages. It preserves pressure, Young modulus, resistor split and
-RC time constant, and recomputes wall thickness at the SI radius with the
-archived wall law. Historical archives are retained. Existing extractions can
-be repaired with:
-
-```sh
-python3 tools/repair_legacy_svv_units.py /path/to/extracted/datasets
-```
-
-Use this repair only for the known legacy archive files; generate new files
-from tree metadata. A conversion marker prevents repeated scaling. Generated
-network files stay outside Git. Correct units alone do not validate inflow,
-wall parameters, near-sonic flow or physiological suitability.
+The release ships SI solver meshes directly. Download the current archive again
+to replace an older extraction; there is no legacy repair path. Original source
+trees retain their recorded CGS metadata. See the dataset manifest for the units
+and role of each file. Generated network files stay outside Git. Correct units
+alone do not validate inflow, wall parameters, near-sonic flow or physiological
+suitability.
