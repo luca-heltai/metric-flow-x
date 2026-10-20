@@ -1600,7 +1600,7 @@ namespace MetricFlowX
     per_cell_mass_inv.assign(n_local_cells, FullMatrix<double>());
 
     const QGauss<dim>       quad(fe_degree + 1);
-    FEValues<dim, spacedim>     fev(*fe_, quad, update_values | update_JxW_values);
+    FEValues<dim, spacedim> fev(*fe_, quad, update_values | update_JxW_values);
 
     const unsigned int n_dofs = fe_->n_dofs_per_cell();
 
@@ -4318,7 +4318,7 @@ namespace MetricFlowX
 
     const FEValuesExtractors::Scalar area_extr(0);
     const QGauss<dim>                quad(fe_degree + 2);
-    FEValues<dim, spacedim>     fev(*fe_, quad, update_values | update_JxW_values);
+    FEValues<dim, spacedim> fev(*fe_, quad, update_values | update_JxW_values);
 
     std::vector<double> A_q(quad.size());
     double              local_volume = 0.0;
