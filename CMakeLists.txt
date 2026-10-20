@@ -16,7 +16,30 @@ if(NOT ${deal.II_FOUND})
   )
 ENDIF()
 
+# Preserve DebugRelease before deal.II can normalize CMAKE_BUILD_TYPE.
+set(_requested_build_type "${CMAKE_BUILD_TYPE}")
+if(_requested_build_type AND NOT _requested_build_type MATCHES "^(Debug|Release|DebugRelease)$")
+  message(FATAL_ERROR "Supported CMAKE_BUILD_TYPE values: Debug, Release, DebugRelease")
+endif()
 deal_II_initialize_cached_variables()
+if(_requested_build_type)
+  set(CMAKE_BUILD_TYPE "${_requested_build_type}" CACHE STRING "Build type" FORCE)
+endif()
+if(CMAKE_CONFIGURATION_TYPES)
+  message(FATAL_ERROR "Use a single-config generator for MetricFlowX (e.g. Ninja or Unix Makefiles)")
+endif()
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release DebugRelease)
+if(CMAKE_BUILD_TYPE STREQUAL "DebugRelease")
+  set(METRIC_FLOW_X_BUILD_TYPES Release Debug)
+else()
+  set(METRIC_FLOW_X_BUILD_TYPES "${CMAKE_BUILD_TYPE}")
+endif()
+foreach(_variant IN LISTS METRIC_FLOW_X_BUILD_TYPES)
+  string(TOUPPER "${_variant}" _variant_upper)
+  if(NOT _variant_upper IN_LIST DEAL_II_BUILD_TYPES)
+    message(FATAL_ERROR "deal.II does not provide ${_variant}; available variants: ${DEAL_II_BUILD_TYPES}")
+  endif()
+endforeach()
 
 set(METRIC_FLOW_X_SOURCES
   source/blood_flow_system.cc
@@ -25,15 +48,45 @@ set(METRIC_FLOW_X_SOURCES
   source/parsed_tools/function.cc
 )
 
-add_library(metric_flow_x SHARED ${METRIC_FLOW_X_SOURCES})
-add_library(MetricFlowX::metric_flow_x ALIAS metric_flow_x)
-
-target_include_directories(metric_flow_x
-  PUBLIC
+set(METRIC_FLOW_X_INSTALL_TARGETS)
+foreach(_variant IN LISTS METRIC_FLOW_X_BUILD_TYPES)
+  string(TOUPPER "${_variant}" _variant_upper)
+  set(_suffix "")
+  if(_variant STREQUAL "Debug" AND CMAKE_BUILD_TYPE STREQUAL "DebugRelease")
+    set(_suffix "_debug")
+  endif()
+  set(_library "metric_flow_x${_suffix}")
+  set(_application "blood_flow${_suffix}")
+  add_library(${_library} SHARED ${METRIC_FLOW_X_SOURCES})
+  target_include_directories(${_library} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-deal_ii_setup_target(metric_flow_x)
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+  deal_ii_setup_target(${_library} ${_variant_upper})
+  set_target_properties(${_library} PROPERTIES EXPORT_NAME metric_flow_x_${_variant})
+
+  add_executable(${_application} apps/blood_flow.cc)
+  target_compile_definitions(${_application} PRIVATE
+    PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/")
+  deal_ii_setup_target(${_application} ${_variant_upper})
+  target_link_libraries(${_application} ${_library})
+  file(RELATIVE_PATH _library_relative_to_bin
+    "${CMAKE_INSTALL_FULL_BINDIR}" "${CMAKE_INSTALL_FULL_LIBDIR}")
+  if(APPLE)
+    set_property(TARGET ${_application} APPEND PROPERTY INSTALL_RPATH
+      "@loader_path/${_library_relative_to_bin}")
+  elseif(UNIX)
+    set_property(TARGET ${_application} APPEND PROPERTY INSTALL_RPATH
+      "$ORIGIN/${_library_relative_to_bin}")
+  endif()
+  # Retain runtime search paths for shared deal.II dependencies as well.
+  set_target_properties(${_library} ${_application} PROPERTIES
+    INSTALL_RPATH_USE_LINK_PATH TRUE)
+  set(TEST_LIBRARIES_${_variant_upper} ${_library})
+  list(APPEND METRIC_FLOW_X_INSTALL_TARGETS ${_library} ${_application})
+endforeach()
+
+# The build-tree alias is the default variant; tests use explicit variants.
+add_library(MetricFlowX::metric_flow_x ALIAS metric_flow_x)
 
 
 # Mirror parameters/ into the build tree so tests and examples always use
@@ -57,13 +110,6 @@ foreach(parameter_file IN LISTS PARAMETER_FILES)
   endif()
 endforeach()
 
-add_executable(blood_flow apps/blood_flow.cc)
-target_compile_definitions(blood_flow PRIVATE
-  PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/")
-deal_ii_setup_target(blood_flow)
-target_link_libraries(blood_flow MetricFlowX::metric_flow_x)
-
-set(TEST_LIBRARIES MetricFlowX::metric_flow_x)
 set(METRIC_FLOW_X_PARAMETER_DIR
   "${CMAKE_CURRENT_BINARY_DIR}/parameters/")
 add_compile_definitions(
@@ -72,10 +118,10 @@ add_compile_definitions(
 )
 
 # Add tests
-add_subdirectory(tests)
 enable_testing()
+add_subdirectory(tests)
 
-install(TARGETS metric_flow_x blood_flow
+install(TARGETS ${METRIC_FLOW_X_INSTALL_TARGETS}
   EXPORT MetricFlowXTargets
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

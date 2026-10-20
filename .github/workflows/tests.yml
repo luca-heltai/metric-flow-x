@@ -14,38 +14,32 @@ jobs:
       - name: Test release dataset downloader
         run: python3 -m unittest discover -s tests -p test_download_datasets.py -v
 
-  debug:
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Debug, Release, DebugRelease]
     container:
       image: dealii/dealii:v9.7.1-noble
       options: --user root
 
     steps:
-      - uses: actions/checkout@v2
-      - name: Test debug
+      - uses: actions/checkout@v4
+      - name: Build and test
         run: |
-          rm -rf build_linux_debug
-          mkdir build_linux_debug
-          cd build_linux_debug
-          cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug
-          ninja
-          ctest -N
-          ctest --output-on-failure
-
-  release:
-    runs-on: ubuntu-latest
-    container:
-      image: dealii/dealii:v9.7.1-noble
-      options: --user root
-
-    steps:
-      - uses: actions/checkout@v2
-      - name: Test release
+          cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          cmake --build build -j 2
+          ctest --test-dir build -N
+          ctest --test-dir build --no-tests=error --output-on-failure
+      - name: Check dual-variant installation and downstream consumers
+        if: matrix.build_type == 'DebugRelease'
         run: |
-          rm -rf build_linux_release
-          mkdir build_linux_release
-          cd build_linux_release
-          cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
-          ninja
-          ctest -N
-          ctest --output-on-failure
+          cmake --install build --prefix "$PWD/install"
+          # Move the prefix to catch non-relocatable package paths.
+          mv install relocated
+          for variant in Debug Release; do
+            cmake -S tools/package-smoke -B "consumer-$variant" -GNinja \
+              -DCMAKE_BUILD_TYPE="$variant" -DCMAKE_PREFIX_PATH="$PWD/relocated"
+            cmake --build "consumer-$variant" -j 2
+            ctest --test-dir "consumer-$variant" --no-tests=error --output-on-failure
+          done
