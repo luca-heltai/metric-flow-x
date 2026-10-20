@@ -26,6 +26,15 @@ class ValidateVtkNetworkTests(unittest.TestCase):
             result = validator.validate(ROOT / relative)
             self.assertTrue(result["valid"], result)
 
+    def test_zero_capacitance_retains_series_resistances(self):
+        source = (ROOT / "parameters/single_vessel.vtk").read_text()
+        source = source.replace("0.0 1.0163e-8", "0.0 0.0")
+        with tempfile.NamedTemporaryFile("w", suffix=".vtk") as handle:
+            handle.write(source)
+            handle.flush()
+            result = validator.validate(Path(handle.name))
+        self.assertTrue(result["valid"], result)
+
     def test_invalid_cell_type_has_json_failure_and_nonzero_exit(self):
         source = (ROOT / "notebooks" / "bifurcation_network.vtk").read_text()
         invalid = source.replace("CELL_TYPES 3\n3\n3\n3", "CELL_TYPES 3\n3\n5\n3")
