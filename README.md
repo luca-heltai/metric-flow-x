@@ -247,3 +247,39 @@ per initialization phase. Nonzero-state residual norms/checksums agree, and
 CSV/legacy residuals and both Jacobian blocks are regression-tested with one
 and two ranks. Rank-zero reading/distribution remains a profiling follow-up;
 each rank currently loads one dataset.
+### Tabulated inflow and terminal traces
+
+In `MetricFlowSystem<1, 3>`, set `Inflow CSV file` to a CSV with the exact header
+`time_s,flow_m3_s`. Rows use seconds and m3/s, finite values and strictly
+increasing times. At least two samples are required. Piecewise linear
+interpolation replaces the analytic inlet only when this file is configured.
+Both ends of the simulation interval must be covered; extrapolation is an error.
+Paths are relative to the run directory, as for the existing mesh path.
+
+`Inflow CSV period` defaults to zero (no repetition). A positive value explicitly
+repeats one complete cycle; the file must span exactly that period and have
+matching endpoint flows. No cardiac period or flow-sign convention is inferred.
+Only inlet flow is prescribed. Any cardiac pressure history remains a comparison
+signal.
+
+Set `Write terminal CSV files = true` to export `terminal_<boundary_id>.csv` in
+the output directory. The fields are `time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id`.
+Pressure and velocity/area come from the boundary trace, including prescribed
+external pressure. Flow is outward: negative at a conventionally oriented inlet
+and positive at an outlet. Each boundary ID must identify exactly one terminal;
+only its owning MPI rank writes the file. Existing midpoint probe CSVs retain
+their original names and units. Mass-conservation and solver-summary files are
+also finalized by the standalone runner.
+
+The PETSc direct path uses MUMPS when available and native serial LU otherwise.
+Parallel direct runs require PETSc built with MUMPS. Set `Use direct solver = false`
+for parallel GMRES with block Jacobi; local ILU shifts address zero pivots in DAE
+subdomain blocks and can be overridden through PETSc options. This also applies
+to trace initialization. A missing PETSc MUMPS backend must never produce an
+unchanged solution while reporting a successful direct solve.
+
+Validation uses a synthetic triangular waveform at one and two ranks, compares
+CSV with the equivalent analytic inlet, checks nonzero prescribed flow, and
+compares terminal pressure/flow within solver tolerance. It does not establish
+MOX pressure datum, valve sign, cardiac period, RCR compatibility or a complete
+physiological cardiac cycle.

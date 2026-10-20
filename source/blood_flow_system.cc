@@ -170,6 +170,9 @@ namespace MetricFlowX
     add_parameter("Default terminal C", default_terminal_c);
     add_parameter("Default terminal P_out", default_terminal_p_out);
 
+    add_parameter("Inflow CSV file", inflow_csv_file);
+    add_parameter("Inflow CSV period", inflow_csv_period);
+    add_parameter("Write terminal CSV files", write_terminal_csv);
 
     this->enter_subsection("IDA parameters");
     this->enter_my_subsection(this->prm);
@@ -218,6 +221,18 @@ namespace MetricFlowX
     exact_solution.update_constants(par);
     rhs_function.update_constants(par);
     inflow_function.update_constants(par);
+    AssertThrow(std::isfinite(inflow_csv_period) && inflow_csv_period >= 0.0,
+                ExcMessage(
+                  "Inflow CSV period must be finite and nonnegative."));
+    AssertThrow(!inflow_csv_file.empty() || inflow_csv_period == 0.0,
+                ExcMessage("Inflow CSV period requires an Inflow CSV file."));
+    inflow_series = InflowSeries{};
+    if (!inflow_csv_file.empty())
+      {
+        inflow_series.read(inflow_csv_file, inflow_csv_period);
+        inflow_series.value(ida_parameters.initial_time);
+        inflow_series.value(ida_parameters.final_time);
+      }
 
     if (numerical_flux_type_str == "HLL")
       numerical_flux_type = NumericalFluxType::HLL;
@@ -246,6 +261,45 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::make_state() const
   {
     return VectorType(locally_owned_dofs_, mpi_communicator_);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::initialize_iterative_preconditioner(
+    IterativePreconditioner &preconditioner,
+    const MatrixType        &matrix) const
+  {
+    preconditioner.initialize(matrix);
+#ifdef USE_PETSC_LA
+    // A local DAE block may have zero pivots even when the global matrix is
+    // invertible. Shift the local ILU factors, without changing the operator.
+    const auto check = [](const PetscErrorCode error) {
+      AssertThrow(error == 0,
+                  ExcMessage("PETSc preconditioner setup error " +
+                             std::to_string(error)));
+    };
+    const PC pc = preconditioner.get_pc();
+    PCType   type;
+    check(PCGetType(pc, &type));
+    if (std::string(type) != PCBJACOBI)
+      return; // Respect a different preconditioner explicitly selected by PETSc
+              // options.
+    check(PCSetUp(pc));
+    PetscInt count;
+    KSP     *subsolvers;
+    check(PCBJacobiGetSubKSP(pc, &count, nullptr, &subsolvers));
+    for (PetscInt i = 0; i < count; ++i)
+      {
+        PC subpc;
+        check(KSPGetPC(subsolvers[i], &subpc));
+        check(PCGetType(subpc, &type));
+        if (std::string(type) == PCILU || std::string(type) == PCLU)
+          {
+            check(PCFactorSetShiftType(subpc, MAT_SHIFT_NONZERO));
+            check(PCSetFromOptions(subpc));
+          }
+      }
+#endif
   }
 
   template <int dim, int spacedim>
@@ -1679,14 +1733,38 @@ namespace MetricFlowX
         // ---- solve and update
         // ------------------------------------------------
         {
-          SolverControl solver_control(1, 0.0);
+          if (use_direct_solver)
+            {
+              SolverControl solver_control(1, 0.0);
 #ifdef USE_PETSC_LA
-          PETScWrappers::SparseDirectMUMPS newton_solver(solver_control);
-          newton_solver.solve(linear_system_matrix, delta, rhs);
+#  ifdef DEAL_II_PETSC_WITH_MUMPS
+              PETScWrappers::SparseDirectMUMPS newton_solver(solver_control);
+              newton_solver.solve(linear_system_matrix, delta, rhs);
+#  else
+              AssertThrow(
+                n_mpi_processes == 1,
+                ExcMessage(
+                  "Parallel direct solves require PETSc with MUMPS. Set Use direct solver = false for GMRES with block Jacobi."));
+              PETScWrappers::PreconditionLU factorization(linear_system_matrix);
+              factorization.vmult(delta, rhs);
+#  endif
 #else
-          TrilinosWrappers::SolverDirect newton_solver(solver_control);
-          newton_solver.solve(linear_system_matrix, delta, rhs);
+              TrilinosWrappers::SolverDirect newton_solver(solver_control);
+              newton_solver.solve(linear_system_matrix, delta, rhs);
 #endif
+            }
+          else
+            {
+              SolverControl   solver_control(1000, 1e-12 * rhs.l2_norm());
+              LA::SolverGMRES newton_solver(solver_control);
+              IterativePreconditioner preconditioner;
+              initialize_iterative_preconditioner(preconditioner,
+                                                  linear_system_matrix);
+              newton_solver.solve(linear_system_matrix,
+                                  delta,
+                                  rhs,
+                                  preconditioner);
+            }
         }
 
         for (const auto i : trace_dofs_owned)
@@ -1796,6 +1874,41 @@ namespace MetricFlowX
 
     close_csv_files();
     csv_vessel.clear();
+    csv_terminal.clear();
+    if (write_terminal_csv)
+      {
+        std::vector<unsigned int> local_terminal_ids;
+        for (const auto &cell : dof_handler_.active_cell_iterators())
+          if (cell->is_locally_owned())
+            for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+              if (cell->face(f)->at_boundary() &&
+                  !is_junction_face(cell->id(), f))
+                local_terminal_ids.push_back(cell->face(f)->boundary_id());
+        std::map<unsigned int, unsigned int> terminal_counts;
+        for (const auto &ids :
+             Utilities::MPI::all_gather(mpi_communicator_, local_terminal_ids))
+          for (const auto id : ids)
+            ++terminal_counts[id];
+        for (const auto &entry : terminal_counts)
+          AssertThrow(entry.second == 1,
+                      ExcMessage(
+                        "Terminal boundary ids must be globally unique"));
+        for (const auto &cell : dof_handler_.active_cell_iterators())
+          if (cell->is_locally_owned())
+            for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+              if (cell->face(f)->at_boundary() &&
+                  !is_junction_face(cell->id(), f))
+                {
+                  const auto bid = cell->face(f)->boundary_id();
+                  auto      &os  = csv_terminal[bid];
+                  AssertThrow(!os.is_open(),
+                              ExcMessage("Duplicate terminal boundary id"));
+                  os.open(dir + "terminal_" + std::to_string(bid) + ".csv");
+                  AssertThrow(os.good(),
+                              ExcMessage("Cannot open terminal CSV"));
+                  os << "time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id\n";
+                }
+      }
     probe_targets.clear();
 
     const std::string hdr = "time_s,P_dynpcm2,Q_cm3ps,A_cm2,U_cmps\n";
@@ -1860,6 +1973,32 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::write_csv_row(const double      t,
                                                 const VectorType &sol)
   {
+    if (write_terminal_csv)
+      {
+        for (const auto &cell : dof_handler_.active_cell_iterators())
+          if (cell->is_locally_owned())
+            for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+              if (cell->face(f)->at_boundary() &&
+                  !is_junction_face(cell->id(), f))
+                {
+                  const auto bid  = cell->face(f)->boundary_id();
+                  double     area = 0., velocity = 0.;
+                  get_face_trace(sol, cell, f, area, velocity);
+                  const auto   point = cell->face(f)->center();
+                  const double pressure =
+                    compute_physical_pressure(area,
+                                              cell->material_id(),
+                                              compute_a_d_at_face(cell, f),
+                                              t,
+                                              point,
+                                              cell->id());
+                  auto &os = csv_terminal.at(bid);
+                  os << std::setprecision(17) << t << ',' << pressure << ','
+                     << (f == 0 ? -1. : 1.) * area * velocity << ',' << bid
+                     << ',' << cell->material_id() << '\n';
+                  os.flush();
+                }
+      }
     const unsigned int dofs_per_cell = fe_->n_dofs_per_cell();
 
     // Reference-cell midpoint (DGQ, dim == 1 -> xi = 0.5).
@@ -1908,6 +2047,9 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::close_csv_files()
   {
     for (auto &kv : csv_vessel)
+      if (kv.second.is_open())
+        kv.second.close();
+    for (auto &kv : csv_terminal)
       if (kv.second.is_open())
         kv.second.close();
   }
@@ -2697,7 +2839,9 @@ namespace MetricFlowX
             if (bid == 0) // inflow
               {
                 inflow_function.set_time(t);
-                const double Q_in   = inflow_function.value(Point<1>(0.0));
+                const double Q_in   = (inflow_series.empty() ?
+                                         inflow_function.value(Point<1>(0.0)) :
+                                         inflow_series.value(t));
                 const double W2_int = U_int - 4.0 * (c_int - c0);
 
                 res_A = A_hat_cur * U_hat_cur - Q_in;

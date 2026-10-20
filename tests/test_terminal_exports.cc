@@ -1,0 +1,82 @@
+#include <deal.II/base/mpi.h>
+
+#include <metric_flow_x/blood_flow_system.h>
+
+#include <filesystem>
+
+#include "tests.h"
+
+using namespace dealii;
+using namespace MetricFlowX;
+
+void
+test()
+{
+  BloodFlowSystem<1, 3> flow;
+  flow.initialize_params(PRM_DIR "constant.prm");
+  flow.setup();
+  auto y = flow.make_state();
+  flow.initialize_state(y, 0.0);
+  const double     area     = 1.2 * flow.vessel_properties(0).a_d;
+  constexpr double velocity = 0.13;
+  flow.set_external_pressure_provider([](const auto &) { return 234.0; });
+  for (const auto &cell : flow.dof_handler_.active_cell_iterators())
+    if (cell->is_locally_owned())
+      for (const auto face : cell->face_indices())
+        if (cell->face(face)->at_boundary())
+          {
+            const auto &trace =
+              flow.face_dof_map.at(flow.canonical_face_key(cell, face));
+            y(trace.a_hat_dof) = area;
+            y(trace.u_hat_dof) = velocity;
+          }
+  y.compress(VectorOperation::insert);
+  flow.write_terminal_csv = true;
+  flow.output_directory   = "terminal-output";
+  flow.open_csv_files();
+  AssertThrow(Utilities::MPI::sum(static_cast<unsigned int>(
+                                    flow.csv_terminal.size()),
+                                  flow.mpi_communicator()) == 2,
+              ExcInternalError());
+  flow.write_csv_row(0.005, y);
+  flow.close_csv_files();
+  MPI_Barrier(flow.mpi_communicator());
+  if (Utilities::MPI::this_mpi_process(flow.mpi_communicator()) == 0)
+    for (const unsigned int boundary : {0, 1})
+      {
+        std::ifstream input("terminal-output/terminal_" +
+                            std::to_string(boundary) + ".csv");
+        std::string   line;
+        std::getline(input, line);
+        AssertThrow(line ==
+                      "time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id",
+                    ExcInternalError());
+        std::getline(input, line);
+        std::replace(line.begin(), line.end(), ',', ' ');
+        std::istringstream row(line);
+        double             time, pressure, flux;
+        unsigned int       bid, vid;
+        AssertThrow(static_cast<bool>(row >> time >> pressure >> flux >> bid >>
+                                      vid),
+                    ExcInternalError());
+        AssertThrow(time == 0.005 && bid == boundary && vid == 0,
+                    ExcInternalError());
+        AssertThrow(std::abs(pressure - flow.pressure(area, 0) - 234.0) < 1e-9,
+                    ExcInternalError());
+        AssertThrow(std::abs(flux - (boundary == 0 ? -1 : 1) * area *
+                                      velocity) < 1e-16,
+                    ExcInternalError());
+        AssertThrow(!std::getline(input, line), ExcInternalError());
+      }
+  deallog.depth_file(10);
+  deallog << "Terminal trace values and unique MPI file ownership: PASSED"
+          << std::endl;
+}
+
+int
+main(int argc, char **argv)
+{
+  Utilities::MPI::MPI_InitFinalize mpi(argc, argv, 1);
+  initlog();
+  test();
+}
