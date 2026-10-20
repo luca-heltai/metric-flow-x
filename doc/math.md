@@ -81,3 +81,9 @@ The provider is evaluated during residual assembly and pressure output. It is
 not evaluated during either Jacobian assembly: with the provider held fixed,
 its contribution has zero derivative with respect to the native flow state
 and no dependence on $\dot y$.
+
+### Zero-capacitance RCR outlets
+
+For `C = 0`, the capacitor pressure is eliminated and the outlet relation is
+`P = (R1 + R2) Q + P_out`. Both resistors remain in series; setting `R1 = 0`
+recovers the single-resistor model. No capacitor unknown is allocated.

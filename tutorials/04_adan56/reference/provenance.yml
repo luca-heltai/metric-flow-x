@@ -10,7 +10,7 @@ identity:
 source:
   path: notebooks/56_adnr_new.vtk
   copied_asset: tutorials/04_adan56/network.vtk
-  sha256: 2565e6ec349aea4defa4ee964da9f06ebddfe6f2d5ae67219f9026fbf9883bd4
+  sha256: 61975d5e4219135c3f9a43210b03ce074a197d3d026c88f7581938c96425df3d
   copy_policy: byte-for-byte copy
   selected_variant: 56_adnr_new
   selection_basis: Existing 56_ADNR parameter source references this mesh; exact arrays and connectivity were checked before copying.
@@ -57,3 +57,8 @@ missing_provenance:
   raw_solver_outputs_and_run_receipt: pending
   literature_and_external_reference_data: pending
   note: Input identity and integrity are resolved; missing provenance does not support a quantitative validation claim.
+
+input_correction:
+  issue: https://github.com/luca-heltai/metric-flow-x/issues/12
+  change: Restored the exchanged a_d entries for vessel IDs 59 and 60 in both source meshes and the tutorial copy.
+  check: All a_d entries agree with pi*r_d^2 within 2 percent.

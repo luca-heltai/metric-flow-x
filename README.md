@@ -140,7 +140,8 @@ From the repository root, run:
 The script downloads both `metric-flow-x-datasets-si-v1.tar.gz` and
 `cerebral-datasets-v1.tar.gz` from release `datasets-final-version-v1` in
 `luca-heltai/metric-flow-x`. It verifies pinned SHA-256 checksums before
-extracting each archive into its expected `notebooks/` paths. The network archive ships corrected SI meshes directly. No post-extraction
+extracting each archive into its expected `notebooks/` paths. The network archive
+ships corrected SI meshes directly. No post-extraction
 conversion or Python dependency is needed. Dataset contents, units and hashes
 are recorded in [the release manifest](datasets/network-datasets-si-v1.json).
 The cerebral archive adds:

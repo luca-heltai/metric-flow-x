@@ -62,36 +62,34 @@ namespace MetricFlowX
   //
   // SUNDIALS::IDA keeps its `ida_mem` handle private, but IDAGetNumSteps and
   // friends need it.  An explicit instantiation may name a private member, so
-  // Planter<..., &IDA::ida_mem> captures the pointer-to-member and exposes it
+  // Planter<&IDA::ida_mem> captures the pointer-to-member and exposes it
   // through the ADL-found friend steal().  Same trick as the pre-MetricFlowX
   // driver; it lives in exactly one translation unit.
   // ===========================================================================
   namespace internal_ida_access
   {
-    template <typename VecType>
     struct IdaMemAccessor
     {
-      using type = void *dealii::SUNDIALS::IDA<VecType>::*;
+      using type = void *dealii::SUNDIALS::IDA<VectorType>::*;
       friend type        steal(IdaMemAccessor);
     };
 
-    template <typename VecType, typename IdaMemAccessor<VecType>::type M>
+    template <IdaMemAccessor::type M>
     struct Planter
     {
-      friend typename IdaMemAccessor<VecType>::type
-      steal(IdaMemAccessor<VecType>)
+      friend IdaMemAccessor::type
+      steal(IdaMemAccessor)
       {
         return M;
       }
     };
 
-    template struct Planter<VectorType,
-                            &dealii::SUNDIALS::IDA<VectorType>::ida_mem>;
+    template struct Planter<&dealii::SUNDIALS::IDA<VectorType>::ida_mem>;
 
     inline void *
     get_ida_mem(const dealii::SUNDIALS::IDA<VectorType> &ida)
     {
-      return ida.*steal(IdaMemAccessor<VectorType>{});
+      return ida.*steal(IdaMemAccessor{});
     }
   } // namespace internal_ida_access
 
@@ -1306,10 +1304,10 @@ namespace MetricFlowX
       trace_dofs_owned.compress();
 
       const std::array<ComponentMask, 4> component_masks = {
-        ComponentMask({true, false, false, false}),
-        ComponentMask({false, true, false, false}),
-        ComponentMask({false, false, true, false}),
-        ComponentMask({false, false, false, true})};
+        {ComponentMask({true, false, false, false}),
+         ComponentMask({false, true, false, false}),
+         ComponentMask({false, false, true, false}),
+         ComponentMask({false, false, false, true})}};
       for (unsigned int c = 0; c < component_masks.size(); ++c)
         {
           component_dofs_[c].clear();
@@ -2600,10 +2598,10 @@ namespace MetricFlowX
                             (rcr.R1 * Q + Pc);
                   }
                 else
-                  { // single R: P = R2*Q + P_out
+                  { // C=0: the two resistances remain in series.
                     res_A = compute_physical_pressure(
                               A_hat, vid, a_d_local, t, point, cell->id()) -
-                            (rcr.R2 * Q + rcr.P_out);
+                            ((rcr.R1 + rcr.R2) * Q + rcr.P_out);
                   }
                 const double W1_int = U_int + 4.0 * (c_int - c0);
                 res_U               = (U_hat_cur + 4.0 * (c_hat - c0)) - W1_int;
@@ -3714,20 +3712,12 @@ namespace MetricFlowX
                   }
                 else
                   {
-                    // Single R
-                    // -------------------------------------------------------
-                    // res_A = P(A_hat) - R2*(A_hat*U_hat) - P_out
-                    // res_U = U_hat + 4(c_hat - c0) - W1_int
-                    //
-                    // dres_A/dA_hat = dP/dA_hat - R2*U_hat   (same
-                    // form as RCR with R2) dres_A/dU_hat =
-                    // -R2*A_hat               (R2 replaces R1) Pc
-                    // term drops out (no capacitor, no time
-                    // derivative)
+                    // C=0: P = (R1 + R2)*Q + P_out; no capacitor unknown.
+                    const double resistance = rcr.R1 + rcr.R2;
                     jacobian_matrix.add(a_row,
                                         a_row,
-                                        dPdA_hat - rcr.R2 * U_hat_cur);
-                    jacobian_matrix.add(a_row, u_row, -rcr.R2 * A_hat);
+                                        dPdA_hat - resistance * U_hat_cur);
+                    jacobian_matrix.add(a_row, u_row, -resistance * A_hat);
 
                     // dres_U/dA_hat = 4*dc_hat
                     // dres_U/dU_hat = 1
