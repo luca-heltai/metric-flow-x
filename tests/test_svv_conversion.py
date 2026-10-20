@@ -75,6 +75,16 @@ class SvvConversionTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("source units are never inferred", result.stderr)
 
+    def test_invalid_si_model_constants_are_rejected(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for options in (("--young-modulus", "0"),
+                            ("--perfusion-pressure", "nan"),
+                            ("--diastolic-pressure", "inf")):
+                result, mesh = self.convert(Path(folder), {"length": "cm", "time": "s"}, options=options)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("must be finite", result.stderr)
+                self.assertIsNone(mesh)
+
     def test_explicit_overrides(self):
         with tempfile.TemporaryDirectory() as folder:
             result, mesh = self.convert(Path(folder), {}, options=("--length-unit", "cm", "--time-unit", "s"))

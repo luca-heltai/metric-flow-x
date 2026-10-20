@@ -38,6 +38,14 @@ parser.add_argument("--reference-pressure", type=float, default=0.0, help="Refer
 parser.add_argument("--perfusion-pressure", type=float, default=1.25e5, help="Outlet driving pressure in Pa")
 parser.add_argument("--reference-inflow", type=float, default=1e-3, help="Diagnostic inflow in m^3/s")
 args = parser.parse_args()
+for name in ("young_modulus", "perfusion_pressure"):
+    if not np.isfinite(getattr(args, name)) or getattr(args, name) <= 0:
+        option = name.replace("_", "-")
+        parser.error(f"--{option} must be finite and positive")
+for name in ("diastolic_pressure", "reference_pressure", "reference_inflow"):
+    if not np.isfinite(getattr(args, name)):
+        option = name.replace("_", "-")
+        parser.error(f"--{option} must be finite")
 input_file = args.input_file
 output_file = args.output_file
 dataset_title = "svVascularize vessel network"

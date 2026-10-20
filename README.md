@@ -173,3 +173,42 @@ The formulation and derivation remain documented in `doc/math.md` and
 ## License
 
 This project is licensed under the MIT License (see `LICENSE.md`).
+
+
+### svVascularize units
+
+The solver consumes SI geometry, area and flow. Convert trusted tree archives
+using their recorded `unit_system`; missing or unsupported length/time units
+require explicit `--length-unit` and `--time-unit` overrides. The converter
+requires Python 3 and NumPy, without svVascularize or Matplotlib.
+
+To regenerate the 10000-terminal tree with its existing RCR/material assumptions:
+
+```sh
+python3 notebooks/Networks-by-svv/convert_to_standard_vtk.py \
+  notebooks/Networks-by-svv/trees/network_10000.tree.npz \
+  notebooks/Networks-by-svv/trees/network_10000_adnr.vtk \
+  --rcr --young-modulus 225000 --diastolic-pressure 10000 \
+  --perfusion-pressure 10000 --reference-inflow 8.178e-7
+```
+
+Pressure and wall-law arguments are SI. Centimetre/second trees require lengths
+and radii scaled by 0.01 and design flow by 1e-6 before deriving areas, wall
+thickness, resistances and capacitances. The interior boundary marker is 300655,
+within the unsigned 32-bit range and above the outlet IDs in these datasets.
+
+The checksum-pinned release archive predates the unit fix. The downloader now
+repairs its legacy `*_adnr*.vtk` files after extraction, using Python 3 without
+additional packages. It preserves pressure, Young modulus, resistor split and
+RC time constant, and recomputes wall thickness at the SI radius with the
+archived wall law. Historical archives are retained. Existing extractions can
+be repaired with:
+
+```sh
+python3 tools/repair_legacy_svv_units.py /path/to/extracted/datasets
+```
+
+Use this repair only for the known legacy archive files; generate new files
+from tree metadata. A conversion marker prevents repeated scaling. Generated
+network files stay outside Git. Correct units alone do not validate inflow,
+wall parameters, near-sonic flow or physiological suitability.
