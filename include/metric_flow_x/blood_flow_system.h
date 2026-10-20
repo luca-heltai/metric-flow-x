@@ -688,7 +688,15 @@ namespace MetricFlowX
     double      default_terminal_c     = 0.0;
     double      default_terminal_p_out = 0.0;
 
-    ParsedTools::Constants    par;
+    ParsedTools::Constants par;
+    // Parameter entries refer to stable map values. These references avoid
+    // string lookups and automatically observe subsequent parameter reloads.
+    const double &density                = par["rho"];
+    const double &tube_law_exponent      = par["m"];
+    const double &viscosity              = par["mu"];
+    const double &friction_profile       = par["xi"];
+    const double &reflection_coefficient = par["Rt"];
+
     AffineConstraints<double> constraints_;
     double                    current_dt  = 0.0;
     double                    last_rcr_dt = 0.0;
@@ -1210,7 +1218,7 @@ namespace MetricFlowX
                        const double       a_d_local) const
     {
       const double A_safe = std::max(A, 1e-10);
-      return std::sqrt(A_safe / par["rho"] *
+      return std::sqrt(A_safe / density *
                        compute_pressure_derivative(A_safe, vid, a_d_local));
     }
 
@@ -1220,7 +1228,7 @@ namespace MetricFlowX
                                   const double       a_d_local) const
     {
       const double A_safe = std::max(A, 1e-10);
-      return compute_wave_speed(A_safe, vid, a_d_local) * par["m"] /
+      return compute_wave_speed(A_safe, vid, a_d_local) * tube_law_exponent /
              (2.0 * A_safe);
     }
 

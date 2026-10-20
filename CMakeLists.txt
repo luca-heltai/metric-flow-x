@@ -149,6 +149,12 @@ add_compile_definitions(
   METRIC_FLOW_X_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
+add_executable(benchmark_assembly EXCLUDE_FROM_ALL tools/benchmark_assembly.cc)
+list(GET METRIC_FLOW_X_BUILD_TYPES 0 _benchmark_variant)
+string(TOUPPER "${_benchmark_variant}" _benchmark_variant_upper)
+deal_ii_setup_target(benchmark_assembly ${_benchmark_variant_upper})
+target_link_libraries(benchmark_assembly metric_flow_x)
+
 # Add tests
 enable_testing()
 add_subdirectory(tests)

@@ -2397,14 +2397,14 @@ namespace MetricFlowX
                            U_L,
                            compute_pressure_value(A_L, vid_L, ad_L) +
                              external_pressure_L,
-                           par["rho"]);
+                           density);
     const double FAR = scalar_area_flux(bn_R, A_R, U_R);
     const double FUR =
       scalar_momentum_flux(bn_R,
                            U_R,
                            compute_pressure_value(A_R, vid_R, ad_R) +
                              external_pressure_R,
-                           par["rho"]);
+                           density);
 
     if (s_L >= 0.0)
       return {{FAL, FUL}};
@@ -2498,7 +2498,7 @@ namespace MetricFlowX
                            U_R,
                            compute_pressure_value(A_R, vid_R, ad_R) +
                              external_pressure_R,
-                           par["rho"]);
+                           density);
 
     // Stabilization term: s⁺(U_e - U_b)
     const double FA = FA_b + s_plus * (A_L - A_R);
@@ -2579,14 +2579,14 @@ namespace MetricFlowX
                            U_L,
                            compute_pressure_value(A_L, vid_L, ad_L) +
                              external_pressure_L,
-                           par["rho"]);
+                           density);
     const double FAR = scalar_area_flux(bn_R, A_R, U_R);
     const double FUR =
       scalar_momentum_flux(bn_R,
                            U_R,
                            compute_pressure_value(A_R, vid_R, ad_R) +
                              external_pressure_R,
-                           par["rho"]);
+                           density);
     const double alpha =
       theta * compute_LF_penalty(
                 A_L, A_R, U_L, U_R, bn_L, bn_R, vid_L, vid_R, ad_L, ad_R);
@@ -2611,8 +2611,8 @@ namespace MetricFlowX
     const double       external_pressure_L,
     const double       external_pressure_R) const
   {
-    const double pressure_flux_L = external_pressure_L / par["rho"] * bn_L;
-    const double pressure_flux_R = external_pressure_R / par["rho"] * bn_R;
+    const double pressure_flux_L = external_pressure_L / density * bn_L;
+    const double pressure_flux_R = external_pressure_R / density * bn_R;
 
     if (numerical_flux_type == NumericalFluxType::HLL_HDG)
       {
@@ -2729,8 +2729,9 @@ namespace MetricFlowX
     Vector<double>                       cell_rhs(n_dofs);
     std::vector<types::global_dof_index> ldofs(n_dofs);
 
-    const double rho = par["rho"];
-    const double eta = 2.0 * (par["xi"] + 2.0) * numbers::PI * par["mu"] / rho;
+    const double rho = density;
+    const double eta =
+      2.0 * (friction_profile + 2.0) * numbers::PI * viscosity / rho;
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
@@ -3193,7 +3194,7 @@ namespace MetricFlowX
               }
             else // Reflection outlet
               {
-                const double Rt     = par["Rt"];
+                const double Rt     = reflection_coefficient;
                 const double W1_int = U_int + 4.0 * (c_int - c0);
                 const double W2_tgt = -Rt * W1_int;
 
@@ -3313,7 +3314,7 @@ namespace MetricFlowX
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
 
-    const double rho   = par["rho"];
+    const double rho   = density;
     const double A_min = 1e-10;
 
     for (const auto &J : junctions)
@@ -3807,8 +3808,9 @@ namespace MetricFlowX
                                     update_values | update_JxW_values |
                                       update_normal_vectors);
 
-    const double rho = par["rho"];
-    const double eta = 2.0 * (par["xi"] + 2.0) * numbers::PI * par["mu"] / rho;
+    const double rho = density;
+    const double eta =
+      2.0 * (friction_profile + 2.0) * numbers::PI * viscosity / rho;
     (void)t;
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
@@ -4372,7 +4374,7 @@ namespace MetricFlowX
               }
             else // Reflection
               {
-                const double Rt = par["Rt"];
+                const double Rt = reflection_coefficient;
 
                 // R1 = U_hat + 4(c_hat - c0) - W1_int
                 // R2 = U_hat - 4(c_hat - c0) - (-Rt * W1_int)
@@ -4463,7 +4465,7 @@ namespace MetricFlowX
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
 
-    const double rho   = par["rho"];
+    const double rho   = density;
     const double A_min = 1e-10;
 
     for (const auto &J : junctions)
