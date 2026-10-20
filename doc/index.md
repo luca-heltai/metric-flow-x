@@ -63,6 +63,7 @@ build_and_run
 containers
 math
 results
+performance
 tutorials
 reproducibility
 api
