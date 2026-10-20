@@ -17,6 +17,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p test_svv_conversion.py -v
           python3 -m unittest discover -s tests -p test_repair_svv_units.py -v
+          python3 -m unittest discover -s tests -p test_svv_boundary_ids.py -v
       - name: Test release dataset downloader
         run: python3 -m unittest discover -s tests -p test_download_datasets.py -v
 
