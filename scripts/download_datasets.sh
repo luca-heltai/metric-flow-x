@@ -5,7 +5,7 @@ REPOSITORY="luca-heltai/metric-flow-x"
 RELEASE_TAG="datasets-final-version-v1"
 NETWORK_ASSET="metric_flow_x_datasets_si_v1.tar.gz"
 NETWORK_SHA256="ee7c831a626109639c32edeea5085e5cb8a6cd15cd6dce31cbd75bf173787c1a"
-CEREBRAL_ASSET="cerebral_datasets_v1.tar.gz"
+CEREBRAL_ASSET="cerebral_datasets_v2.tar.gz"
 CEREBRAL_SHA256="3f94081c6a256e2d341a45c51889e9090056273664cc9503cb22a2ffa98c5ee1"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

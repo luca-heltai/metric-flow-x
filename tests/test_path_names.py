@@ -23,7 +23,7 @@ class PathNamesTest(unittest.TestCase):
                 self.assert_standard_path(path)
 
     def test_published_dataset_names(self):
-        manifest = json.loads((ROOT / "datasets/network_datasets_si_v1.json").read_text())
+        manifest = json.loads((ROOT / "datasets/datasets_si_v1.json").read_text())
         for key in ("archive", "cerebral_archive"):
             self.assert_standard_path(manifest[key]["name"])
         for item in manifest["files"] + manifest["cerebral_files"]:

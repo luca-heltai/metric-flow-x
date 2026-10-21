@@ -14,7 +14,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts/download_datasets.sh"
 ASSETS = (
     ("metric_flow_x_datasets_si_v1.tar.gz", "notebooks/binary_tree_255.vtk",
      "ee7c831a626109639c32edeea5085e5cb8a6cd15cd6dce31cbd75bf173787c1a"),
-    ("cerebral_datasets_v1.tar.gz", "notebooks/cerebral_data/standard_cco.vtk",
+    ("cerebral_datasets_v2.tar.gz", "notebooks/cerebral_data/standard_cco.vtk",
      "3f94081c6a256e2d341a45c51889e9090056273664cc9503cb22a2ffa98c5ee1"),
 )
 
