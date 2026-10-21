@@ -398,12 +398,24 @@ namespace MetricFlowX
       result.emplace(id, defaults);
     if (terminal_parameters_csv_file.empty())
       return result;
+    rapidcsv::SeparatorParams separators(',', true);
+    separators.mQuotedLinebreaks = true;
     const rapidcsv::Document csv(terminal_parameters_csv_file,
                                  rapidcsv::LabelParams(),
-                                 rapidcsv::SeparatorParams(',', true));
-    AssertThrow(csv.GetColumnNames() ==
-                  std::vector<std::string>({"boundary_id", "R1", "R2", "C"}),
-                ExcMessage("Expected terminal CSV header boundary_id,R1,R2,C"));
+                                 separators);
+    const auto               columns = csv.GetColumnNames();
+    std::set<std::string>    column_names;
+    for (const auto &name : columns)
+      AssertThrow(!name.empty() && column_names.insert(name).second,
+                  ExcMessage(
+                    "Terminal CSV column names must be nonempty and unique."));
+    AssertThrow(csv.GetColumnIdx("boundary_id") >= 0,
+                ExcMessage("Terminal CSV requires a boundary_id column."));
+    AssertThrow(
+      csv.GetColumnIdx("R1") >= 0 || csv.GetColumnIdx("R2") >= 0 ||
+        csv.GetColumnIdx("C") >= 0,
+      ExcMessage(
+        "Terminal CSV requires at least one of R1, R2 or C; other columns are ignored."));
     const auto parse_value = [](const std::string &text, double &value) {
       std::size_t consumed = 0;
       value                = std::stod(text, &consumed);
@@ -415,7 +427,7 @@ namespace MetricFlowX
       {
         const std::string context =
           "Malformed terminal CSV row " + std::to_string(row + 2);
-        AssertThrow(csv.GetRow<std::string>(row).size() == 4,
+        AssertThrow(csv.GetRow<std::string>(row).size() == columns.size(),
                     ExcMessage(context));
         const auto id_text = csv.GetCell<std::string>("boundary_id", row);
         AssertThrow(
@@ -427,11 +439,17 @@ namespace MetricFlowX
         const auto raw_id = csv.GetCell<unsigned long long>("boundary_id", row);
         AssertThrow(raw_id <= std::numeric_limits<types::boundary_id>::max(),
                     ExcMessage(context + ": boundary_id is out of range"));
-        RCRPhysics value = defaults;
-        value.R1         = csv.GetCell<double>("R1", row, parse_value);
-        value.R2         = csv.GetCell<double>("R2", row, parse_value);
-        value.C          = csv.GetCell<double>("C", row, parse_value);
-        const auto id    = static_cast<types::boundary_id>(raw_id);
+        RCRPhysics value          = defaults;
+        const auto override_value = [&](const std::string &name,
+                                        double            &target) {
+          if (csv.GetColumnIdx(name) >= 0 &&
+              !csv.GetCell<std::string>(name, row).empty())
+            target = csv.GetCell<double>(name, row, parse_value);
+        };
+        override_value("R1", value.R1);
+        override_value("R2", value.R2);
+        override_value("C", value.C);
+        const auto id = static_cast<types::boundary_id>(raw_id);
         AssertThrow(result.count(id) != 0,
                     ExcMessage(
                       "Terminal CSV references non-terminal boundary ID " +

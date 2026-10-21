@@ -56,6 +56,28 @@ test()
     values = flow.read_terminal_parameters(ids);
     AssertThrow(values.at(1).R1 == 2e7 && values.at(2).R2 == 3e7,
                 ExcInternalError());
+    // Column labels, not their positions, select parameters. Other data are
+    // ignored.
+    write("terminal.csv",
+          "C,note,boundary_id,R2,R1\n"
+          "1e-8,\"external, measurement\nnot used by RCR\",2,4e7,1e7\n");
+    values = flow.read_terminal_parameters(ids);
+    AssertThrow(values.at(1).R1 == 2e7 && values.at(2).R1 == 1e7 &&
+                  values.at(2).R2 == 4e7 && values.at(2).C == 1e-8,
+                ExcInternalError());
+    write("terminal.csv", "label,R2,boundary_id\nunused,4e7,2\n");
+    values = flow.read_terminal_parameters(ids);
+    AssertThrow(values.at(2).R1 == 2e7 && values.at(2).R2 == 4e7 &&
+                  values.at(2).C == 0 && values.at(2).P_out == 321,
+                ExcInternalError());
+    write("terminal.csv",
+          "boundary_id,R1,R2,C,external_pressure\n"
+          "1, ,4e7,,not_a_number\n2,1e7, ,1e-8,not_used\n");
+    values = flow.read_terminal_parameters(ids);
+    AssertThrow(values.at(1).R1 == 2e7 && values.at(1).R2 == 4e7 &&
+                  values.at(1).C == 0 && values.at(2).R1 == 1e7 &&
+                  values.at(2).R2 == 3e7 && values.at(2).C == 1e-8,
+                ExcInternalError());
     for (const auto &bad :
          {"boundary_id,R1,R2,C\n2,1,2,0\n2,1,2,0\n",
           "boundary_id,R1,R2,C\n0,1,2,0\n",
@@ -69,6 +91,12 @@ test()
           "boundary_id,R1,R2,C\n-1,1,2,0\n",
           "wrong_header\n1,1,2,0\n",
           "boundary_id,R1,R2,C\n1,1,2\n",
+          "R1,R2,C\n1,2,0\n",
+          "boundary_id,R1,R1\n1,2,3\n",
+          "boundary_id,R1,note,note\n1,2,a,b\n",
+          "boundary_id,R1,\n1,2,a\n",
+          "boundary_id,pressure_pa\n1,12000\n",
+          "boundary_id,R2,C\n1,0,1e-8\n",
           "boundary_id,R1,R2,C\n1,1e7suffix,2,0\n",
           "boundary_id,R1,R2,C\n1,1,2,0suffix\n",
           "boundary_id,R1,R2,C\n1suffix,1,2,0\n",

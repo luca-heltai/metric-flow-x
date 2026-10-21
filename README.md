@@ -195,12 +195,41 @@ set Default terminal P_out = 0
 set Terminal parameters CSV file = terminals.csv
 ```
 
-The CSV header is exactly `boundary_id,R1,R2,C`. A matching row overrides all
-three values for that terminal. Omitted terminal IDs use all three defaults;
-with no CSV configured, every terminal uses the defaults. Resistances are in
-Pa*s/m3, compliance in m3/Pa, and P_out in Pa. P_out is the global default in
-Parameters mode; CSV rows do not override it. VTK mode preserves existing
-per-terminal P_out values. No pressure datum is inferred.
+CSV columns are selected by their case-sensitive names, in any order:
+
+- `boundary_id` is required and must uniquely identify an actual terminal.
+- `R1`, `R2`, and `C` are optional. Each missing column or empty/whitespace-only
+  cell uses the corresponding parameter-file default. At least one of these
+  column names must be present, so a different kind of data file is not silently
+  accepted as terminal configuration.
+- Additional named columns are ignored; they may contain arbitrary metadata or
+  measurements, including quoted commas and line breaks.
+
+For example, with the defaults above:
+
+```csv
+label,R2,boundary_id,C
+outlet_b,4e7,2,
+```
+
+Terminal 2 receives R1=2e7, R2=4e7, C=0. Omitted terminal IDs use all defaults;
+with no CSV configured, every terminal uses the defaults. Headers must be
+nonempty and unique, and every data row must have the same number of cells as
+the header (use explicit empty cells for defaults). Nonempty numeric cells must
+contain a complete valid number; `NaN`, infinity and invalid final RCR values
+are rejected. Duplicate or unknown boundary IDs are errors.
+
+Resistances are in Pa*s/m3, compliance in m3/Pa, and P_out in Pa. P_out remains
+the global default in Parameters mode; CSV rows do not override it. VTK mode
+preserves existing per-terminal P_out values. No units, pressure datum or flow
+sign convention are inferred from unused columns.
+
+This is a constant-parameter table, with one row per terminal, not a time-series
+reader. Future prescribed pressure/flow series should have a separate schema
+with `boundary_id` and `time_s`, explicit units and driving-variable selection,
+strictly increasing times per terminal, and explicit interpolation, coverage
+and periodicity policies. External-file adapters can map column names and units
+to that contract while retaining other columns as unused data.
 
 Parameters mode requires geometry, vessel fields and boundary IDs in VTK, but
 no R1/R2/C/P_out arrays. Actual graph endpoints identify terminals, excluding
