@@ -55,3 +55,30 @@ end
 ```
 
 Use the exact spelling and subsection nesting shown in the parameter files. Parameter defaults in C++ and values in examples are not a scientific calibration.
+
+
+## Component tolerances and sonic-regime diagnostics
+
+The existing scalar IDA tolerance remains the default. For SI states, enable
+`Use componentwise absolute tolerances = true` in `MetricFlowSystem<1, 3>`.
+`Area absolute tolerance fraction` (default 1e-3) multiplies the local reference
+area for both A and A_hat; tapered cells use the smaller endpoint reference area.
+`Velocity absolute tolerance` defaults to 1e-4 m/s for U and U_hat, and
+`Capacitor pressure absolute tolerance` defaults to 1 Pa. All scales must be
+finite and positive. The IDA relative tolerance and algebraic-error-control
+setting remain configurable through their existing parameters.
+
+Set `Write flow regime diagnostics = true` to write `flow_regime.csv` alongside
+other outputs. Each row records SI time, vessel ID and the sampled maximum
+absolute U/c across cell quadrature points and face traces. Values are reduced
+across MPI ranks before rank zero writes them. The configurable
+`Mach warning threshold` defaults to 0.8; warnings occur on upward crossings.
+The same option warns about mesh a_d values differing from pi*r_d^2 by more
+than 2 percent. Diagnostics use the existing physical-output cadence.
+
+These controls improve scaling and expose approach to the sonic fold. They do
+not establish that a subsonic trace solution exists beyond that fold, and a
+lower BDF order alone is not a sonic-flow remedy. The softened-wall reproduction
+in issue #14 still requires a separate physical/numerical assessment. Short,
+abrupt vessel constrictions require geometric assessment in addition to the
+area/radius consistency check.
