@@ -43,17 +43,36 @@ test()
     values = flow.read_terminal_parameters(ids);
     AssertThrow(values.at(1).R1 == 7 && values.at(2).R2 == 10,
                 ExcInternalError());
-    for (const auto &bad : {"boundary_id,R1,R2,C\n2,1,2,0\n2,1,2,0\n",
-                            "boundary_id,R1,R2,C\n0,1,2,0\n",
-                            "boundary_id,R1,R2,C\n999,1,2,0\n",
-                            "boundary_id,R1,R2,C\n1,-1,2,0\n",
-                            "boundary_id,R1,R2,C\n1,0,0,0\n",
-                            "boundary_id,R1,R2,C\n1,1,0,1\n",
-                            "boundary_id,R1,R2,C\n1,1,2,-1\n",
-                            "boundary_id,R1,R2,C\n1,nan,2,0\n",
-                            "boundary_id,R1,R2,C\n1,1,2,0,8\n",
-                            "boundary_id,R1,R2,C\n-1,1,2,0\n",
-                            "wrong_header\n1,1,2,0\n"})
+    // rapidcsv handles quoted fields, whitespace, UTF-8 BOM and CRLF.
+    write("terminal.csv",
+          "\xef\xbb\xbf\"boundary_id\",\"R1\",\"R2\",\"C\"\r\n"
+          "\"2\", \"1e7\", \"4e7\", \"1e-8\"\r\n");
+    values = flow.read_terminal_parameters(ids);
+    AssertThrow(values.at(1).R1 == 2e7 && values.at(2).R1 == 1e7 &&
+                  values.at(2).R2 == 4e7 && values.at(2).C == 1e-8 &&
+                  values.at(2).P_out == 321,
+                ExcInternalError());
+    write("terminal.csv", "boundary_id,R1,R2,C\n");
+    values = flow.read_terminal_parameters(ids);
+    AssertThrow(values.at(1).R1 == 2e7 && values.at(2).R2 == 3e7,
+                ExcInternalError());
+    for (const auto &bad :
+         {"boundary_id,R1,R2,C\n2,1,2,0\n2,1,2,0\n",
+          "boundary_id,R1,R2,C\n0,1,2,0\n",
+          "boundary_id,R1,R2,C\n999,1,2,0\n",
+          "boundary_id,R1,R2,C\n1,-1,2,0\n",
+          "boundary_id,R1,R2,C\n1,0,0,0\n",
+          "boundary_id,R1,R2,C\n1,1,0,1\n",
+          "boundary_id,R1,R2,C\n1,1,2,-1\n",
+          "boundary_id,R1,R2,C\n1,nan,2,0\n",
+          "boundary_id,R1,R2,C\n1,1,2,0,8\n",
+          "boundary_id,R1,R2,C\n-1,1,2,0\n",
+          "wrong_header\n1,1,2,0\n",
+          "boundary_id,R1,R2,C\n1,1,2\n",
+          "boundary_id,R1,R2,C\n1,1e7suffix,2,0\n",
+          "boundary_id,R1,R2,C\n1,1,2,0suffix\n",
+          "boundary_id,R1,R2,C\n1suffix,1,2,0\n",
+          "boundary_id,R1,R2,C\n18446744073709551616,1,2,0\n"})
       {
         write("terminal.csv", bad);
         bool rejected = false;

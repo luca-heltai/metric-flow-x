@@ -170,6 +170,11 @@ observables without using ImmersX.
 The formulation and derivation remain documented in `doc/math.md` and
 `latex/blood_flow.tex`.
 
+Terminal RCR CSV input uses the vendored header-only
+[rapidcsv v9.07](https://github.com/d99kris/rapidcsv/tree/v9.07) dependency;
+see `third_party/rapidcsv/README.md` for provenance and its BSD 3-Clause license.
+No extra package or network download is needed to build the CSV reader.
+
 ## License
 
 This project is licensed under the MIT License (see `LICENSE.md`).

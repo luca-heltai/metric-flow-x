@@ -52,6 +52,8 @@
 #include <limits>
 #include <sstream>
 
+#include "rapidcsv.h"
+
 namespace MetricFlowX
 {
   using namespace dealii;
@@ -396,37 +398,40 @@ namespace MetricFlowX
       result.emplace(id, defaults);
     if (terminal_parameters_csv_file.empty())
       return result;
-    std::ifstream input(terminal_parameters_csv_file);
-    AssertThrow(input,
-                ExcMessage("Cannot open terminal CSV: " +
-                           terminal_parameters_csv_file));
-    std::string line;
-    std::getline(input, line);
-    if (!line.empty() && line.back() == '\r')
-      line.pop_back();
-    AssertThrow(line == "boundary_id,R1,R2,C",
+    const rapidcsv::Document csv(terminal_parameters_csv_file,
+                                 rapidcsv::LabelParams(),
+                                 rapidcsv::SeparatorParams(',', true));
+    AssertThrow(csv.GetColumnNames() ==
+                  std::vector<std::string>({"boundary_id", "R1", "R2", "C"}),
                 ExcMessage("Expected terminal CSV header boundary_id,R1,R2,C"));
+    const auto parse_value = [](const std::string &text, double &value) {
+      std::size_t consumed = 0;
+      value                = std::stod(text, &consumed);
+      AssertThrow(consumed == text.size(),
+                  ExcMessage("Invalid terminal CSV numeric value: " + text));
+    };
     std::set<types::boundary_id> seen;
-    unsigned int                 line_number = 1;
-    while (std::getline(input, line))
+    for (std::size_t row = 0; row < csv.GetRowCount(); ++row)
       {
-        ++line_number;
-        std::istringstream row(line);
-        row >> std::ws;
-        const bool         unsigned_id = row.peek() >= '0' && row.peek() <= '9';
-        unsigned long long raw_id      = 0;
-        char               first, second, third;
-        RCRPhysics         value = defaults;
-        AssertThrow(unsigned_id &&
-                      static_cast<bool>(row >> raw_id >> first >> value.R1 >>
-                                        second >> value.R2 >> third >>
-                                        value.C) &&
-                      first == ',' && second == ',' && third == ',' &&
-                      (row >> std::ws).eof() &&
-                      raw_id <= std::numeric_limits<types::boundary_id>::max(),
-                    ExcMessage("Malformed terminal CSV row " +
-                               std::to_string(line_number)));
-        const auto id = static_cast<types::boundary_id>(raw_id);
+        const std::string context =
+          "Malformed terminal CSV row " + std::to_string(row + 2);
+        AssertThrow(csv.GetRow<std::string>(row).size() == 4,
+                    ExcMessage(context));
+        const auto id_text = csv.GetCell<std::string>("boundary_id", row);
+        AssertThrow(
+          !id_text.empty() &&
+            std::all_of(id_text.begin(),
+                        id_text.end(),
+                        [](const char c) { return c >= '0' && c <= '9'; }),
+          ExcMessage(context + ": boundary_id must be an unsigned integer"));
+        const auto raw_id = csv.GetCell<unsigned long long>("boundary_id", row);
+        AssertThrow(raw_id <= std::numeric_limits<types::boundary_id>::max(),
+                    ExcMessage(context + ": boundary_id is out of range"));
+        RCRPhysics value = defaults;
+        value.R1         = csv.GetCell<double>("R1", row, parse_value);
+        value.R2         = csv.GetCell<double>("R2", row, parse_value);
+        value.C          = csv.GetCell<double>("C", row, parse_value);
+        const auto id    = static_cast<types::boundary_id>(raw_id);
         AssertThrow(result.count(id) != 0,
                     ExcMessage(
                       "Terminal CSV references non-terminal boundary ID " +
