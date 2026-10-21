@@ -21,5 +21,5 @@ For installation and commands, see [Installation and build/run](installation.md)
 ```{include} background.md
 ```
 
-```{include} repository-layout.md
+```{include} repository_layout.md
 ```

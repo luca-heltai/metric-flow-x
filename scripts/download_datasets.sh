@@ -3,10 +3,10 @@ set -euo pipefail
 
 REPOSITORY="luca-heltai/metric-flow-x"
 RELEASE_TAG="datasets-final-version-v1"
-NETWORK_ASSET="blood-flow-datasets-v0.1.0.tar.gz"
-NETWORK_SHA256="a9bef4aa466cb263d8c0bdf7503f175a659c7b22a3a812d2a9d95d3ed0988f47"
-CEREBRAL_ASSET="cerebral-datasets-v1.tar.gz"
-CEREBRAL_SHA256="49a1d6a6789975ffb4f8657f8a725e3ce5664e2997a7a239c041719329380b09"
+NETWORK_ASSET="metric_flow_x_datasets_si_v1.tar.gz"
+NETWORK_SHA256="ee7c831a626109639c32edeea5085e5cb8a6cd15cd6dce31cbd75bf173787c1a"
+CEREBRAL_ASSET="cerebral_datasets_v2.tar.gz"
+CEREBRAL_SHA256="3f94081c6a256e2d341a45c51889e9090056273664cc9503cb22a2ffa98c5ee1"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"

@@ -132,7 +132,7 @@ python3 -m pytest tests/test_periodicity_tools.py
 
 `reference/provenance.yml` records the exact source path, copied-asset path, SHA-256
 digest, validator, and topology counts. It also records the absence of raw
-comparison curves. The PDFs under `NumData/37-arteries` are image-only plot assets;
+comparison curves. The PDFs under `num_data/37_arteries` are image-only plot assets;
 they cannot provide reproducible numerical samples, grids, uncertainty, or raw
 provenance and therefore are not treated as validation data.
 

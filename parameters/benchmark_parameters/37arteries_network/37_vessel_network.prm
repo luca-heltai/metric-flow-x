@@ -5,7 +5,7 @@ subsection MetricFlowSystem<1, 3>
   set Vtk file path for mesh input         = ../../blood-flow/notebooks/37_with_a0_x.vtk
   set Numerical flux type                  = HLL
   set Outlet boundary condition type       = RCR
-  set Output directory                     = ../../blood-flow/NumData/37-variable
+  set Output directory                     = ../../blood-flow/num_data/37-variable
   set Output time interval                 = 1e-3
   set Output filename                      = solution
   set Gamma (Total pressure factor)        = 0

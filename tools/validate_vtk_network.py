@@ -303,19 +303,15 @@ def validate_network(parsed: LegacyVtk) -> dict[str, Any]:
         _same_per_vessel(parsed.cell_arrays["r_out"], vessel_ids, "r_out", path)
 
     boundary_ids = [_integer(value, path, "boundary_id") for value in parsed.point_arrays["boundary_id"]]
-    if any(value < 0 for value in boundary_ids):
-        errors.append("boundary_id values must be nonnegative")
+    if any(value < 0 or value >= 2**32 - 1 for value in boundary_ids):
+        errors.append("boundary_id values must fit the non-reserved unsigned 32-bit range")
     degrees = [len(neighbors) for neighbors in adjacency]
     if boundary_ids.count(0) != 1:
         errors.append(f"boundary_id must contain exactly one inflow id 0; found {boundary_ids.count(0)}")
-    positive_boundary_ids = [value for value in boundary_ids if value > 0 and value != 255]
+    positive_boundary_ids = [value for point, value in enumerate(boundary_ids)
+                             if value > 0 and degrees[point] == 1]
     if len(positive_boundary_ids) != len(set(positive_boundary_ids)):
         errors.append("terminal boundary IDs must be unique")
-    for point, boundary_id in enumerate(boundary_ids):
-        if boundary_id == 255 and degrees[point] <= 1:
-            errors.append(f"boundary_id 255 marks point {point}, which is not an interior junction/point")
-        elif boundary_id != 255 and degrees[point] != 1:
-            errors.append(f"boundary point {point} has id {boundary_id} but graph degree {degrees[point]}; endpoints must be degree one")
     inflow = boundary_ids.index(0)
     if degrees[inflow] != 1:
         errors.append(f"inflow boundary point {inflow} is not a graph endpoint")
@@ -327,10 +323,10 @@ def validate_network(parsed: LegacyVtk) -> dict[str, Any]:
                 errors.append(f"{name}[{point}] must be finite")
             # P_out is a reference pressure and may be populated globally in
             # legacy assets; the circuit coefficients must be zero off-terminal.
-            if name != "P_out" and boundary_ids[point] in (0, 255) and abs(value) > 1e-14:
+            if name != "P_out" and (boundary_ids[point] == 0 or degrees[point] != 1) and abs(value) > 1e-14:
                 errors.append(f"{name}[{point}] must be zero for non-terminal boundary id {boundary_ids[point]}")
     for point, boundary_id in enumerate(boundary_ids):
-        if boundary_id > 0 and boundary_id != 255:
+        if boundary_id > 0 and degrees[point] == 1:
             r1 = parsed.point_arrays["R1"][point]
             r2 = parsed.point_arrays["R2"][point]
             capacitance = parsed.point_arrays["C"][point]

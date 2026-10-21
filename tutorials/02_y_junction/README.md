@@ -29,7 +29,7 @@ for a solver run. The local environment may not provide that executable.
 
 `network.vtk` is a byte-for-byte copy of tracked
 `notebooks/bifurcation_network.vtk`. `parameters.prm.in` is based on the
-configured `parameters/benchmark-parameters/aortic_bifurcation/aortic_bifurcation.prm.in`
+configured `parameters/benchmark_parameters/aortic_bifurcation/aortic_bifurcation.prm.in`
 template and points to the local copied network after `@SOURCE_DIR@` expansion.
 
 ## 6. Topology

@@ -5,7 +5,7 @@ reproducibility documentation and runtime behavior of the model
 
 ## Available tutorials
 
-- [Single-vessel manufactured solution](single-vessel-mms.md) — source-backed MMS
+- [Single-vessel manufactured solution](single_vessel_mms.md) — source-backed MMS
   inputs and the immutable TXT-derived reference table.
 - [Y-junction](../../tutorials/02_y_junction/README.md) — a validated three-vessel
   network input, topology record, and residual-diagnostic preparation.

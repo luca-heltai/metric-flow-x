@@ -11,8 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install converter test dependency
+        run: python3 -m pip install numpy
+      - name: Test svVascularize SI conversion
+        run: |
+          python3 -m unittest discover -s tests -p test_svv_conversion.py -v
+          python3 -m unittest discover -s tests -p test_svv_boundary_ids.py -v
       - name: Test ADAN56 reference areas
         run: python3 -m unittest discover -s tests -p test_adan56_areas.py -v
+      - name: Check file and directory naming
+        run: python3 -m unittest discover -s tests -p test_path_names.py -v
       - name: Test release dataset downloader
         run: python3 -m unittest discover -s tests -p test_download_datasets.py -v
 
@@ -40,7 +48,7 @@ jobs:
           # Move the prefix to catch non-relocatable package paths.
           mv install relocated
           for variant in Debug Release; do
-            cmake -S tools/package-smoke -B "consumer-$variant" -GNinja \
+            cmake -S tools/package_smoke -B "consumer-$variant" -GNinja \
               -DCMAKE_BUILD_TYPE="$variant" -DCMAKE_PREFIX_PATH="$PWD/relocated"
             cmake --build "consumer-$variant" -j 2
             ctest --test-dir "consumer-$variant" --no-tests=error --output-on-failure

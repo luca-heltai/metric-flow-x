@@ -1,0 +1,459 @@
+{
+  "schema_version": 1,
+  "archive": {
+    "name": "metric_flow_x_datasets_si_v1.tar.gz",
+    "size": 401642987,
+    "sha256": "ee7c831a626109639c32edeea5085e5cb8a6cd15cd6dce31cbd75bf173787c1a"
+  },
+  "origin": {
+    "repository": "devi-raksha/blood-flow",
+    "release": "v0.1.0",
+    "sha256": "a9bef4aa466cb263d8c0bdf7503f175a659c7b22a3a812d2a9d95d3ed0988f47"
+  },
+  "units": {
+    "solver_meshes": "SI; settings_SI and source identify each regenerated solver mesh",
+    "tree_npz": "Original trusted source archives; unit_system metadata records CGS",
+    "raw_visualization_exports": "network_10000.vtk, network_56.vtk and network_5000.vtp are original CGS source exports, not solver meshes",
+    "other_files": "Unchanged from the original archive"
+  },
+  "validation": "All eleven solver meshes pass topology/physics validation and independent source-based geometry, area, wall-law, outlet pressure-drop and RC-time checks. No time-integration or physiological validation is claimed.",
+  "solver_meshes": [
+    {
+      "path": "notebooks/networks_by_svv/trees/network_10000_adnr.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_10000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 225000.0,
+        "diastolic_pressure": 10000.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 10000.0,
+        "outlet_pressure": 0.0,
+        "rcr": true
+      },
+      "vessels": 20001,
+      "outlets": 10001,
+      "original_sha256": "b80626f28a1804fcbfd6601474fcc27d51d0127ba48cec3d9c0946f0fda37037",
+      "sha256": "3d93dd9d3edb088d45bd719f4526f6137a97411fd0f51d39ab4db2b6279744be",
+      "source_sha256": "87bb3adb6cc518102766a3ff53175c378fbcedba125bd1b53c6d97d93811c8b2"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_100k_adnr.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_50000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 22500.0,
+        "diastolic_pressure": 0.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 125000.0,
+        "outlet_pressure": 0.0,
+        "rcr": false
+      },
+      "vessels": 100001,
+      "outlets": 50001,
+      "original_sha256": "f0e4e4939e9719ebdafae9a290617be450e9b9c6e3be844fcc360fd15654f9da",
+      "sha256": "0b8d1485ee46fe29c2d932b1e73a40fe557f1415aecd31eec3495588e8c45399",
+      "source_sha256": "b255df34ab72e255eb75b8b50876f428ea3260fe1ccd25c350641714646680a6"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_2k_adnr.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_10000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 22500.0,
+        "diastolic_pressure": 0.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 10000.0,
+        "outlet_pressure": 0.0,
+        "rcr": false
+      },
+      "vessels": 20001,
+      "outlets": 10001,
+      "original_sha256": "27e58acf11c333b85b38b1306ea378fb58cf10e08073f42e36683ddc44cef5d0",
+      "sha256": "f64bca5f0f90004d5850de918df931154ce75c406d9544b993d4f02797c0dacd",
+      "source_sha256": "87bb3adb6cc518102766a3ff53175c378fbcedba125bd1b53c6d97d93811c8b2"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_30k_adnr.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_15000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 225000.0,
+        "diastolic_pressure": 10000.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 1250000.0,
+        "outlet_pressure": 0.0,
+        "rcr": false
+      },
+      "vessels": 30001,
+      "outlets": 15001,
+      "original_sha256": "f6f9ecafd33cb8ec1746c35ca63d7c3e33bce33e2a96d00396d775ace149f210",
+      "sha256": "bac66c271991e50f8a2b763fed12ff775419ffe144cca5b362c2768ecc7cac28",
+      "source_sha256": "8124de86da1803cf0865f3e00aed7d0a4053e04063f819d6591041c3372e5c23"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_30k_adnr_new.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_15000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 225000.0,
+        "diastolic_pressure": 0.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 125000.0,
+        "outlet_pressure": 0.0,
+        "rcr": false
+      },
+      "vessels": 30001,
+      "outlets": 15001,
+      "original_sha256": "177a5dc09950b9187343fcb9b8c0b3f4b768e2c3cd4c872e877d233301d12adf",
+      "sha256": "0d9da87cd755b05ea10a58eb95c01e057da193bd559832cb0df9c46d2430e717",
+      "source_sha256": "8124de86da1803cf0865f3e00aed7d0a4053e04063f819d6591041c3372e5c23"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_40k_adnr.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_20000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 225000.0,
+        "diastolic_pressure": 0.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 12500.0,
+        "outlet_pressure": 0.0,
+        "rcr": false
+      },
+      "vessels": 40001,
+      "outlets": 20001,
+      "original_sha256": "5ed42ab6afd338e3abbb96038d4d69c10ef326791bc2df54c20039ddc896e400",
+      "sha256": "d71e00f9440aafecf567c81f19e67059721f9d9c9a35297064c2c276610e541f",
+      "source_sha256": "56b2b2a8ef38a5eca30dcd820e25ed5bcd6331d0390db76a2064baf2ef73560c"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_40k_adnr_new.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_20000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 225000.0,
+        "diastolic_pressure": 10000.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 125000.0,
+        "outlet_pressure": 0.0,
+        "rcr": true
+      },
+      "vessels": 40001,
+      "outlets": 20001,
+      "original_sha256": "ff8184afc600a5f80a09228046949a4ee91e91e8d040da756d6e1df0005607d5",
+      "sha256": "9872bc46b5a58568e8c466f9ea0103f84a8e12084bc21280f5e395bf65a49329",
+      "source_sha256": "56b2b2a8ef38a5eca30dcd820e25ed5bcd6331d0390db76a2064baf2ef73560c"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_4k_adnr.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_20000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 22500.0,
+        "diastolic_pressure": 0.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 10000.0,
+        "outlet_pressure": 0.0,
+        "rcr": false
+      },
+      "vessels": 40001,
+      "outlets": 20001,
+      "original_sha256": "0cb4b7b4d986a1281d3033883beac481bf3ba3f5444dca1f7c2efb3889f8b9f5",
+      "sha256": "e9821cd0eb757188820ba3ab02fa88bdad49d14a6542916d522ab1963def64bf",
+      "source_sha256": "56b2b2a8ef38a5eca30dcd820e25ed5bcd6331d0390db76a2064baf2ef73560c"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_50k_adnr.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_25000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 22500.0,
+        "diastolic_pressure": 0.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 125000.0,
+        "outlet_pressure": 0.0,
+        "rcr": false
+      },
+      "vessels": 50001,
+      "outlets": 25001,
+      "original_sha256": "d6adf55fa60ffd9530bfc5cc32b13e9cc326c77023d0f4ab9af63c72d9f51f6c",
+      "sha256": "1db8ef0485eafe631a73348fd308adc253b8226934cfec0827436876a7680207",
+      "source_sha256": "953dd50044d9bc75f1c1919ec227f594ce2602da55fe353589135882e1876e92"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_60k_adnr.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_30000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 225000.0,
+        "diastolic_pressure": 0.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 125000.0,
+        "outlet_pressure": 0.0,
+        "rcr": false
+      },
+      "vessels": 60001,
+      "outlets": 30001,
+      "original_sha256": "0d5740e64e96c9ff2695fb6018fd7bfb1a44f5c3f1b83089d57a4d3ae7de67b3",
+      "sha256": "97b5219a2ed2860369b293c1209e3d2e74ee42f28052818067d9550b11f51f7c",
+      "source_sha256": "381946bb016efc4b0912d1fb2f3cd205a681f4ffa68fdb1eaba961601b84a449"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/vtk_files/network_200k_new.vtk",
+      "source": "notebooks/networks_by_svv/trees/network_100000.tree.npz",
+      "settings_SI": {
+        "young_modulus": 1200000.0,
+        "diastolic_pressure": 0.0,
+        "reference_pressure": 0.0,
+        "perfusion_pressure": 2919198.75,
+        "outlet_pressure": 432.6,
+        "rcr": false
+      },
+      "vessels": 200001,
+      "outlets": 100001,
+      "original_sha256": "b477a35720406bf1231f583939324fed32f583c9c29da75adf74f11f510e1c1d",
+      "sha256": "7790d2cc134b476736ae60e02c1073c6716cb225e934c6d78843c26082296721",
+      "source_sha256": "b965e8460009dc3a3b183264032f41371ba9d70595b90d28ad341b7530250289"
+    }
+  ],
+  "files": [
+    {
+      "path": "notebooks/networks_by_svv/trees/network_1.tree.npz",
+      "size": 2013,
+      "sha256": "edbbffe35d41e936a76f30a4060b8746a0a06f7b9ff91b8bb5a6156a6ee2c7ff"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_10000.tree.npz",
+      "size": 3279422,
+      "sha256": "87bb3adb6cc518102766a3ff53175c378fbcedba125bd1b53c6d97d93811c8b2"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_10000.vtk",
+      "size": 3239249,
+      "sha256": "72b7ba31050a869f6bafac7121d06b269e39290b9f1c6d1fa6f1c3152b8c0345"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_100000.tree.npz",
+      "size": 34455462,
+      "sha256": "b965e8460009dc3a3b183264032f41371ba9d70595b90d28ad341b7530250289"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_10000_adnr.vtk",
+      "size": 6707819,
+      "sha256": "3d93dd9d3edb088d45bd719f4526f6137a97411fd0f51d39ab4db2b6279744be"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_100k_adnr.vtk",
+      "size": 33667823,
+      "sha256": "0b8d1485ee46fe29c2d932b1e73a40fe557f1415aecd31eec3495588e8c45399"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_15000.tree.npz",
+      "size": 4960775,
+      "sha256": "8124de86da1803cf0865f3e00aed7d0a4053e04063f819d6591041c3372e5c23"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_2.tree.npz",
+      "size": 2340,
+      "sha256": "b87ba44b011e7c3f0f1e9907c7a714089f1f2deedc5e631d101ddc2755c133f8"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_20000.tree.npz",
+      "size": 6656132,
+      "sha256": "56b2b2a8ef38a5eca30dcd820e25ed5bcd6331d0390db76a2064baf2ef73560c"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_25000.tree.npz",
+      "size": 8360573,
+      "sha256": "953dd50044d9bc75f1c1919ec227f594ce2602da55fe353589135882e1876e92"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_2k_adnr.vtk",
+      "size": 6707819,
+      "sha256": "f64bca5f0f90004d5850de918df931154ce75c406d9544b993d4f02797c0dacd"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_3.tree.npz",
+      "size": 2629,
+      "sha256": "634974b77e624a20e8a14da8a7c3924a1283e3d1b1286bc228c0d8f8deacb9f4"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_30000.tree.npz",
+      "size": 10070865,
+      "sha256": "381946bb016efc4b0912d1fb2f3cd205a681f4ffa68fdb1eaba961601b84a449"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_30k_adnr.vtk",
+      "size": 10077692,
+      "sha256": "bac66c271991e50f8a2b763fed12ff775419ffe144cca5b362c2768ecc7cac28"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_30k_adnr_new.vtk",
+      "size": 10077692,
+      "sha256": "0d9da87cd755b05ea10a58eb95c01e057da193bd559832cb0df9c46d2430e717"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_35000.tree.npz",
+      "size": 11795349,
+      "sha256": "0da536d2e31bc8424378da96d3ccfb0c0fce7577550a915d70f1a206179d2ad6"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_4.tree.npz",
+      "size": 2923,
+      "sha256": "86bf8e7c8a735e3de58dc1f23d1c7a95fbfdb7e1ee3e7654970e79d8c856d827"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_40000.tree.npz",
+      "size": 13528244,
+      "sha256": "2c0ad394ad5b23172bb7bce6f7199cceb88c524eb1d8de22da53a7c97727ee57"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_40k_adnr.vtk",
+      "size": 13447704,
+      "sha256": "d71e00f9440aafecf567c81f19e67059721f9d9c9a35297064c2c276610e541f"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_40k_adnr_new.vtk",
+      "size": 13447704,
+      "sha256": "9872bc46b5a58568e8c466f9ea0103f84a8e12084bc21280f5e395bf65a49329"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_45000.tree.npz",
+      "size": 15263832,
+      "sha256": "1a5dea07585638be056bab07d588fb3115cc9d99cda1af037fa1c56ab627eb21"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_4k_adnr.vtk",
+      "size": 13447704,
+      "sha256": "e9821cd0eb757188820ba3ab02fa88bdad49d14a6542916d522ab1963def64bf"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_5.tree.npz",
+      "size": 3198,
+      "sha256": "08be65e6ae2dacad6da272d6303646fa415e2c1bc516946e2d99eb14fd3ae1f2"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_5000.tree.npz",
+      "size": 1615836,
+      "sha256": "c9e7187173f76203a3724b6bac9392a093cd52af19e7a4cb02bd93b80bf007c8"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_5000.vtp",
+      "size": 25350,
+      "sha256": "facd4f7e24f4ab12c3b82d839d793113ebef1c019eaba95246044017793d491e"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_50000.tree.npz",
+      "size": 17000527,
+      "sha256": "b255df34ab72e255eb75b8b50876f428ea3260fe1ccd25c350641714646680a6"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_50k_adnr.vtk",
+      "size": 16817679,
+      "sha256": "1db8ef0485eafe631a73348fd308adc253b8226934cfec0827436876a7680207"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_55000.tree.npz",
+      "size": 18738015,
+      "sha256": "1a4dcc1803da9c481c9406fd0b912bb9304298899b1c9ed9f8426233c42787ea"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_56.tree.npz",
+      "size": 17980,
+      "sha256": "069b5844633d6194ff88d0512bf608863b592350b5e1d8b04d8b1251cb8c3a7e"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_56.vtk",
+      "size": 17603,
+      "sha256": "99414a1e43782398d2a67e1db4f347d077af8d6be1d14c5c596fcd8f1042d7a2"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_6.tree.npz",
+      "size": 3489,
+      "sha256": "da9425967329a421e12638f047f0a1ddc48f70f583fa328bb22ea750398eb7c9"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_60000.tree.npz",
+      "size": 20475952,
+      "sha256": "618dc83de14031f796ff04c4a0c339192c521002aea0a6079a8b7b3307f5feb6"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_60k_adnr.vtk",
+      "size": 20187581,
+      "sha256": "97b5219a2ed2860369b293c1209e3d2e74ee42f28052818067d9550b11f51f7c"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_65000.tree.npz",
+      "size": 22215792,
+      "sha256": "b08f5b39f6808d10babf7baebc465ce31201c31c5d814e25db73d040b349c6e6"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_70000.tree.npz",
+      "size": 23968048,
+      "sha256": "81b72f30a189c399e3b779fffb11c754348647e01b578baae0b4149ed3b53383"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_75000.tree.npz",
+      "size": 25716985,
+      "sha256": "a635bac1039194150921ce2a561f13ef71df820157125c21e3731914bd7a454d"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_80000.tree.npz",
+      "size": 27465803,
+      "sha256": "de056e5a9fd834c50937733a9888c9479f052c46bc7476b611b4090c6651e2d7"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_85000.tree.npz",
+      "size": 29213439,
+      "sha256": "901314efbe0abeabc3034bd81ab57513e79c7dfce7ab64f2f3dd239505625659"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_90000.tree.npz",
+      "size": 30961079,
+      "sha256": "f50a17a46f1e57624baddcc40dba03b337652206e0eb59872802d64e4649cfc7"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/network_95000.tree.npz",
+      "size": 32709019,
+      "sha256": "2a8b5aaf85ca52b44dd1146fc9ae46f3dbeb52dca0de9eabbdf2753e9b547792"
+    },
+    {
+      "path": "notebooks/networks_by_svv/trees/vtk_files/network_200k_new.vtk",
+      "size": 67568355,
+      "sha256": "7790d2cc134b476736ae60e02c1073c6716cb225e934c6d78843c26082296721"
+    },
+    {
+      "path": "notebooks/binary_tree_2047.vtk",
+      "size": 345975,
+      "sha256": "90d3c84ec96d96efe23eb3b22de938339d7c3df4b35ae76ce823b8989770b109"
+    },
+    {
+      "path": "notebooks/binary_tree_255.vtk",
+      "size": 45281,
+      "sha256": "f7ae740254dcafd8e04bab4a7c0dbcb25b9c30996081ca7cd58dc31f7ed26d5a"
+    },
+    {
+      "path": "notebooks/graph_export.xml",
+      "size": 4132465,
+      "sha256": "af78de917728f7e6ceb326621c0b8d93c507ea7b0c730c3b0b4f4c7d71137520"
+    },
+    {
+      "path": "notebooks/vascular_tree_physics.vtk",
+      "size": 216907,
+      "sha256": "27ae71a1742d076d3a730f87b81e108b83fc9c4a434845b22097b703655e84e1"
+    },
+    {
+      "path": "notebooks/very_large_vascular_tree_physics.vtk",
+      "size": 309926,
+      "sha256": "4894f3b00ffb8f494a4d026a6a61aca06c8a45e09c8784cabdc58463fcc4d7ac"
+    }
+  ],
+  "cerebral_archive": {
+    "name": "cerebral_datasets_v2.tar.gz",
+    "size": 2706860,
+    "sha256": "3f94081c6a256e2d341a45c51889e9090056273664cc9503cb22a2ffa98c5ee1"
+  },
+  "cerebral_files": [
+    {
+      "path": "notebooks/cerebral_data/cco_parietal_hc_w_data.vtk",
+      "size": 3599071,
+      "sha256": "f671811a4c9aa680b9cb3f8ebc601f100b951cbc410a71092e81b62d7e9eee4d"
+    },
+    {
+      "path": "notebooks/cerebral_data/standard_cco.vtk",
+      "size": 5086146,
+      "sha256": "1b1d1dae3de6a9d1619572892f92b4e5bc4135a0c15d2f7cedd1989ddcbb1d36"
+    }
+  ],
+  "naming": "Project-owned file and directory names use lowercase letters and underscores."
+}

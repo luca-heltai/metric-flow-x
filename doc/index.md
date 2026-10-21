@@ -6,8 +6,8 @@
 :maxdepth: 1
 
 overview
-getting-started
-build-and-run
+getting_started
+build_and_run
 math
 tutorials
 api

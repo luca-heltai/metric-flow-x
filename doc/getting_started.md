@@ -16,7 +16,7 @@ The first two commands configure and build the current CMake targets. CMake copi
 ```{include} configuration.md
 ```
 
-```{include} reference/parameter-reference.md
+```{include} reference/parameter_reference.md
 ```
 
 ```{include} outputs.md

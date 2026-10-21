@@ -22,7 +22,7 @@ comparison_data:
   raw_reference_curves_available: false
   note: No raw reference curves or machine-readable measurement tables were found in the checkout.
   image_only_numdata:
-    path: NumData/37-arteries
+    path: num_data/37_arteries
     limitation: PDF plots are image-only evidence; their numerical values, sampling grids, uncertainty, and provenance cannot be recovered reproducibly from these assets.
     included_for: provenance pointer only, not quantitative validation
 periodicity:

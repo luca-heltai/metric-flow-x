@@ -54,11 +54,11 @@ doc/api/
 .atl/
 
 # Large vascular-network datasets downloaded from GitHub Releases
-/notebooks/Networks-by-svv/trees/
+/notebooks/networks_by_svv/trees/
 /notebooks/binary_tree_2047.vtk
 /notebooks/binary_tree_255.vtk
-/notebooks/graphExport.xml
+/notebooks/graph_export.xml
 /notebooks/vascular_tree_physics.vtk
 /notebooks/very_large_vascular_tree_physics.vtk
-/notebooks/cerebral-data/ccoParietal_hc_wData.vtk
-/notebooks/cerebral-data/standard_cco.vtk
+/notebooks/cerebral_data/cco_parietal_hc_w_data.vtk
+/notebooks/cerebral_data/standard_cco.vtk

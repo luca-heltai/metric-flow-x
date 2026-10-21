@@ -13,6 +13,6 @@ The top-level directories have the following roles:
 | `doc/` | Markdown pages, bibliography, Doxygen configuration, Sphinx configuration, and documentation requirements. |
 | `scripts/` | Shell helpers, including `build_doc.sh` and `serve_doc.sh`. |
 | `latex/` | Repository TeX manuscript sources. This documentation task does not modify them. |
-| `NumData/`, `notebooks/` | Additional data and exploratory/reference material; |
+| `num_data/`, `notebooks/` | Additional data and exploratory/reference material; |
 
 CMake lists the library sources and application target explicitly. `tests/CMakeLists.txt` delegates test registration to deal.II's `DEAL_II_PICKUP_TESTS()` macro.

@@ -29,7 +29,7 @@ exclude_patterns = [
 # Suppress specific warnings that are benign for this repository build.
 suppress_warnings = [
     'doxygenfunction',
-    # README is included at the documentation root but retains repository
+    # readme is included at the documentation root but retains repository
     # relative links such as doc/configuration.md for GitHub readers.
     'myst.xref_missing',
 ]
