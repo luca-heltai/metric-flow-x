@@ -20,7 +20,10 @@ def validate(executable, destination, mpi):
     source = source.replace("= 1e-05", "= 1e-07").replace("= HLL\n", "= HLL_HDG\n")
     source = source.replace("set Inflow function = 0.0", "set Inflow function = 1e-8 - 2e-6*abs(t-0.005)")
     waveform = destination / "inflow.csv"
-    waveform.write_text("time_s,flow_m3_s\n0,0\n0.005,1e-8\n0.01,0\n")
+    waveform.write_text('"note","flow_m3_s","time_s"\n'
+                        '"start, zero",0,0\n'
+                        '"peak\nannotation",1e-8,0.005\n'
+                        'end,0,0.01\n')
     traces = {}
     environment = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1",
                        OMPI_ALLOW_RUN_AS_ROOT="1", OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1")

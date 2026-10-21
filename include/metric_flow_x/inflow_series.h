@@ -3,8 +3,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -17,48 +15,7 @@ namespace MetricFlowX
   {
   public:
     void
-    read(const std::string &filename, const double period = 0.)
-    {
-      samples.clear();
-      periodicity = period;
-      if (!std::isfinite(period) || period < 0.)
-        throw std::invalid_argument(
-          "Inflow period must be finite and nonnegative");
-      std::ifstream input(filename);
-      std::string   line;
-      if (!std::getline(input, line))
-        throw std::invalid_argument("Cannot read inflow CSV: " + filename);
-      if (!line.empty() && line.back() == '\r')
-        line.pop_back();
-      if (line != "time_s,flow_m3_s")
-        throw std::invalid_argument(
-          "Expected inflow CSV header time_s,flow_m3_s");
-      while (std::getline(input, line))
-        {
-          if (!line.empty() && line.back() == '\r')
-            line.pop_back();
-          std::istringstream row(line);
-          double             time, flow;
-          char               comma;
-          if (!(row >> time >> comma >> flow) || comma != ',' ||
-              !std::isfinite(time) || !std::isfinite(flow) ||
-              (row >> std::ws && !row.eof()) ||
-              (!samples.empty() && time <= samples.back().first))
-            throw std::invalid_argument("Invalid or unordered inflow CSV row");
-          samples.emplace_back(time, flow);
-        }
-      if (samples.size() < 2)
-        throw std::invalid_argument("Inflow CSV requires at least two samples");
-      if (!std::isfinite(samples.back().first - samples.front().first))
-        throw std::invalid_argument("Inflow time span must be representable");
-      if (period > 0. &&
-          (std::abs(samples.back().first - samples.front().first - period) >
-             1e-10 * period ||
-           std::abs(samples.front().second - samples.back().second) >
-             1e-14 + 1e-8 * std::abs(samples.front().second)))
-        throw std::invalid_argument(
-          "Periodic inflow must span one closed period");
-    }
+    read(const std::string &filename, const double period = 0.);
 
     bool
     empty() const

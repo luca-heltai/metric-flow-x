@@ -170,7 +170,7 @@ observables without using ImmersX.
 The formulation and derivation remain documented in `doc/math.md` and
 `latex/blood_flow.tex`.
 
-Terminal RCR CSV input uses the vendored header-only
+Terminal RCR and inflow CSV input use the vendored header-only
 [rapidcsv v9.07](https://github.com/d99kris/rapidcsv/tree/v9.07) dependency;
 see `third_party/rapidcsv/README.md` for provenance and its BSD 3-Clause license.
 No extra package or network download is needed to build the CSV reader.
@@ -247,11 +247,16 @@ per initialization phase. Nonzero-state residual norms/checksums agree, and
 CSV/legacy residuals and both Jacobian blocks are regression-tested with one
 and two ranks. Rank-zero reading/distribution remains a profiling follow-up;
 each rank currently loads one dataset.
+
 ### Tabulated inflow and terminal traces
 
-In `MetricFlowSystem<1, 3>`, set `Inflow CSV file` to a CSV with the exact header
-`time_s,flow_m3_s`. Rows use seconds and m3/s, finite values and strictly
-increasing times. At least two samples are required. Piecewise linear
+In `MetricFlowSystem<1, 3>`, set `Inflow CSV file` to a CSV containing the
+case-sensitive columns `time_s` and `flow_m3_s`, in any order. Additional named
+columns are ignored and may hold arbitrary metadata. Headers must be nonempty
+and unique; every row must match the header width. The shared rapidcsv reader
+accepts quoted fields, quoted commas/newlines, UTF-8 BOM and CRLF. Required
+fields must contain complete, finite numeric values in seconds and m3/s, with
+strictly increasing times. At least two samples are required. Piecewise linear
 interpolation replaces the analytic inlet only when this file is configured.
 Both ends of the simulation interval must be covered; extrapolation is an error.
 Paths are relative to the run directory, as for the existing mesh path.

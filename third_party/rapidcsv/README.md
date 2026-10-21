@@ -1,6 +1,7 @@
 # rapidcsv
 
-Vendored header-only dependency used to read terminal RCR CSV files.
+Vendored header-only dependency used to read terminal RCR and tabulated inflow
+CSV files.
 
 - Upstream: https://github.com/d99kris/rapidcsv
 - Version: v9.07

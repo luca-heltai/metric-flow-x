@@ -43,6 +43,7 @@ endforeach()
 
 set(METRIC_FLOW_X_SOURCES
   source/blood_flow_system.cc
+  source/inflow_series.cc
   source/io/vtk_utils.cc
   source/parsed_tools/constants.cc
   source/parsed_tools/function.cc
