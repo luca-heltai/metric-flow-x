@@ -10,7 +10,7 @@ run or that a numerical result has been validated.
 
 ## 2. Scope
 
-The tutorial covers the source-backed ASCII VTK network, the existing 56_ADNR
+The tutorial covers the source-backed ASCII VTK network, the existing 56_adnr
 parameter source, input validation, topology inspection, and a deterministic
 connectivity diagram. It does not change solver behavior, funding, licensing,
 or mathematical model decisions.
@@ -33,9 +33,9 @@ for a solver run. The local environment may not provide that executable.
 ## 5. Input assets
 
 `network.vtk` is a byte-for-byte copy of `notebooks/56_adnr_new.vtk`, the
-provenance-supported 56_ADNR variant selected by the existing parameter source.
+provenance-supported 56_adnr variant selected by the existing parameter source.
 `parameters.prm.in` is derived from
-`parameters/benchmark-parameters/56_ADNR/56_adnr.prm`; its mesh path is made
+`parameters/benchmark_parameters/56_adnr/56_adnr.prm`; its mesh path is made
 portable with `@SOURCE_DIR@/tutorials/04_adan56/network.vtk` and its output
 directory is dedicated to this tutorial. The template is retained as `.prm.in`;
 `run.sh` expands `@SOURCE_DIR@` into a temporary parameter file.
@@ -109,7 +109,7 @@ boundary arrays. It does not draw a hand-authored illustration.
 This tutorial provides input and topology diagnostics only. No raw pressure,
 flow, or reference-curve table is checked in, and no postprocessing command is
 presented as a benchmark acceptance test. Existing image-only artifacts under
-`NumData/56-arteries/` and related benchmark-parameter directories may be used
+`num_data/56_arteries/` and related benchmark-parameter directories may be used
 as demonstration/reference material only until their input, run, and raw-data
 provenance is established.
 

@@ -13,9 +13,9 @@ source:
   sha256: 61975d5e4219135c3f9a43210b03ce074a197d3d026c88f7581938c96425df3d
   copy_policy: byte-for-byte copy
   selected_variant: 56_adnr_new
-  selection_basis: Existing 56_ADNR parameter source references this mesh; exact arrays and connectivity were checked before copying.
+  selection_basis: Existing 56_adnr parameter source references this mesh; exact arrays and connectivity were checked before copying.
 parameter_source:
-  path: parameters/benchmark-parameters/56_ADNR/56_adnr.prm
+  path: parameters/benchmark_parameters/56_adnr/56_adnr.prm
   copied_template: tutorials/04_adan56/parameters.prm.in
   source_sha256: 425a414aabee5028e79c5f731e0c2c5a90bb65f60527e67d8558bc8317c6a263
   copied_template_sha256: 12738a578e9d638ebb147b2cf9902f595f99f13cf6acf2acfd35bd221cb78600
@@ -48,7 +48,7 @@ comparison_data:
   raw_reference_curves_available: false
   literature_reference_available: false
   image_only_results:
-    paths: [NumData/56-arteries, parameters/benchmark-parameters/56_ADNR]
+    paths: [num_data/56_arteries, parameters/benchmark_parameters/56_adnr]
     status: demonstration/reference-only
     limitation: Image/PDF artifacts do not expose raw samples, grids, uncertainty, input mapping, run details, or complete provenance.
   acceptance_threshold: pending-maintainer-set

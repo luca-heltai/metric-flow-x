@@ -137,17 +137,17 @@ From the repository root, run:
 ./scripts/download_datasets.sh
 ```
 
-The script downloads both `metric-flow-x-datasets-si-v1.tar.gz` and
-`cerebral-datasets-v1.tar.gz` from release `datasets-final-version-v1` in
+The script downloads both `metric_flow_x_datasets_si_v1.tar.gz` and
+`cerebral_datasets_v1.tar.gz` from release `datasets-final-version-v1` in
 `luca-heltai/metric-flow-x`. It verifies pinned SHA-256 checksums before
 extracting each archive into its expected `notebooks/` paths. The network archive
 ships corrected SI meshes directly. No post-extraction
 conversion or Python dependency is needed. Dataset contents, units and hashes
-are recorded in [the release manifest](datasets/network-datasets-si-v1.json).
+are recorded in [the release manifest](datasets/network_datasets_si_v1.json).
 The cerebral archive adds:
 
-- `notebooks/cerebral-data/ccoParietal_hc_wData.vtk`
-- `notebooks/cerebral-data/standard_cco.vtk`
+- `notebooks/cerebral_data/cco_parietal_hc_w_data.vtk`
+- `notebooks/cerebral_data/standard_cco.vtk`
 
 All downloaded data paths are ignored by Git. `curl`, `tar`, and either
 `shasum` or `sha256sum` are required.
@@ -174,7 +174,7 @@ The formulation and derivation remain documented in `doc/math.md` and
 
 ## License
 
-This project is licensed under the MIT License (see `LICENSE.md`).
+This project is licensed under the MIT License (see `license.md`).
 
 
 ### svVascularize units
@@ -187,9 +187,9 @@ requires Python 3 and NumPy, without svVascularize or Matplotlib.
 To regenerate the 10000-terminal tree with its existing RCR/material assumptions:
 
 ```sh
-python3 notebooks/Networks-by-svv/convert_to_standard_vtk.py \
-  notebooks/Networks-by-svv/trees/network_10000.tree.npz \
-  notebooks/Networks-by-svv/trees/network_10000_adnr.vtk \
+python3 notebooks/networks_by_svv/convert_to_standard_vtk.py \
+  notebooks/networks_by_svv/trees/network_10000.tree.npz \
+  notebooks/networks_by_svv/trees/network_10000_adnr.vtk \
   --rcr --young-modulus 225000 --diastolic-pressure 10000 \
   --perfusion-pressure 10000 --reference-inflow 8.178e-7
 ```
@@ -205,3 +205,6 @@ trees retain their recorded CGS metadata. See the dataset manifest for the units
 and role of each file. Generated network files stay outside Git. Correct units
 alone do not validate inflow, wall parameters, near-sonic flow or physiological
 suitability.
+
+Project-owned file and directory names use lowercase letters and underscores.
+Tool-required filenames `CMakeLists.txt` and `.clang-format` retain their standard spelling.

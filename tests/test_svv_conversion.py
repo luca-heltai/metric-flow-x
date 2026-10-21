@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-CONVERTER = ROOT / "notebooks/Networks-by-svv/convert_to_standard_vtk.py"
+CONVERTER = ROOT / "notebooks/networks_by_svv/convert_to_standard_vtk.py"
 spec = importlib.util.spec_from_file_location("vtk_validator", ROOT / "tools/validate_vtk_network.py")
 validator = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(validator)

@@ -5,7 +5,7 @@
 This tutorial prepares a one-vessel manufactured-solution (MMS) convergence
 study for the current `BloodFlowSystem<1, 3>` implementation. The checked-in
 assets contain three exact-solution/RHS profiles (`p1`, `p2`, and `p3`), three
-polynomial degrees, a one-cell single-vessel VTK input, and an immutable TXT
+polynomial degrees, a one-cell single_vessel VTK input, and an immutable TXT
 reference report. The purpose of this page is to make those inputs and their
 provenance reproducible.
 
@@ -123,7 +123,7 @@ working copy, for example:
 
 ```bash
 sed "s|@SOURCE_DIR@|$(pwd)|g" \
-  tutorials/01_single_vessel_mms/p1.prm.in > /tmp/single-vessel-p1.prm
+  tutorials/01_single_vessel_mms/p1.prm.in > /tmp/single_vessel-p1.prm
 ```
 
 This command prepares a parameter file.
@@ -133,7 +133,7 @@ This command prepares a parameter file.
 The eventual serial invocation has the normal executable shape:
 
 ```bash
-./build/metric_flow_x /tmp/single-vessel-p1.prm
+./build/metric_flow_x /tmp/single_vessel-p1.prm
 ```
 
 The executable accepts the resulting parameter file as its input.
@@ -144,7 +144,7 @@ After the same implementation blockers are resolved, the corresponding MPI
 shape is:
 
 ```bash
-mpirun -np 2 ./build/metric_flow_x /tmp/single-vessel-p1.prm
+mpirun -np 2 ./build/metric_flow_x /tmp/single_vessel-p1.prm
 ```
 
 This is recorded for reproducibility preparation only.

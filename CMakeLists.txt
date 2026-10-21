@@ -133,7 +133,7 @@ install(DIRECTORY include/metric_flow_x
 )
 
 configure_package_config_file(
-  cmake/MetricFlowXConfig.cmake.in
+  cmake/metric_flow_x_config.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/MetricFlowXConfig.cmake
   INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MetricFlowX
 )

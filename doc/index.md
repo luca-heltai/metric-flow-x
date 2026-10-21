@@ -1,4 +1,4 @@
-```{include} ../README.md
+```{include} ../readme.md
 ```
 
 ```{toctree}
@@ -6,8 +6,8 @@
 :maxdepth: 1
 
 overview
-getting-started
-build-and-run
+getting_started
+build_and_run
 math
 tutorials
 api

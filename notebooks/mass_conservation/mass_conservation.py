@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Publication figure for the global mass-conservation check written by
+Publication figure for the global mass_conservation check written by
 BloodFlowSystem::check_mass_conservation()  ->  mass_conservation.csv
 
 Columns expected (SI):  t, total_volume, dVdt, net_flux, imbalance, rel_imbalance

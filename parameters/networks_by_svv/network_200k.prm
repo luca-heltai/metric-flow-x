@@ -2,7 +2,7 @@ subsection BloodFlowSystem<1, 3>
   set Finite element degree                = 3
   set Number of global refinement          = 0
   set Number of refinement cycles          = 1
-  set Vtk file path for mesh input         = ../../blood-flow/notebooks/Networks-by-svv/trees/vtk_files/network_200k_new.vtk
+  set Vtk file path for mesh input         = ../../blood-flow/notebooks/networks_by_svv/trees/vtk_files/network_200k_new.vtk
   set Numerical flux type                  = HLL
   set Outlet boundary condition type       = RCR
   set Output directory                     = output-200k

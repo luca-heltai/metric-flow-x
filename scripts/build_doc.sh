@@ -13,8 +13,8 @@ DOXYGEN_DIR="${BUILD_DIR}/doxygen"
 SITE_DIR="${BUILD_DIR}/site"
 DOCS_SOURCE_DIR="${ROOT_DIR}/doc"
 API_STUB_DIR="${DOCS_SOURCE_DIR}/api"
-DOXYFILE="${ROOT_DIR}/doc/Doxyfile"
-TMP_DOXYFILE="${BUILD_DIR}/Doxyfile"
+DOXYFILE="${ROOT_DIR}/doc/doxyfile"
+TMP_DOXYFILE="${BUILD_DIR}/doxyfile"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "python3 not found in PATH." >&2
@@ -46,7 +46,7 @@ rm -rf "${SITE_DIR}" "${API_STUB_DIR}"
 cp "${DOXYFILE}" "${TMP_DOXYFILE}"
 cat >> "${TMP_DOXYFILE}" <<EOF
 OUTPUT_DIRECTORY = ${DOXYGEN_DIR}
-INPUT = ${ROOT_DIR}/source ${ROOT_DIR}/include ${ROOT_DIR}/README.md
+INPUT = ${ROOT_DIR}/source ${ROOT_DIR}/include ${ROOT_DIR}/readme.md
 STRIP_FROM_PATH = ${ROOT_DIR}
 GENERATE_HTML = NO
 GENERATE_XML = YES
