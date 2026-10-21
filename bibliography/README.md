@@ -43,7 +43,7 @@ otherwise unavailable TeX material may refer to them.
 > **WP-12: establish canonical bibliography and software citation.** Please
 > provide source-backed metadata for `MR1873203`, `MR2657217`, `MR4260434`,
 > `MR4570554`, and `formaggia2003one` if they are required by unavailable
-> manuscript material. Confirm maintainer names for `citation.cff`; do not add
+> manuscript material. Confirm maintainer names for `CITATION.cff`; do not add
 > guessed papers, DOI values, authors, or a license assertion.
 
 ## Use

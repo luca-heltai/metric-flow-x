@@ -1,4 +1,4 @@
-# doxyfile 1.14.0
+# Doxyfile 1.14.0
 
 # This file describes the settings to be used by the documentation system
 # Doxygen (www.doxygen.org) for a project.
@@ -993,7 +993,7 @@ WARN_LOGFILE           =
 
 INPUT                  = ./source \
                          ./include \
-                         ./readme.md
+                         ./README.md
 
 # This tag can be used to specify the character encoding of the source files
 # that Doxygen parses. Internally Doxygen uses the UTF-8 encoding. Doxygen uses
@@ -1209,12 +1209,12 @@ FILTER_SOURCE_PATTERNS =
 # (index.html). This can be useful if you have a project on for instance GitHub
 # and want to reuse the introduction page also for the Doxygen output.
 
-USE_MDFILE_AS_MAINPAGE = ./readme.md
+USE_MDFILE_AS_MAINPAGE = ./README.md
 
-# If the IMPLICIT_DIR_DOCS tag is set to YES, any readme.md file found in sub-
+# If the IMPLICIT_DIR_DOCS tag is set to YES, any README.md file found in sub-
 # directories of the project's root, is used as the documentation for that sub-
-# directory, except when the readme.md starts with a \dir, \page or \mainpage
-# command. If set to NO, the readme.md file needs to start with an explicit \dir
+# directory, except when the README.md starts with a \dir, \page or \mainpage
+# command. If set to NO, the README.md file needs to start with an explicit \dir
 # command in order to be used as directory documentation.
 # The default value is: YES.
 

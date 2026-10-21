@@ -174,7 +174,7 @@ The formulation and derivation remain documented in `doc/math.md` and
 
 ## License
 
-This project is licensed under the MIT License (see `license.md`).
+This project is licensed under the MIT License (see `LICENSE.md`).
 
 
 ### svVascularize units
@@ -207,4 +207,5 @@ alone do not validate inflow, wall parameters, near-sonic flow or physiological
 suitability.
 
 Project-owned file and directory names use lowercase letters and underscores.
-Tool-required filenames `CMakeLists.txt` and `.clang-format` retain their standard spelling.
+Conventional metadata and tool filenames retain their standard spelling:
+`README.md`, `LICENSE.md`, `CITATION.cff`, `CMakeLists.txt`, `Doxyfile`, and `.clang-format`.

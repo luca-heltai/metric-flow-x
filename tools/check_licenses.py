@@ -22,7 +22,7 @@ SPDX_RE = re.compile(r"SPDX-License-Identifier:\s*([^\s*]+)")
 # does not inspect build products, virtual environments, caches, or subagent
 # transcripts, whose third-party notices would obscure this project's audit.
 SOURCE_DIRS = ("apps", "include", "source", "tests", "scripts")
-TOP_LEVEL_FILES = ("license.md", "readme.md", "citation.cff")
+TOP_LEVEL_FILES = ("LICENSE.md", "README.md", "CITATION.cff")
 EXCLUDED_SUFFIXES = {".output"}
 
 
@@ -63,11 +63,11 @@ def notice_for(path: Path, text: str) -> tuple[list[str], list[str]]:
     provenance = set()
     if "fsi-suite" in lowered or "parsedtools" in lowered:
         provenance.add("FSI-suite/ParsedTools")
-    if "deal.ii" in lowered and path.name not in {"readme.md", "citation.cff"}:
+    if "deal.ii" in lowered and path.name not in {"README.md", "CITATION.cff"}:
         provenance.add("deal.II")
-    if path.name == "license.md":
+    if path.name == "LICENSE.md":
         provenance.add("root project notice")
-    elif path.name in {"readme.md", "citation.cff"}:
+    elif path.name in {"README.md", "CITATION.cff"}:
         provenance.add("project metadata")
     if not provenance and licenses:
         provenance.add("project or unclassified notice")
@@ -92,14 +92,14 @@ def audit(root: Path) -> dict:
             )
 
     root_notice = next(
-        (entry for entry in files if entry["path"] == "license.md"),
+        (entry for entry in files if entry["path"] == "LICENSE.md"),
         {"licenses": []},
     )
     root_licenses = root_notice["licenses"]
     conflicts = []
     for entry in files:
         non_root = [license_id for license_id in entry["licenses"] if license_id not in root_licenses]
-        if non_root and entry["path"] != "license.md":
+        if non_root and entry["path"] != "LICENSE.md":
             conflicts.append(
                 {
                     "path": entry["path"],
@@ -125,7 +125,7 @@ def audit(root: Path) -> dict:
         key=lambda item: (item["path"], item["reason"], item["licenses"]),
     )
     return {
-        "root": {"path": "license.md", "licenses": root_licenses},
+        "root": {"path": "LICENSE.md", "licenses": root_licenses},
         "files": files,
         "conflicts": conflicts,
         "status": "blocked" if conflicts else "clear",

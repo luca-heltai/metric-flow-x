@@ -5,13 +5,15 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOL_FILENAMES = {"CMakeLists.txt", ".clang-format"}
+STANDARD_FILENAMES = {
+    "CMakeLists.txt", ".clang-format", "README.md", "LICENSE.md", "CITATION.cff", "Doxyfile"
+}
 
 
 class PathNamesTest(unittest.TestCase):
     def assert_standard_path(self, path):
         for part in Path(path).parts:
-            if part in TOOL_FILENAMES:
+            if part in STANDARD_FILENAMES:
                 continue
             self.assertEqual(part, part.lower(), path)
             self.assertRegex(part, r"^[a-z0-9_.]+$", path)
