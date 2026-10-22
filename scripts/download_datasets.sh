@@ -7,6 +7,8 @@ NETWORK_ASSET="metric_flow_x_datasets_si_v1.tar.gz"
 NETWORK_SHA256="ee7c831a626109639c32edeea5085e5cb8a6cd15cd6dce31cbd75bf173787c1a"
 CEREBRAL_ASSET="cerebral_datasets_v2.tar.gz"
 CEREBRAL_SHA256="3f94081c6a256e2d341a45c51889e9090056273664cc9503cb22a2ffa98c5ee1"
+PAPER_ASSET="paper_inputs_v1.tar.gz"
+PAPER_SHA256="452d1df2db7d62dd0c20fed3237c516d9b45cfe61553e472f53db4e97212f30c"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -42,4 +44,5 @@ download_and_extract() {
 
 download_and_extract "${NETWORK_ASSET}" "${NETWORK_SHA256}"
 download_and_extract "${CEREBRAL_ASSET}" "${CEREBRAL_SHA256}"
+download_and_extract "${PAPER_ASSET}" "${PAPER_SHA256}"
 echo "Datasets extracted to ${DESTINATION}."

@@ -1,0 +1,555 @@
+{
+  "schema_version": 1,
+  "status": "Canonical inputs for future current-code runs; archived results have not been validated or reproduced.",
+  "units": "SI (m, kg, s, Pa); derived display units must be stated by postprocessing.",
+  "source_manuscript": "2026_1d_blood_flow",
+  "code_baseline": "77cc1d7239ef015a1dcf73cb408a0cfb3ece9fe2",
+  "provenance": {
+    "mms": {
+      "source": "convergence_results/mms_single_vessel.prm",
+      "source_sha256": "b1bf8353d592e0f1b52feb499c02676ed5197d7c0cebf4304b999566fed51e41",
+      "adaptations": [
+        "Rename legacy parameter sections for current parser.",
+        "Replace machine paths with runner tokens; keep one effective inflow assignment.",
+        "Use final time 0.1 s from manuscript; original parameter uses 1 s.",
+        "One independent mesh per run; MMS Dirichlet data come from Exact solution, unused inflow set to zero."
+      ]
+    },
+    "bifurcation": {
+      "source": "verification_results/aorta-bifurcation/NumData/aortic_bifurcation.prm",
+      "source_sha256": "4fd8e04d001bd5e3e64a67775cdf8c11fe69ee3dde075ba8be1a2c8a082a4a79",
+      "adaptations": [
+        "Rename legacy parameter sections for current parser.",
+        "Replace machine paths with runner tokens; keep one effective inflow assignment."
+      ]
+    },
+    "network37": {
+      "source": "verification_results/plots_37/NumData/37_vessel_network.prm",
+      "source_sha256": "ca43494b14364caf78bd8250acd313df8d1688619704784326e1adae03646804",
+      "adaptations": [
+        "Rename legacy parameter sections for current parser.",
+        "Replace machine paths with runner tokens; keep one effective inflow assignment."
+      ]
+    },
+    "liver": {
+      "source": "scaling_results_on_my_computer/8k_vessels/network_tree.prm",
+      "source_sha256": "ec5f24be271ff95a03bc96c88356af329924e9a52724b18fdf53b989f33780b8",
+      "adaptations": [
+        "Rename legacy parameter sections for current parser.",
+        "Replace machine paths with runner tokens; keep one effective inflow assignment.",
+        "Retain supplied tolerances 1e-6/1e-7; manuscript table lists 1e-8/1e-9. Review before final paper rerun."
+      ]
+    },
+    "cerebral": {
+      "source": "scaling_results_on_my_computer/cerebral/cco_network.prm",
+      "source_sha256": "c000202d55bb3bb6c5a19aa6224a3b243004d7d67a3bc35166a17a9ac8c29152",
+      "adaptations": [
+        "Rename legacy parameter sections for current parser.",
+        "Replace machine paths with runner tokens; keep one effective inflow assignment.",
+        "Keep supplied maximum BDF order 2; manuscript describes orders through 5. Review before final paper rerun.",
+        "Use the current pinned cerebral v2 dataset, not a private manuscript copy."
+      ]
+    },
+    "network50k": {
+      "source": "scaling_results_on_my_computer/50k_vessels/network_50k.prm",
+      "source_sha256": "be6925b23610d5e5dc1112f674dd628f197375393ecd158cf40b4cb8c99179b8",
+      "adaptations": [
+        "Rename legacy parameter sections for current parser.",
+        "Replace machine paths with runner tokens; keep one effective inflow assignment.",
+        "Use corrected SI mesh from datasets_si_v1.json; archived paper meshes are not replayed."
+      ]
+    },
+    "network100k": {
+      "source": "scaling_results_on_my_computer/100k_vessels/network_100k.prm",
+      "source_sha256": "01cddfb6c5fdf8a998fbe0f56d94ba739866c0749c97c90958aae6e61348d6f1",
+      "adaptations": [
+        "Rename legacy parameter sections for current parser.",
+        "Replace machine paths with runner tokens; keep one effective inflow assignment.",
+        "Use corrected SI mesh from datasets_si_v1.json; archived paper meshes are not replayed."
+      ]
+    }
+  },
+  "meshes": {
+    "mms": {
+      "path": "notebooks/paper_inputs/mms_single_vessel.vtk",
+      "sha256": "806f79ccf2b4cb75feb8568ba8e9de574fb9c707da73b1518854405b3233d48e"
+    },
+    "bifurcation": {
+      "path": "notebooks/paper_inputs/bifurcation_network.vtk",
+      "sha256": "4536f94764b94aa4f34fdaac83cd01e4a8e1211f727e7bf72a2f978ba4ca3b58"
+    },
+    "network37": {
+      "path": "notebooks/paper_inputs/37_vessel_network.vtk",
+      "sha256": "28c6d138903f4e5cca31d78f57ed6adfd31448fe81216babee9650f30b82bcc1"
+    },
+    "liver": {
+      "path": "notebooks/paper_inputs/liver_vascular_tree.vtk",
+      "sha256": "7eacce700126e6cab5bb01df307695eebd198c7bc3ef16971cc887a872d4e5d6"
+    },
+    "cerebral": {
+      "path": "notebooks/cerebral_data/standard_cco.vtk",
+      "sha256": "1b1d1dae3de6a9d1619572892f92b4e5bc4135a0c15d2f7cedd1989ddcbb1d36"
+    },
+    "network50k": {
+      "path": "notebooks/networks_by_svv/trees/network_50k_adnr.vtk",
+      "sha256": "1db8ef0485eafe631a73348fd308adc253b8226934cfec0827436876a7680207"
+    },
+    "network100k": {
+      "path": "notebooks/networks_by_svv/trees/network_100k_adnr.vtk",
+      "sha256": "0b8d1485ee46fe29c2d932b1e73a40fe557f1415aecd31eec3495588e8c45399"
+    }
+  },
+  "runs": [
+    {
+      "id": "mms-p1-n4",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "1",
+        "Number of global refinement": "2"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p1-n8",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "1",
+        "Number of global refinement": "3"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p1-n16",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "1",
+        "Number of global refinement": "4"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p1-n32",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "1",
+        "Number of global refinement": "5"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p1-n64",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "1",
+        "Number of global refinement": "6"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p2-n4",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "2",
+        "Number of global refinement": "2"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p2-n8",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "2",
+        "Number of global refinement": "3"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p2-n16",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "2",
+        "Number of global refinement": "4"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p2-n32",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "2",
+        "Number of global refinement": "5"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p2-n64",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "2",
+        "Number of global refinement": "6"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p3-n4",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "3",
+        "Number of global refinement": "2"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p3-n8",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "3",
+        "Number of global refinement": "3"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p3-n16",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "3",
+        "Number of global refinement": "4"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p3-n32",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "3",
+        "Number of global refinement": "5"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "mms-p3-n64",
+      "base": "mms",
+      "suite": "mms",
+      "mpi": 1,
+      "settings": {
+        "Finite element degree": "3",
+        "Number of global refinement": "6"
+      },
+      "paper": "Spatial-convergence table"
+    },
+    {
+      "id": "bifurcation",
+      "base": "bifurcation",
+      "suite": "benchmarks",
+      "mpi": 1,
+      "settings": {},
+      "paper": "Aortic, junction and iliac waveforms"
+    },
+    {
+      "id": "network37",
+      "base": "network37",
+      "suite": "benchmarks",
+      "mpi": 1,
+      "settings": {},
+      "paper": "37-artery waveforms"
+    },
+    {
+      "id": "mesh37-r0",
+      "base": "network37",
+      "suite": "mesh",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "0"
+      },
+      "paper": "37-artery mesh independence"
+    },
+    {
+      "id": "mesh37-r1",
+      "base": "network37",
+      "suite": "mesh",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "1"
+      },
+      "paper": "37-artery mesh independence"
+    },
+    {
+      "id": "mesh37-r2",
+      "base": "network37",
+      "suite": "mesh",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "2"
+      },
+      "paper": "37-artery mesh independence"
+    },
+    {
+      "id": "mesh37-r3",
+      "base": "network37",
+      "suite": "mesh",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "3"
+      },
+      "paper": "37-artery mesh independence"
+    },
+    {
+      "id": "time37-r1-bdf1",
+      "base": "network37",
+      "suite": "time",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "1",
+        "Maximum order of BDF": "1"
+      },
+      "paper": "BDF cost and statistics"
+    },
+    {
+      "id": "time37-r1-bdf2",
+      "base": "network37",
+      "suite": "time",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "1",
+        "Maximum order of BDF": "2"
+      },
+      "paper": "BDF cost and statistics"
+    },
+    {
+      "id": "time37-r1-bdf3",
+      "base": "network37",
+      "suite": "time",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "1",
+        "Maximum order of BDF": "3"
+      },
+      "paper": "BDF cost and statistics"
+    },
+    {
+      "id": "time37-r1-bdf4",
+      "base": "network37",
+      "suite": "time",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "1",
+        "Maximum order of BDF": "4"
+      },
+      "paper": "BDF cost and statistics"
+    },
+    {
+      "id": "time37-r1-bdf5",
+      "base": "network37",
+      "suite": "time",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "1",
+        "Maximum order of BDF": "5"
+      },
+      "paper": "BDF cost and statistics"
+    },
+    {
+      "id": "time37-r2-bdf1",
+      "base": "network37",
+      "suite": "time",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "2",
+        "Maximum order of BDF": "1"
+      },
+      "paper": "BDF cost and statistics"
+    },
+    {
+      "id": "time37-r2-bdf2",
+      "base": "network37",
+      "suite": "time",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "2",
+        "Maximum order of BDF": "2"
+      },
+      "paper": "BDF cost and statistics"
+    },
+    {
+      "id": "time37-r2-bdf3",
+      "base": "network37",
+      "suite": "time",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "2",
+        "Maximum order of BDF": "3"
+      },
+      "paper": "BDF cost and statistics"
+    },
+    {
+      "id": "time37-r2-bdf4",
+      "base": "network37",
+      "suite": "time",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "2",
+        "Maximum order of BDF": "4"
+      },
+      "paper": "BDF cost and statistics"
+    },
+    {
+      "id": "time37-r2-bdf5",
+      "base": "network37",
+      "suite": "time",
+      "mpi": 1,
+      "settings": {
+        "Number of global refinement": "2",
+        "Maximum order of BDF": "5"
+      },
+      "paper": "BDF cost and statistics"
+    },
+    {
+      "id": "liver",
+      "base": "liver",
+      "suite": "applications",
+      "mpi": 1,
+      "settings": {},
+      "paper": "7999-vessel liver application"
+    },
+    {
+      "id": "cerebral",
+      "base": "cerebral",
+      "suite": "applications",
+      "mpi": 1,
+      "settings": {},
+      "paper": "19999-vessel cerebral application"
+    },
+    {
+      "id": "network50k-np4",
+      "base": "network50k",
+      "suite": "scaling",
+      "mpi": 4,
+      "settings": {},
+      "paper": "Strong scaling and pressure fields"
+    },
+    {
+      "id": "network50k-np6",
+      "base": "network50k",
+      "suite": "scaling",
+      "mpi": 6,
+      "settings": {},
+      "paper": "Strong scaling and pressure fields"
+    },
+    {
+      "id": "network50k-np8",
+      "base": "network50k",
+      "suite": "scaling",
+      "mpi": 8,
+      "settings": {},
+      "paper": "Strong scaling and pressure fields"
+    },
+    {
+      "id": "network50k-np10",
+      "base": "network50k",
+      "suite": "scaling",
+      "mpi": 10,
+      "settings": {},
+      "paper": "Strong scaling and pressure fields"
+    },
+    {
+      "id": "network50k-np12",
+      "base": "network50k",
+      "suite": "scaling",
+      "mpi": 12,
+      "settings": {},
+      "paper": "Strong scaling and pressure fields"
+    },
+    {
+      "id": "network100k-np4",
+      "base": "network100k",
+      "suite": "scaling",
+      "mpi": 4,
+      "settings": {},
+      "paper": "Strong scaling and pressure fields"
+    },
+    {
+      "id": "network100k-np6",
+      "base": "network100k",
+      "suite": "scaling",
+      "mpi": 6,
+      "settings": {},
+      "paper": "Strong scaling and pressure fields"
+    },
+    {
+      "id": "network100k-np8",
+      "base": "network100k",
+      "suite": "scaling",
+      "mpi": 8,
+      "settings": {},
+      "paper": "Strong scaling and pressure fields"
+    },
+    {
+      "id": "network100k-np10",
+      "base": "network100k",
+      "suite": "scaling",
+      "mpi": 10,
+      "settings": {},
+      "paper": "Strong scaling and pressure fields"
+    },
+    {
+      "id": "network100k-np12",
+      "base": "network100k",
+      "suite": "scaling",
+      "mpi": 12,
+      "settings": {},
+      "paper": "Strong scaling and pressure fields"
+    }
+  ],
+  "supplemental_archive": {
+    "name": "paper_inputs_v1.tar.gz",
+    "release": "datasets-final-version-v1",
+    "sha256": "452d1df2db7d62dd0c20fed3237c516d9b45cfe61553e472f53db4e97212f30c",
+    "source_manuscript": "2026_1d_blood_flow",
+    "files": {
+      "mms": {
+        "path": "notebooks/paper_inputs/mms_single_vessel.vtk",
+        "sha256": "806f79ccf2b4cb75feb8568ba8e9de574fb9c707da73b1518854405b3233d48e"
+      },
+      "bifurcation": {
+        "path": "notebooks/paper_inputs/bifurcation_network.vtk",
+        "sha256": "4536f94764b94aa4f34fdaac83cd01e4a8e1211f727e7bf72a2f978ba4ca3b58"
+      },
+      "network37": {
+        "path": "notebooks/paper_inputs/37_vessel_network.vtk",
+        "sha256": "28c6d138903f4e5cca31d78f57ed6adfd31448fe81216babee9650f30b82bcc1"
+      },
+      "liver": {
+        "path": "notebooks/paper_inputs/liver_vascular_tree.vtk",
+        "sha256": "7eacce700126e6cab5bb01df307695eebd198c7bc3ef16971cc887a872d4e5d6"
+      }
+    }
+  }
+}

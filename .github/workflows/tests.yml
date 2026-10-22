@@ -24,6 +24,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_download_datasets.py -v
       - name: Test manufactured sources
         run: python3 -m unittest discover -s tests -p test_mms_tools.py -v
+      - name: Test canonical paper runner
+        run: python3 -m unittest discover -s tests -p test_paper_runner.py -v
 
   test:
     runs-on: ubuntu-latest

@@ -1,5 +1,7 @@
 # macOS
 .DS_Store
+/paper-runs/
+/notebooks/paper_inputs/
 
 # Editor/IDE caches
 .vscode/
