@@ -1989,7 +1989,13 @@ namespace MetricFlowX
                   os.open(dir + "terminal_" + std::to_string(bid) + ".csv");
                   AssertThrow(os.good(),
                               ExcMessage("Cannot open terminal CSV"));
-                  os << "time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id\n";
+                  csv_write_row(os,
+                                "time_s",
+                                "pressure_Pa",
+                                "flow_m3_s",
+                                "boundary_id",
+                                "vessel_id",
+                                "label");
                 }
       }
     probe_targets.clear();
@@ -1997,8 +2003,7 @@ namespace MetricFlowX
     if (this_mpi_process == 0)
       {
         std::ofstream terminals(dir + "network_terminals.csv");
-        AssertThrow(terminals,
-                    ExcMessage("Cannot open network_terminals.csv"));
+        AssertThrow(terminals, ExcMessage("Cannot open network_terminals.csv"));
         csv_write_row(terminals,
                       "boundary_id",
                       "vessel_id",
@@ -2106,11 +2111,18 @@ namespace MetricFlowX
                                               t,
                                               point,
                                               cell->id());
-                  auto &os = csv_terminal.at(bid);
-                  os << std::setprecision(17) << t << ',' << pressure << ','
-                     << (f == 0 ? -1. : 1.) * area * velocity << ',' << bid
-                     << ',' << cell->material_id() << '\n';
-                  os.flush();
+                  auto             &os  = csv_terminal.at(bid);
+                  const auto        rcr = rcr_map.find(bid);
+                  const std::string label =
+                    rcr == rcr_map.end() ? "boundary_" + std::to_string(bid) :
+                                           rcr->second.label;
+                  csv_write_row(os,
+                                t,
+                                pressure,
+                                (f == 0 ? -1. : 1.) * area * velocity,
+                                bid,
+                                cell->material_id(),
+                                label);
                 }
       }
     const unsigned int dofs_per_cell = fe_->n_dofs_per_cell();

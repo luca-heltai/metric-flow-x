@@ -287,7 +287,9 @@ Only inlet flow is prescribed. Any cardiac pressure history remains a comparison
 signal.
 
 Set `Write terminal CSV files = true` to export `terminal_<boundary_id>.csv` in
-the output directory. The fields are `time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id`.
+the output directory. The fields are `time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id,label`.
+`label` comes from the terminal parameter CSV and defaults to `boundary_<id>`;
+the inlet uses `boundary_0`. Rapidcsv quotes and escapes arbitrary label text.
 Pressure and velocity/area come from the boundary trace, including prescribed
 external pressure. Flow is outward: negative at a conventionally oriented inlet
 and positive at an outlet. Each boundary ID must identify exactly one terminal;

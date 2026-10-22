@@ -4,6 +4,7 @@
 
 #include <filesystem>
 
+#include "rapidcsv.h"
 #include "tests.h"
 
 using namespace dealii;
@@ -15,7 +16,10 @@ test()
   BloodFlowSystem<1, 3> flow;
   flow.initialize_params(PRM_DIR "constant.prm");
   flow.setup();
-  auto y = flow.make_state();
+  AssertThrow(flow.rcr_map.at(1).label == "boundary_1", ExcInternalError());
+  const std::string label  = "right, \"iliac\"\nterminal";
+  flow.rcr_map.at(1).label = label;
+  auto y                   = flow.make_state();
   flow.initialize_state(y, 0.0);
   const double     area     = 1.2 * flow.vessel_properties(0).a_d;
   constexpr double velocity = 0.13;
@@ -44,20 +48,28 @@ test()
   if (Utilities::MPI::this_mpi_process(flow.mpi_communicator()) == 0)
     for (const unsigned int boundary : {0, 1})
       {
-        std::ifstream input("terminal-output/terminal_" +
-                            std::to_string(boundary) + ".csv");
-        std::string   line;
-        std::getline(input, line);
-        AssertThrow(line ==
-                      "time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id",
+        rapidcsv::SeparatorParams separators;
+        separators.mQuotedLinebreaks = true;
+        const rapidcsv::Document       input("terminal-output/terminal_" +
+                                         std::to_string(boundary) + ".csv",
+                                       rapidcsv::LabelParams(),
+                                       separators);
+        const std::vector<std::string> header{"time_s",
+                                              "pressure_Pa",
+                                              "flow_m3_s",
+                                              "boundary_id",
+                                              "vessel_id",
+                                              "label"};
+        AssertThrow(input.GetColumnNames() == header &&
+                      input.GetRowCount() == 1,
                     ExcInternalError());
-        std::getline(input, line);
-        std::replace(line.begin(), line.end(), ',', ' ');
-        std::istringstream row(line);
-        double             time, pressure, flux;
-        unsigned int       bid, vid;
-        AssertThrow(static_cast<bool>(row >> time >> pressure >> flux >> bid >>
-                                      vid),
+        const auto time     = input.GetCell<double>("time_s", 0);
+        const auto pressure = input.GetCell<double>("pressure_Pa", 0);
+        const auto flux     = input.GetCell<double>("flow_m3_s", 0);
+        const auto bid      = input.GetCell<unsigned int>("boundary_id", 0);
+        const auto vid      = input.GetCell<unsigned int>("vessel_id", 0);
+        AssertThrow(input.GetCell<std::string>("label", 0) ==
+                      (boundary == 0 ? "boundary_0" : label),
                     ExcInternalError());
         AssertThrow(time == 0.005 && bid == boundary && vid == 0,
                     ExcInternalError());
@@ -66,7 +78,6 @@ test()
         AssertThrow(std::abs(flux - (boundary == 0 ? -1 : 1) * area *
                                       velocity) < 1e-16,
                     ExcInternalError());
-        AssertThrow(!std::getline(input, line), ExcInternalError());
       }
   deallog.depth_file(10);
   deallog << "Terminal trace values and unique MPI file ownership: PASSED"

@@ -56,7 +56,9 @@ def validate(executable, destination, mpi):
                 with path.open() as stream:
                     rows = list(csv.DictReader(stream))
                 assert len(rows) == 11
-                numeric = [{key: float(value) for key, value in row.items()} for row in rows]
+                boundary = int(path.stem.removeprefix("terminal_"))
+                assert all(row["label"] == f"boundary_{boundary}" for row in rows)
+                numeric = [{key: float(value) for key, value in row.items() if key != "label"} for row in rows]
                 assert all(math.isfinite(value) for row in numeric for value in row.values())
                 assert abs(numeric[-1]["time_s"] - 0.01) < 1e-14
                 traces[kind, ranks][path.name] = numeric

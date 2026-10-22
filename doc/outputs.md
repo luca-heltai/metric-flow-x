@@ -45,6 +45,14 @@ values use round-trip precision and a locale-independent decimal point.
 Statistics and timings append to existing files, writing a header when the
 file is absent or empty. Python tools use the Python CSV library.
 
+## Terminal time series
+
+With `Write terminal CSV files = true`, `terminal_<boundary_id>.csv` records
+`time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id,label`. The optional input
+label is carried in each record; unnamed boundaries use `boundary_<id>`,
+including `boundary_0` at the inlet. Rapidcsv handles quoting and escaping.
+Numeric filenames and ID columns remain the stable keys.
+
 ## Logs and parameter receipt
 
 `ParameterAcceptor::initialize()` writes `last_used_parameters.prm` after reading the input. deal.II logging is controlled by `Verbosity (console depth)`, and rank zero is the visible writer in the MPI run.
