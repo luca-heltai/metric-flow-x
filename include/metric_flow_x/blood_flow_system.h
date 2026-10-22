@@ -621,9 +621,13 @@ namespace MetricFlowX
 
     struct RCRPhysics
     {
-      double R1, R2, C, P_out;
+      double      R1, R2, C, P_out;
+      std::string label;
     };
     std::map<unsigned int, RCRPhysics> rcr_map;
+    // Coarse-mesh incidence, replicated before partitioning; output owners
+    // need labels even when the terminal itself belongs to another rank.
+    std::map<unsigned int, std::set<types::boundary_id>> vessel_terminals;
 
     std::map<types::boundary_id, RCRPhysics>
     read_terminal_parameters(
