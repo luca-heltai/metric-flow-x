@@ -13,19 +13,19 @@ datasets and benchmark outputs remain outside Git. The input generator records
 source revision and SHA-256 hashes of the exact meshes and parameter files.
 
 ```sh
-cmake -S . -B build-benchmark -GNinja \
+cmake -S . -B build_benchmark -GNinja \
   -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_BUILD_TYPE=Release
-cmake --build build-benchmark --target benchmark_assembly -j 4
+cmake --build build_benchmark --target benchmark_assembly -j 4
 python3 tools/prepare_assembly_benchmarks.py \
   --adan56-mesh notebooks/56_adnr_new.vtk \
-  --network10k-mesh notebooks/Networks-by-svv/trees/network_10000_adnr.vtk \
-  --output-dir /tmp/metric-flow-benchmarks
+  --network10k-mesh notebooks/networks_by_svv/trees/network_10000_adnr.vtk \
+  --output-dir /tmp/metric_flow_benchmarks
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 mpirun -n 1 \
-  build-benchmark/benchmark_assembly /tmp/metric-flow-benchmarks/adan56.prm 10
+  build_benchmark/benchmark_assembly /tmp/metric_flow_benchmarks/adan56.prm 10
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 mpirun -n 2 \
-  build-benchmark/benchmark_assembly /tmp/metric-flow-benchmarks/adan56.prm 10
+  build_benchmark/benchmark_assembly /tmp/metric_flow_benchmarks/adan56.prm 10
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 mpirun -n 1 \
-  build-benchmark/benchmark_assembly /tmp/metric-flow-benchmarks/network10k.prm 10
+  build_benchmark/benchmark_assembly /tmp/metric_flow_benchmarks/network10k.prm 10
 ```
 
 The generator retains the ADAN56 tutorial's degree 2 and five refinements

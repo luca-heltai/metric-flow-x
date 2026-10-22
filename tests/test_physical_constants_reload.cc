@@ -29,11 +29,11 @@ test()
     }
   if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
     {
-      std::ofstream output("changed-density.prm");
+      std::ofstream output("changed_density.prm");
       output << changed.str();
     }
   MPI_Barrier(MPI_COMM_WORLD);
-  flow.initialize_params("changed-density.prm");
+  flow.initialize_params("changed_density.prm");
   AssertThrow(std::abs(flow.wave_speed(area, 0) / before - 1 / std::sqrt(2.0)) <
                 1e-14,
               ExcMessage("Physical constants must observe parameter reloads."));
