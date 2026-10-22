@@ -2,12 +2,14 @@
 
 import json
 import importlib.util
+import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,6 +83,14 @@ class PaperRunnerTest(unittest.TestCase):
             result = self.invoke("bifurcation", "--prepare-only", *args)
             self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.root / "runs").exists())
+
+    def test_release_preparation_does_not_require_git_program(self):
+        with patch.dict(os.environ, {"PATH": ""}):
+            result = self.invoke("bifurcation", "--prepare-only")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt = json.loads((self.root / "runs/bifurcation/run.json").read_text())
+        self.assertIsNone(receipt["workflow_revision"])
+        self.assertIsNone(receipt["workflow_dirty"])
 
     def test_mms_and_all_suite_require_explicit_supported_executable_revision(self):
         for selection in (("mms-p1-n4",), ("--suite", "all")):
