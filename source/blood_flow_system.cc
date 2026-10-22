@@ -1875,8 +1875,7 @@ namespace MetricFlowX
     if (this_mpi_process == 0)
       {
         std::ofstream terminals(dir + "network_terminals.csv");
-        AssertThrow(terminals,
-                    ExcMessage("Cannot open network_terminals.csv"));
+        AssertThrow(terminals, ExcMessage("Cannot open network_terminals.csv"));
         csv_write_row(terminals,
                       "boundary_id",
                       "vessel_id",
