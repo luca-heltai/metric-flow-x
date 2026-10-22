@@ -49,6 +49,9 @@
 #  include <deal.II/lac/la_parallel_vector.h>
 #  include <deal.II/lac/vector.h>
 
+#  include <vtkSmartPointer.h>
+#  include <vtkUnstructuredGrid.h>
+
 namespace MetricFlowX
 {
   using dealii::BlockIndices;
@@ -90,6 +93,28 @@ namespace MetricFlowX
    * and parallel computations.
    */
   {
+    /** Load one VTK dataset and reuse its geometry and data arrays. */
+    class Reader
+    {
+    public:
+      explicit Reader(const std::string &filename);
+
+      template <int dim, int spacedim>
+      void
+      read_vtk(Triangulation<dim, spacedim> &tria,
+               const bool                    cleanup = true) const;
+      void
+      read_cell_data(const std::string &name, Vector<double> &values) const;
+      void
+      read_vertex_data(const std::string &name, Vector<double> &values) const;
+      bool
+      has_cell_data(const std::string &name) const;
+
+    private:
+      std::string                          vtk_filename;
+      vtkSmartPointer<vtkUnstructuredGrid> dataset;
+    };
+
     /**
      * @brief Read a VTK mesh file and populate a deal.II Triangulation.
      *

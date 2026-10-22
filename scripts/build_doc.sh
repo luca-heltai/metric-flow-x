@@ -46,7 +46,11 @@ rm -rf "${SITE_DIR}" "${API_STUB_DIR}"
 cp "${DOXYFILE}" "${TMP_DOXYFILE}"
 cat >> "${TMP_DOXYFILE}" <<EOF
 OUTPUT_DIRECTORY = ${DOXYGEN_DIR}
-INPUT = ${ROOT_DIR}/source ${ROOT_DIR}/include ${ROOT_DIR}/README.md
+# The README contains MyST directives and is included by Sphinx's index.md.
+# Doxygen only parses the C++ API; parsing the README again treats directives
+# such as csv-table as unknown code lexers on older Doxygen versions.
+INPUT = ${ROOT_DIR}/source ${ROOT_DIR}/include
+USE_MDFILE_AS_MAINPAGE =
 STRIP_FROM_PATH = ${ROOT_DIR}
 GENERATE_HTML = NO
 GENERATE_XML = YES

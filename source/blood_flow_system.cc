@@ -25,7 +25,6 @@
 
 #include <deal.II/dofs/dof_renumbering.h>
 
-#include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_description.h>
@@ -51,11 +50,67 @@
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <locale>
 #include <sstream>
+#include <type_traits>
+
+#include "rapidcsv.h"
 
 namespace MetricFlowX
 {
   using namespace dealii;
+
+  namespace
+  {
+    template <typename T>
+    std::string
+    csv_cell(const T &value)
+    {
+      if constexpr (std::is_convertible_v<T, std::string>)
+        return value;
+      else
+        {
+          std::ostringstream text;
+          text.imbue(std::locale::classic());
+          text << std::setprecision(std::numeric_limits<double>::max_digits10)
+               << value;
+          return text.str();
+        }
+    }
+
+    // Serialize only the current record, preserving bounded memory and live
+    // output even for long simulations. Rapidcsv owns quoting and escaping.
+    void
+    csv_write_record(std::ostream                   &stream,
+                     const std::vector<std::string> &values)
+    {
+      rapidcsv::Document row("", rapidcsv::LabelParams(-1, -1));
+      row.SetRow(0, values);
+      row.Save(stream);
+      stream.flush();
+      AssertThrow(stream.good(), ExcMessage("Cannot write CSV record."));
+    }
+
+    template <typename... Values>
+    void
+    csv_write_row(std::ostream &stream, const Values &...values)
+    {
+      csv_write_record(stream, {csv_cell(values)...});
+    }
+
+    std::ofstream
+    csv_append(const std::string              &filename,
+               const std::vector<std::string> &header)
+    {
+      const bool empty = !std::filesystem::exists(filename) ||
+                         std::filesystem::file_size(filename) == 0;
+      std::ofstream stream(filename, std::ios::app);
+      AssertThrow(stream, ExcMessage("Cannot open " + filename));
+      if (empty)
+        csv_write_record(stream, header);
+      return stream;
+    }
+  } // namespace
 
   // ===========================================================================
   // IDA statistics access shim.
@@ -166,6 +221,21 @@ namespace MetricFlowX
     add_parameter("Use junction mesh", use_junction_mesh);
     add_parameter("Outlet boundary condition type", outlet_type);
     add_parameter("Vtk file path for mesh input", vtk_file_path);
+    add_parameter(
+      "Terminal parameter source",
+      terminal_parameter_source,
+      "VTK preserves legacy mesh values; Parameters uses defaults and optional CSV overrides.",
+      this->prm,
+      Patterns::Selection("VTK|Parameters"));
+    add_parameter("Terminal parameters CSV file", terminal_parameters_csv_file);
+    add_parameter("Default terminal R1", default_terminal_r1);
+    add_parameter("Default terminal R2", default_terminal_r2);
+    add_parameter("Default terminal C", default_terminal_c);
+    add_parameter("Default terminal P_out", default_terminal_p_out);
+
+    add_parameter("Inflow CSV file", inflow_csv_file);
+    add_parameter("Inflow CSV period", inflow_csv_period);
+    add_parameter("Write terminal CSV files", write_terminal_csv);
 
     this->enter_subsection("IDA parameters");
     this->enter_my_subsection(this->prm);
@@ -214,9 +284,27 @@ namespace MetricFlowX
         ExcMessage(
           "Component tolerance scales and Mach threshold must be finite and positive."));
 
+    AssertThrow(
+      terminal_parameter_source == "Parameters" ||
+        terminal_parameters_csv_file.empty(),
+      ExcMessage(
+        "Terminal parameters CSV file requires Terminal parameter source = Parameters."));
+
     exact_solution.update_constants(par);
     rhs_function.update_constants(par);
     inflow_function.update_constants(par);
+    AssertThrow(std::isfinite(inflow_csv_period) && inflow_csv_period >= 0.0,
+                ExcMessage(
+                  "Inflow CSV period must be finite and nonnegative."));
+    AssertThrow(!inflow_csv_file.empty() || inflow_csv_period == 0.0,
+                ExcMessage("Inflow CSV period requires an Inflow CSV file."));
+    inflow_series = InflowSeries{};
+    if (!inflow_csv_file.empty())
+      {
+        inflow_series.read(inflow_csv_file, inflow_csv_period);
+        inflow_series.value(ida_parameters.initial_time);
+        inflow_series.value(ida_parameters.final_time);
+      }
 
     if (numerical_flux_type_str == "HLL")
       numerical_flux_type = NumericalFluxType::HLL;
@@ -363,6 +451,45 @@ namespace MetricFlowX
 
   template <int dim, int spacedim>
   void
+  BloodFlowSystem<dim, spacedim>::initialize_iterative_preconditioner(
+    IterativePreconditioner &preconditioner,
+    const MatrixType        &matrix) const
+  {
+    preconditioner.initialize(matrix);
+#ifdef USE_PETSC_LA
+    // A local DAE block may have zero pivots even when the global matrix is
+    // invertible. Shift the local ILU factors, without changing the operator.
+    const auto check = [](const PetscErrorCode error) {
+      AssertThrow(error == 0,
+                  ExcMessage("PETSc preconditioner setup error " +
+                             std::to_string(error)));
+    };
+    const PC pc = preconditioner.get_pc();
+    PCType   type;
+    check(PCGetType(pc, &type));
+    if (std::string(type) != PCBJACOBI)
+      return; // Respect a different preconditioner explicitly selected by PETSc
+              // options.
+    check(PCSetUp(pc));
+    PetscInt count;
+    KSP     *subsolvers;
+    check(PCBJacobiGetSubKSP(pc, &count, nullptr, &subsolvers));
+    for (PetscInt i = 0; i < count; ++i)
+      {
+        PC subpc;
+        check(KSPGetPC(subsolvers[i], &subpc));
+        check(PCGetType(subpc, &type));
+        if (std::string(type) == PCILU || std::string(type) == PCLU)
+          {
+            check(PCFactorSetShiftType(subpc, MAT_SHIFT_NONZERO));
+            check(PCSetFromOptions(subpc));
+          }
+      }
+#endif
+  }
+
+  template <int dim, int spacedim>
+  void
   BloodFlowSystem<dim, spacedim>::reinit_state(VectorType &state) const
   {
     state.reinit(locally_owned_dofs_, mpi_communicator_);
@@ -486,6 +613,105 @@ namespace MetricFlowX
   // create_description_from_triangulation_in_groups().
   // ============================================================================
   template <int dim, int spacedim>
+  std::map<types::boundary_id,
+           typename BloodFlowSystem<dim, spacedim>::RCRPhysics>
+  BloodFlowSystem<dim, spacedim>::read_terminal_parameters(
+    const std::set<types::boundary_id> &terminal_ids) const
+  {
+    const auto validate = [](const RCRPhysics &rcr) {
+      AssertThrow(
+        std::isfinite(rcr.R1) && std::isfinite(rcr.R2) &&
+          std::isfinite(rcr.C) && std::isfinite(rcr.P_out) && rcr.R1 >= 0.0 &&
+          rcr.R2 >= 0.0 && rcr.C >= 0.0 && rcr.R1 + rcr.R2 > 0.0 &&
+          std::isfinite(rcr.R1 + rcr.R2) && (rcr.C == 0.0 || rcr.R2 > 0.0),
+        ExcMessage(
+          "Terminal RCR values must be finite, resistances and compliance nonnegative, total resistance positive, and R2 positive when C > 0."));
+    };
+    RCRPhysics defaults;
+    defaults.R1    = default_terminal_r1;
+    defaults.R2    = default_terminal_r2;
+    defaults.C     = default_terminal_c;
+    defaults.P_out = default_terminal_p_out;
+    validate(defaults);
+    std::map<types::boundary_id, RCRPhysics> result;
+    for (const auto id : terminal_ids)
+      {
+        auto value  = defaults;
+        value.label = "boundary_" + std::to_string(id);
+        result.emplace(id, value);
+      }
+    if (terminal_parameters_csv_file.empty())
+      return result;
+    rapidcsv::SeparatorParams separators(',', true);
+    separators.mQuotedLinebreaks = true;
+    const rapidcsv::Document csv(terminal_parameters_csv_file,
+                                 rapidcsv::LabelParams(),
+                                 separators);
+    const auto               columns = csv.GetColumnNames();
+    std::set<std::string>    column_names;
+    for (const auto &name : columns)
+      AssertThrow(!name.empty() && column_names.insert(name).second,
+                  ExcMessage(
+                    "Terminal CSV column names must be nonempty and unique."));
+    AssertThrow(csv.GetColumnIdx("boundary_id") >= 0,
+                ExcMessage("Terminal CSV requires a boundary_id column."));
+    AssertThrow(
+      csv.GetColumnIdx("R1") >= 0 || csv.GetColumnIdx("R2") >= 0 ||
+        csv.GetColumnIdx("C") >= 0 || csv.GetColumnIdx("label") >= 0,
+      ExcMessage(
+        "Terminal CSV requires at least one of R1, R2, C or label; other columns are ignored."));
+    const auto parse_value = [](const std::string &text, double &value) {
+      std::size_t consumed = 0;
+      value                = std::stod(text, &consumed);
+      AssertThrow(consumed == text.size(),
+                  ExcMessage("Invalid terminal CSV numeric value: " + text));
+    };
+    std::set<types::boundary_id> seen;
+    for (std::size_t row = 0; row < csv.GetRowCount(); ++row)
+      {
+        const std::string context =
+          "Malformed terminal CSV row " + std::to_string(row + 2);
+        AssertThrow(csv.GetRow<std::string>(row).size() == columns.size(),
+                    ExcMessage(context));
+        const auto id_text = csv.GetCell<std::string>("boundary_id", row);
+        AssertThrow(
+          !id_text.empty() &&
+            std::all_of(id_text.begin(),
+                        id_text.end(),
+                        [](const char c) { return c >= '0' && c <= '9'; }),
+          ExcMessage(context + ": boundary_id must be an unsigned integer"));
+        const auto raw_id = csv.GetCell<unsigned long long>("boundary_id", row);
+        AssertThrow(raw_id <= std::numeric_limits<types::boundary_id>::max(),
+                    ExcMessage(context + ": boundary_id is out of range"));
+        RCRPhysics value          = defaults;
+        const auto override_value = [&](const std::string &name,
+                                        double            &target) {
+          if (csv.GetColumnIdx(name) >= 0 &&
+              !csv.GetCell<std::string>(name, row).empty())
+            target = csv.GetCell<double>(name, row, parse_value);
+        };
+        override_value("R1", value.R1);
+        override_value("R2", value.R2);
+        override_value("C", value.C);
+        const auto id = static_cast<types::boundary_id>(raw_id);
+        AssertThrow(result.count(id) != 0,
+                    ExcMessage(
+                      "Terminal CSV references non-terminal boundary ID " +
+                      std::to_string(id)));
+        AssertThrow(seen.insert(id).second,
+                    ExcMessage("Duplicate boundary ID in terminal CSV: " +
+                               std::to_string(id)));
+        value.label = result.at(id).label;
+        if (csv.GetColumnIdx("label") >= 0 &&
+            !csv.GetCell<std::string>("label", row).empty())
+          value.label = csv.GetCell<std::string>("label", row);
+        validate(value);
+        result.at(id) = value;
+      }
+    return result;
+  }
+
+  template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::create_triangulation()
   {
@@ -493,28 +719,21 @@ namespace MetricFlowX
 
     Triangulation<dim, spacedim> serial_triangulation;
 
-    {
-      GridIn<dim, spacedim> grid_in;
-      grid_in.attach_triangulation(serial_triangulation);
-      if (verbosity > 0)
-        pcout << "Reading VTK file: " << vtk_file_path << std::endl;
-      std::ifstream mesh_file(vtk_file_path);
-      AssertThrow(mesh_file, ExcMessage("Cannot open " + vtk_file_path));
-      grid_in.read_vtk(mesh_file);
-    }
+    VTKUtils::Reader vtk(vtk_file_path);
+    vtk.read_vtk(serial_triangulation, false);
     if (verbosity > 0)
       pcout << "Coarse cells = " << serial_triangulation.n_active_cells()
             << std::endl;
 
-    VTKUtils::read_cell_data(vtk_file_path, "vessel_id", cell_vessel_ids);
-    VTKUtils::read_cell_data(vtk_file_path, "a0", cell_a0);
-    VTKUtils::read_cell_data(vtk_file_path, "a_d", cell_a_d);
-    VTKUtils::read_cell_data(vtk_file_path, "E", cell_E);
-    VTKUtils::read_cell_data(vtk_file_path, "h_wall", cell_h_wall);
-    VTKUtils::read_cell_data(vtk_file_path, "p_d", cell_p_d);
-    VTKUtils::read_cell_data(vtk_file_path, "p0", cell_p0);
-    VTKUtils::read_cell_data(vtk_file_path, "L", cell_L);
-    VTKUtils::read_cell_data(vtk_file_path, "r_d", cell_r_d);
+    vtk.read_cell_data("vessel_id", cell_vessel_ids);
+    vtk.read_cell_data("a0", cell_a0);
+    vtk.read_cell_data("a_d", cell_a_d);
+    vtk.read_cell_data("E", cell_E);
+    vtk.read_cell_data("h_wall", cell_h_wall);
+    vtk.read_cell_data("p_d", cell_p_d);
+    vtk.read_cell_data("p0", cell_p0);
+    vtk.read_cell_data("L", cell_L);
+    vtk.read_cell_data("r_d", cell_r_d);
 
     if (write_flow_regime_diagnostics)
       for (unsigned int i = 0; i < cell_a_d.size(); ++i)
@@ -525,29 +744,29 @@ namespace MetricFlowX
                   << " has a_d inconsistent with pi*r_d^2 by more than 2%.\n";
         }
 
-    // Tapered radii are optional.
-    try
-      {
-        VTKUtils::read_cell_data(vtk_file_path, "r_in", cell_r_in);
-      }
-    catch (...)
-      {
-        cell_r_in.reinit(0);
-      }
-    try
-      {
-        VTKUtils::read_cell_data(vtk_file_path, "r_out", cell_r_out);
-      }
-    catch (...)
-      {
-        cell_r_out.reinit(0);
-      }
 
-    VTKUtils::read_vertex_data(vtk_file_path, "R1", point_R1);
-    VTKUtils::read_vertex_data(vtk_file_path, "R2", point_R2);
-    VTKUtils::read_vertex_data(vtk_file_path, "C", point_C);
-    VTKUtils::read_vertex_data(vtk_file_path, "P_out", point_P_out);
-    VTKUtils::read_vertex_data(vtk_file_path, "boundary_id", point_boundary_id);
+    // Missing taper arrays are optional; malformed arrays still report errors.
+    cell_r_in.reinit(0);
+    cell_r_out.reinit(0);
+    if (vtk.has_cell_data("r_in"))
+      vtk.read_cell_data("r_in", cell_r_in);
+    if (vtk.has_cell_data("r_out"))
+      vtk.read_cell_data("r_out", cell_r_out);
+
+    if (terminal_parameter_source == "VTK")
+      {
+        vtk.read_vertex_data("R1", point_R1);
+        vtk.read_vertex_data("R2", point_R2);
+        vtk.read_vertex_data("C", point_C);
+        vtk.read_vertex_data("P_out", point_P_out);
+      }
+    vtk.read_vertex_data("boundary_id", point_boundary_id);
+
+    std::vector<unsigned int> vertex_degree(serial_triangulation.n_vertices(),
+                                            0);
+    for (const auto &cell : serial_triangulation.active_cell_iterators())
+      for (const auto vertex : cell->vertex_indices())
+        ++vertex_degree[cell->vertex_index(vertex)];
 
     // Material IDs + boundary IDs from VTK.  These are attributes of the coarse
     // cells and are inherited by their children through refinement and carried
@@ -572,22 +791,53 @@ namespace MetricFlowX
 
     // RCR map, keyed by boundary id: global data, identical on every rank
     // because every rank reads the same file.
-    rcr_map.clear();
+    if (terminal_parameter_source == "Parameters")
+      {
+        std::set<types::boundary_id> terminals;
+        for (const auto &cell : serial_triangulation.active_cell_iterators())
+          for (const auto face : cell->face_indices())
+            if (cell->face(face)->at_boundary() &&
+                vertex_degree[cell->face(face)->vertex_index(0)] == 1)
+              {
+                const auto id = cell->face(face)->boundary_id();
+                if (id != 0)
+                  AssertThrow(terminals.insert(id).second,
+                              ExcMessage(
+                                "Duplicate terminal boundary ID in mesh."));
+              }
+        rcr_map = read_terminal_parameters(terminals);
+      }
+    else
+      {
+        rcr_map.clear();
+        for (const auto &cell : serial_triangulation.active_cell_iterators())
+          for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+            if (cell->face(f)->at_boundary())
+              {
+                const types::boundary_id bid = cell->face(f)->boundary_id();
+                if (bid == 0)
+                  continue; // inflow
+                const unsigned int v = cell->face(f)->vertex_index(0);
+                RCRPhysics         rcr;
+                rcr.R1    = point_R1[v];
+                rcr.R2    = point_R2[v];
+                rcr.C     = point_C[v];
+                rcr.P_out = point_P_out[v];
+                rcr.label = "boundary_" + std::to_string(bid);
+                if (rcr.R2 > 0.0)
+                  rcr_map[bid] = rcr;
+              }
+      }
+
+    vessel_terminals.clear();
     for (const auto &cell : serial_triangulation.active_cell_iterators())
-      for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
-        if (cell->face(f)->at_boundary())
+      for (const auto face : cell->face_indices())
+        if (cell->face(face)->at_boundary() &&
+            vertex_degree[cell->face(face)->vertex_index(0)] == 1)
           {
-            const types::boundary_id bid = cell->face(f)->boundary_id();
-            if (bid == 0)
-              continue; // inflow
-            const unsigned int v = cell->face(f)->vertex_index(0);
-            RCRPhysics         rcr;
-            rcr.R1    = point_R1[v];
-            rcr.R2    = point_R2[v];
-            rcr.C     = point_C[v];
-            rcr.P_out = point_P_out[v];
-            if (rcr.R2 > 0.0)
-              rcr_map[bid] = rcr;
+            const auto id = cell->face(face)->boundary_id();
+            if (id != 0 && rcr_map.count(id))
+              vessel_terminals[cell->material_id()].insert(id);
           }
 
     serial_triangulation.refine_global(n_global_refinements);
@@ -1699,15 +1949,48 @@ namespace MetricFlowX
         // ---- solve and update
         // ------------------------------------------------
         {
-          SolverControl solver_control(1, 0.0);
+          if (use_direct_solver)
+            {
+              SolverControl solver_control(1, 0.0);
 #ifdef USE_PETSC_LA
-          PETScWrappers::SparseDirectMUMPS newton_solver(solver_control);
-          newton_solver.solve(linear_system_matrix, delta, rhs);
+#  ifdef DEAL_II_PETSC_WITH_MUMPS
+              PETScWrappers::SparseDirectMUMPS newton_solver(solver_control);
+              newton_solver.solve(linear_system_matrix, delta, rhs);
+#  else
+              AssertThrow(
+                n_mpi_processes == 1,
+                ExcMessage(
+                  "Parallel direct solves require PETSc with MUMPS. Set Use direct solver = false for GMRES with block Jacobi."));
+              PETScWrappers::PreconditionLU factorization(linear_system_matrix);
+              const PetscErrorCode error = PCFactorReorderForNonzeroDiagonal(
+                factorization.get_pc(),
+                PETScWrappers::PreconditionLU::AdditionalData().zero_pivot);
+              AssertThrow(error == 0,
+                          ExcMessage("Cannot reorder the trace LU diagonal."));
+              factorization.vmult(delta, rhs);
+#  endif
 #else
-          TrilinosWrappers::SolverDirect newton_solver(solver_control);
-          newton_solver.solve(linear_system_matrix, delta, rhs);
+              TrilinosWrappers::SolverDirect newton_solver(solver_control);
+              newton_solver.solve(linear_system_matrix, delta, rhs);
 #endif
+            }
+          else
+            {
+              SolverControl   solver_control(1000, 1e-12 * rhs.l2_norm());
+              LA::SolverGMRES newton_solver(solver_control);
+              IterativePreconditioner preconditioner;
+              initialize_iterative_preconditioner(preconditioner,
+                                                  linear_system_matrix);
+              newton_solver.solve(linear_system_matrix,
+                                  delta,
+                                  rhs,
+                                  preconditioner);
+            }
         }
+
+        AssertThrow(std::isfinite(delta.l2_norm()),
+                    ExcMessage(
+                      "Trace linear solve returned a non-finite correction."));
 
         for (const auto i : trace_dofs_owned)
           sol(i) += delta(i);
@@ -1817,9 +2100,76 @@ namespace MetricFlowX
     close_csv_files();
     csv_vessel.clear();
     mach_warning_active.clear();
+
+    csv_terminal.clear();
+    if (write_terminal_csv)
+      {
+        std::vector<unsigned int> local_terminal_ids;
+        for (const auto &cell : dof_handler_.active_cell_iterators())
+          if (cell->is_locally_owned())
+            for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+              if (cell->face(f)->at_boundary() &&
+                  !is_junction_face(cell->id(), f))
+                local_terminal_ids.push_back(cell->face(f)->boundary_id());
+        std::map<unsigned int, unsigned int> terminal_counts;
+        for (const auto &ids :
+             Utilities::MPI::all_gather(mpi_communicator_, local_terminal_ids))
+          for (const auto id : ids)
+            ++terminal_counts[id];
+        for (const auto &entry : terminal_counts)
+          AssertThrow(entry.second == 1,
+                      ExcMessage(
+                        "Terminal boundary ids must be globally unique"));
+        for (const auto &cell : dof_handler_.active_cell_iterators())
+          if (cell->is_locally_owned())
+            for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+              if (cell->face(f)->at_boundary() &&
+                  !is_junction_face(cell->id(), f))
+                {
+                  const auto bid = cell->face(f)->boundary_id();
+                  auto      &os  = csv_terminal[bid];
+                  AssertThrow(!os.is_open(),
+                              ExcMessage("Duplicate terminal boundary id"));
+                  os.open(dir + "terminal_" + std::to_string(bid) + ".csv");
+                  AssertThrow(os.good(),
+                              ExcMessage("Cannot open terminal CSV"));
+                  csv_write_row(os,
+                                "time_s",
+                                "pressure_Pa",
+                                "flow_m3_s",
+                                "boundary_id",
+                                "vessel_id",
+                                "label");
+                }
+      }
     probe_targets.clear();
 
-    const std::string hdr = "time_s,P_dynpcm2,Q_cm3ps,A_cm2,U_cmps\n";
+    if (this_mpi_process == 0)
+      {
+        std::ofstream terminals(dir + "network_terminals.csv");
+        AssertThrow(terminals, ExcMessage("Cannot open network_terminals.csv"));
+        csv_write_row(terminals,
+                      "boundary_id",
+                      "vessel_id",
+                      "label",
+                      "R1",
+                      "R2",
+                      "C",
+                      "P_out");
+        for (const auto &[vid, ids] : vessel_terminals)
+          for (const auto id : ids)
+            {
+              const auto &rcr = rcr_map.at(id);
+              csv_write_row(terminals,
+                            id,
+                            vid,
+                            rcr.label,
+                            rcr.R1,
+                            rcr.R2,
+                            rcr.C,
+                            rcr.P_out);
+            }
+      }
 
     for (const auto &[vid, vpp] : vessel_map)
       {
@@ -1869,7 +2219,12 @@ namespace MetricFlowX
 
         std::ofstream &os = csv_vessel[vid];
         os.open(dir + "HDG_IDA_Vessel_" + std::to_string(vid) + ".csv");
-        os << hdr;
+        AssertThrow(os, ExcMessage("Cannot open vessel probe CSV."));
+        std::vector<std::string> header{
+          "time_s", "P_dynpcm2", "Q_cm3ps", "A_cm2", "U_cmps"};
+        for (const auto id : vessel_terminals[vid])
+          header.push_back("boundary_" + std::to_string(id) + "_label");
+        csv_write_record(os, header);
       }
   }
 
@@ -1881,6 +2236,39 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::write_csv_row(const double      t,
                                                 const VectorType &sol)
   {
+    if (write_terminal_csv)
+      {
+        for (const auto &cell : dof_handler_.active_cell_iterators())
+          if (cell->is_locally_owned())
+            for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+              if (cell->face(f)->at_boundary() &&
+                  !is_junction_face(cell->id(), f))
+                {
+                  const auto bid  = cell->face(f)->boundary_id();
+                  double     area = 0., velocity = 0.;
+                  get_face_trace(sol, cell, f, area, velocity);
+                  const auto   point = cell->face(f)->center();
+                  const double pressure =
+                    compute_physical_pressure(area,
+                                              cell->material_id(),
+                                              compute_a_d_at_face(cell, f),
+                                              t,
+                                              point,
+                                              cell->id());
+                  auto             &os  = csv_terminal.at(bid);
+                  const auto        rcr = rcr_map.find(bid);
+                  const std::string label =
+                    rcr == rcr_map.end() ? "boundary_" + std::to_string(bid) :
+                                           rcr->second.label;
+                  csv_write_row(os,
+                                t,
+                                pressure,
+                                (f == 0 ? -1. : 1.) * area * velocity,
+                                bid,
+                                cell->material_id(),
+                                label);
+                }
+      }
     const unsigned int dofs_per_cell = fe_->n_dofs_per_cell();
 
     // Reference-cell midpoint (DGQ, dim == 1 -> xi = 0.5).
@@ -1915,9 +2303,14 @@ namespace MetricFlowX
 
         const double Q_cm3ps = A_val * U_val * 1.0e6;
 
-        os << std::scientific << std::setprecision(8) << t << "," << P_dynpcm2
-           << "," << Q_cm3ps << "," << A_cm2 << "," << U_cmps << "\n";
-        os.flush();
+        std::vector<std::string> values{csv_cell(t),
+                                        csv_cell(P_dynpcm2),
+                                        csv_cell(Q_cm3ps),
+                                        csv_cell(A_cm2),
+                                        csv_cell(U_cmps)};
+        for (const auto id : vessel_terminals.at(vid))
+          values.push_back(rcr_map.at(id).label);
+        csv_write_record(os, values);
       }
   }
 
@@ -1930,6 +2323,9 @@ namespace MetricFlowX
   {
     flow_regime_log.close();
     for (auto &kv : csv_vessel)
+      if (kv.second.is_open())
+        kv.second.close();
+    for (auto &kv : csv_terminal)
       if (kv.second.is_open())
         kv.second.close();
   }
@@ -2654,8 +3050,6 @@ namespace MetricFlowX
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
-    const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
-    const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_,
@@ -2719,7 +3113,9 @@ namespace MetricFlowX
             if (bid == 0) // inflow
               {
                 inflow_function.set_time(t);
-                const double Q_in   = inflow_function.value(Point<1>(0.0));
+                const double Q_in   = (inflow_series.empty() ?
+                                         inflow_function.value(Point<1>(0.0)) :
+                                         inflow_series.value(t));
                 const double W2_int = U_int - 4.0 * (c_int - c0);
 
                 res_A = A_hat_cur * U_hat_cur - Q_in;
@@ -2869,8 +3265,6 @@ namespace MetricFlowX
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
-    const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
-    const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
@@ -3518,8 +3912,6 @@ namespace MetricFlowX
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
-    const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
-    const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_,
@@ -3739,8 +4131,6 @@ namespace MetricFlowX
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
-    const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
-    const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
@@ -3972,8 +4362,6 @@ namespace MetricFlowX
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
-    const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
-    const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
@@ -4311,6 +4699,11 @@ namespace MetricFlowX
     for (unsigned int i = 0; i < subdomain.size(); ++i)
       subdomain(i) = triangulation_.locally_owned_subdomain();
     data_out.add_data_vector(subdomain, "subdomain");
+    Vector<double> vessel_ids(triangulation_.n_active_cells());
+    for (const auto &cell : triangulation_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        vessel_ids(cell->active_cell_index()) = cell->material_id();
+    data_out.add_data_vector(vessel_ids, "vessel_id");
 
     data_out.build_patches();
 
@@ -4514,10 +4907,8 @@ namespace MetricFlowX
 
     if (this_mpi_process == 0 && mass_log.is_open())
       {
-        mass_log << std::scientific << std::setprecision(8) << t << ","
-                 << total_volume << "," << dVdt << "," << net_flux << ","
-                 << imbalance << "," << rel_imbalance << "\n";
-        mass_log.flush();
+        csv_write_row(
+          mass_log, t, total_volume, dVdt, net_flux, imbalance, rel_imbalance);
       }
 
     // Two independent gates: relative-to-peak-flow AND an absolute floor, so
@@ -4563,7 +4954,13 @@ namespace MetricFlowX
         AssertThrow(mass_log,
                     ExcMessage("Cannot open " + dir +
                                "/mass_conservation.csv"));
-        mass_log << "t,total_volume,dVdt,net_flux,imbalance,rel_imbalance\n";
+        csv_write_row(mass_log,
+                      "t",
+                      "total_volume",
+                      "dVdt",
+                      "net_flux",
+                      "imbalance",
+                      "rel_imbalance");
       }
 
     bdf_steps.fill(0);
@@ -4647,21 +5044,30 @@ namespace MetricFlowX
     const std::string dir = output_directory.empty() ? "." : output_directory;
     std::filesystem::create_directories(dir);
 
-    const std::string filename    = dir + "/ida_statistics.csv";
-    const bool        file_exists = std::ifstream(filename).good();
-
-    std::ofstream csv(filename, std::ios::app);
-    AssertThrow(csv, ExcMessage("Cannot open " + filename));
-
-    if (!file_exists)
-      csv << "max_order,wall_time,n_steps,n_err_test_fails,"
-             "n_nonlin_iters,n_nonlin_conv_fails,"
-             "bdf1_steps,bdf2_steps,bdf3_steps,bdf4_steps,bdf5_steps\n";
-
-    csv << ida_parameters.maximum_order << ',' << wall_time << ',' << nst << ','
-        << netf << ',' << nni << ',' << ncfn << ',' << bdf_steps[1] << ','
-        << bdf_steps[2] << ',' << bdf_steps[3] << ',' << bdf_steps[4] << ','
-        << bdf_steps[5] << '\n';
+    auto csv = csv_append(dir + "/ida_statistics.csv",
+                          {"max_order",
+                           "wall_time",
+                           "n_steps",
+                           "n_err_test_fails",
+                           "n_nonlin_iters",
+                           "n_nonlin_conv_fails",
+                           "bdf1_steps",
+                           "bdf2_steps",
+                           "bdf3_steps",
+                           "bdf4_steps",
+                           "bdf5_steps"});
+    csv_write_row(csv,
+                  ida_parameters.maximum_order,
+                  wall_time,
+                  nst,
+                  netf,
+                  nni,
+                  ncfn,
+                  bdf_steps[1],
+                  bdf_steps[2],
+                  bdf_steps[3],
+                  bdf_steps[4],
+                  bdf_steps[5]);
   }
 
   // ============================================================================
@@ -4699,18 +5105,10 @@ namespace MetricFlowX
     const std::string dir = output_directory.empty() ? "." : output_directory;
     std::filesystem::create_directories(dir);
 
-    const std::string filename    = dir + "/scaling_timings.csv";
-    const bool        file_exists = std::ifstream(filename).good();
-
-    std::ofstream csv(filename, std::ios::app);
-    AssertThrow(csv, ExcMessage("Cannot open " + filename));
-
-    if (!file_exists)
-      csv << "n_mpi_processes,section,wall_time\n";
-
+    auto csv = csv_append(dir + "/scaling_timings.csv",
+                          {"n_mpi_processes", "section", "wall_time"});
     for (const auto &entry : summary)
-      csv << n_mpi_processes << "," << entry.first << "," << entry.second
-          << "\n";
+      csv_write_row(csv, n_mpi_processes, entry.first, entry.second);
   }
 
   // Explicit instantiation

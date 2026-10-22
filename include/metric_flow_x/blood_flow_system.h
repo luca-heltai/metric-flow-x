@@ -51,6 +51,7 @@
 
 #include <deal.II/sundials/ida.h>
 
+#include <metric_flow_x/inflow_series.h>
 #include <metric_flow_x/parsed_tools/constants.h>
 #include <metric_flow_x/parsed_tools/function.h>
 
@@ -630,6 +631,13 @@ namespace MetricFlowX
     // &cell,
     //          const unsigned int face_no) const;
 
+    std::string terminal_parameter_source = "VTK";
+    std::string terminal_parameters_csv_file;
+    double      default_terminal_r1    = 0.0;
+    double      default_terminal_r2    = 1e8;
+    double      default_terminal_c     = 0.0;
+    double      default_terminal_p_out = 0.0;
+
     ParsedTools::Constants    par;
     AffineConstraints<double> constraints_;
     double                    current_dt  = 0.0;
@@ -651,9 +659,18 @@ namespace MetricFlowX
 
     struct RCRPhysics
     {
-      double R1, R2, C, P_out;
+      double      R1, R2, C, P_out;
+      std::string label;
     };
-    std::map<unsigned int, RCRPhysics>   rcr_map;
+    std::map<unsigned int, RCRPhysics> rcr_map;
+    // Coarse-mesh incidence, replicated before partitioning; output owners
+    // need labels even when the terminal itself belongs to another rank.
+    std::map<unsigned int, std::set<types::boundary_id>> vessel_terminals;
+
+    std::map<types::boundary_id, RCRPhysics>
+    read_terminal_parameters(
+      const std::set<types::boundary_id> &terminal_ids) const;
+
     std::map<unsigned int, unsigned int> vid_to_rcr_vertex; // key = vessel id
     std::map<types::boundary_id, double> terminal_Pc_storage;
     std::set<types::boundary_id>         terminal_boundary_ids;
@@ -859,15 +876,28 @@ namespace MetricFlowX
     // differs.
 
 #ifdef USE_PETSC_LA
+#  ifdef DEAL_II_PETSC_WITH_MUMPS
     std::unique_ptr<PETScWrappers::SparseDirectMUMPS> direct_solver;
+#  else
+    std::unique_ptr<PETScWrappers::PreconditionLU> direct_lu;
+#  endif
 #else
     std::unique_ptr<TrilinosWrappers::SolverDirect> direct_solver;
 #endif
 
-    // Preconditioner for the iterative path.  Note that PETSc's PCILU is a
-    // single-rank preconditioner: with more than one process, initialize() it
-    // through a block-Jacobi outer level or fall back to PreconditionAMG.
-    std::unique_ptr<LA::MPI::PreconditionILU> ilu_preconditioner;
+    // The PETSc iterative path uses block Jacobi with a local ILU per rank.
+    // Local shifts handle zero DAE pivots without changing the system matrix.
+#ifdef USE_PETSC_LA
+    using IterativePreconditioner = PETScWrappers::PreconditionBlockJacobi;
+#else
+    using IterativePreconditioner = LA::MPI::PreconditionILU;
+#endif
+    std::unique_ptr<IterativePreconditioner> ilu_preconditioner;
+
+    void
+    initialize_iterative_preconditioner(IterativePreconditioner &preconditioner,
+                                        const MatrixType        &matrix) const;
+
 
     // Per-cell mass matrices, indexed by cell->active_cell_index(): deal.II
     // numbers the locally stored active cells contiguously, so no CellId lookup
@@ -931,9 +961,14 @@ namespace MetricFlowX
 
     SUNDIALS::IDA<VectorType>::AdditionalData ida_parameters;
 
-    ParsedTools::Function<spacedim> rhs_function;
-    ParsedTools::Function<spacedim> exact_solution;
-    ParsedTools::Function<1>        inflow_function;
+    ParsedTools::Function<spacedim>       rhs_function;
+    ParsedTools::Function<spacedim>       exact_solution;
+    ParsedTools::Function<1>              inflow_function;
+    InflowSeries                          inflow_series;
+    std::string                           inflow_csv_file;
+    double                                inflow_csv_period  = 0.;
+    bool                                  write_terminal_csv = false;
+    std::map<unsigned int, std::ofstream> csv_terminal;
 
     // -----------------------------------------------------------------------
     // CSV time-series output, one file per vessel.
