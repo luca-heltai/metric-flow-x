@@ -22,6 +22,7 @@
 #include <metric_flow_x/blood_flow_system.h> // header exposing BloodFlowSystem
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -69,7 +70,7 @@ namespace MetricFlowX
               problem.initialize_terminal_capacitors();
               problem.build_per_cell_mass_inv();
             }
-          problem.open_csv_files();
+          problem.open_output_files();
           problem.initialize_state(problem.solution,
                                    problem.ida_parameters.initial_time);
           problem.initialize_state_derivative(
@@ -316,6 +317,7 @@ namespace MetricFlowX
           unsigned int output_number     = 0;
           ida.output_step =
             [&problem,
+             &ida,
              initial_output_time,
              final_output_time,
              &next_output_time,
@@ -324,6 +326,9 @@ namespace MetricFlowX
                              const VectorType & /*ydot*/,
                              const unsigned int /*step_number*/) {
               problem.time = t;
+              // Count all steps since the previous IDA callback, including
+              // callbacks at which physical file output is suppressed.
+              problem.record_ida_step(ida);
 
               const double tolerance =
                 16.0 * std::numeric_limits<double>::epsilon() *
@@ -340,7 +345,7 @@ namespace MetricFlowX
 
               problem.compute_pressure(sol, problem.pressure_);
               problem.output_results(sol, problem.pressure_, output_number++);
-              problem.write_csv_row(t, sol);
+              problem.write_output_step(t, sol);
               problem.report_flow_regime(sol, t);
 
               if (problem.time_interval > 0.0)
@@ -360,13 +365,20 @@ namespace MetricFlowX
                 }
             };
 
-          problem.solution_dot = 0.0;
-          problem.time         = problem.ida_parameters.initial_time;
+          problem.solution_dot   = 0.0;
+          problem.time           = problem.ida_parameters.initial_time;
+          const auto solve_start = std::chrono::steady_clock::now();
           ida.solve_dae(problem.solution, problem.solution_dot);
-          problem.close_csv_files();
+          const double solve_wall_time =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                          solve_start)
+              .count();
+          problem.record_ida_step(ida);
+          problem.finalize_output(ida, solve_wall_time);
           problem.compute_pressure(problem.solution, problem.pressure_);
           problem.compute_errors(cycle);
         }
+      problem.write_scaling_timings();
     }
   };
 } // namespace MetricFlowX
