@@ -1,0 +1,44 @@
+{
+  "manuscript_title": "An HDG-type discretization of 1D embedded blood flow in complex networks with Riemann-coupled junctions",
+  "manuscript_revision": "f7e92b6",
+  "status": "In preparation, 2026",
+  "source_root": "2026_1d_blood_flow",
+  "note": "Archived figures copied from the manuscript. No simulations or comparisons with the current solver were performed for this documentation update.",
+  "files": [
+    {
+      "file": "liver_pressure.png",
+      "source": "scaling_results_on_my_computer/8k_vessels/8k_arteries_picture_direct_solver3d.png",
+      "sha256": "458a67879a5b0e3aa25e6fe16bd7e494897a716ba1200a63c43421f469d9027d"
+    },
+    {
+      "file": "liver_mass_balance.png",
+      "source": "scaling_results_on_my_computer/8k_vessels/mass_conservation_combined.png",
+      "sha256": "e2bf1b166e80d885d6513bc73caac8fbefe768987abab4c4e85de4086a60b4df"
+    },
+    {
+      "file": "cerebral_mean_pressure.png",
+      "source": "scaling_results_on_my_computer/cerebral/cco_map_withbar.png",
+      "sha256": "b6463da178001852f3a8a01b3357cdc5e9e41e9a8d61b0a13375f7f64c3a44c6"
+    },
+    {
+      "file": "arteries37_pressure.pdf",
+      "source": "figures_tikz/network_37_aortic_arch_ii_pressure.pdf",
+      "sha256": "8fb9e16b8794055ce2b24344d263f81cf6909d33f04dbcdf6f724169fb5397af",
+      "web_preview": {
+        "file": "arteries37_pressure.png",
+        "sha256": "5cd27270fcd007f9ab2ec719628d049947732e74e559552ca19e78078b562100",
+        "conversion": "pdftoppm -png -singlefile -scale-to 1200"
+      }
+    },
+    {
+      "file": "cerebral_ida.pdf",
+      "source": "figures_tikz/cerebral_ida_statistics.pdf",
+      "sha256": "55ed2167082320bcceaa65a832853a0aecf985eafcf668bf3b65022992850c4f",
+      "web_preview": {
+        "file": "cerebral_ida.png",
+        "sha256": "57408e6f66c76431f7b84113dcd78b9278f22a2cf68d9876a2fa1f6c23f3692e",
+        "conversion": "pdftoppm -png -singlefile -scale-to 1200"
+      }
+    }
+  ]
+}
