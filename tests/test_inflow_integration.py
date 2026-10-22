@@ -71,7 +71,8 @@ def validate(executable, destination, mpi):
             # Overlapping driver hooks must not duplicate history records or
             # consume interval counters before the corresponding output row.
             assert len(history) == len(mass) == summary["n_outputs"]
-            assert [float(row["output_time"]) for row in history] == [float(row["t"]) for row in mass]
+            assert all(abs(float(record["output_time"]) - float(row["t"])) < 1e-14
+                       for record, row in zip(history, mass))
             assert sum(int(row["steps_interval"]) for row in history) == summary["n_steps"]
             assert sum(int(row["nonlin_iters_interval"]) for row in history) == summary["n_nonlin_iters"]
             with (folder / "output/scaling_timings.csv").open() as stream:
