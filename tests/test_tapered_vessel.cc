@@ -29,7 +29,9 @@ test()
           vessel.r_out = 0.006;
         }
       auto y = flow.make_state();
-      flow.initialize_state(y, 0.0);
+      // Test the seeded rest state before the terminal initialization solve
+      // adjusts traces to the fixture's non-equilibrium outlet conditions.
+      flow.compute_initial_solution(y, 0.0);
       auto residual = flow.make_state();
       flow.update_ghosted_vectors(y);
       flow.assemble_cell_residuals(0.0, flow.y_relevant, residual);
