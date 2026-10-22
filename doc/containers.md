@@ -98,7 +98,10 @@ operation; they do not validate the paper's scientific results.
 
 Pull requests build and test without publishing images. Pushes to `main`,
 version tags, `container-*` preview tags, and manual workflow runs publish tested architecture images and
-then their combined OCI index. Manual runs on a feature branch publish only its
+then their combined OCI index. Architecture tags are pushed after Docker and
+SDK checks; the combined index waits for Podman and Apptainer checks as well.
+The CI runtime installation uses the official Ubuntu HTTPS archives with
+bounded retries and timeouts, avoiding stalled optional mirror fallbacks. Manual runs on a feature branch publish only its
 commit tag; `container-*` tags publish an explicitly named preview image. A workflow artifact records the digest and a launcher pinned to it;
 version tags also attach these files to an existing release or create a draft
 release. The workflow does not merge a pull request or publish a draft release.

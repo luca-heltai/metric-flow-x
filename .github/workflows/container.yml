@@ -25,6 +25,7 @@ jobs:
           - runner: ubuntu-24.04-arm
             arch: arm64
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
@@ -69,33 +70,51 @@ jobs:
           test "$(stat -c %u "$RUNNER_TEMP/consumer/ownership")" = "$(id -u)"
           bash scripts/run_container.sh --runtime docker --image "$IMAGE" --ranks 2 \
             --exec bash -c 'test -n "$OMPI_COMM_WORLD_RANK"'
-      - name: Check Podman and Apptainer interoperability
-        if: matrix.arch == 'amd64'
-        run: |
-          sudo apt-get update
-          curl --fail --location --retry 3 \
-            https://github.com/apptainer/apptainer/releases/download/v1.5.4/apptainer_1.5.4_amd64.deb \
-            --output /tmp/apptainer.deb
-          sudo apt-get install -y podman /tmp/apptainer.deb
-          docker save "$IMAGE" | sudo podman load
-          sudo bash scripts/run_container.sh --runtime podman --image "$IMAGE" \
-            --workdir "$RUNNER_TEMP/consumer" --exec bash -c './build/consumer && touch podman-output'
-          test -f "$RUNNER_TEMP/consumer/podman-output"
-          sudo podman image rm "$IMAGE"
-          apptainer build "$RUNNER_TEMP/metric-flow-x.sif" "docker-daemon://$IMAGE"
-          bash scripts/run_container.sh --runtime apptainer --image "$RUNNER_TEMP/metric-flow-x.sif" \
-            --workdir "$RUNNER_TEMP/consumer" --ranks 2 --exec bash -c \
-            'test -n "$OMPI_COMM_WORLD_RANK" && mkdir -p "rank-$OMPI_COMM_WORLD_RANK" && cd "rank-$OMPI_COMM_WORLD_RANK" && ../build/consumer && touch ../apptainer-output'
-          test "$(stat -c %u "$RUNNER_TEMP/consumer/apptainer-output")" = "$(id -u)"
       - uses: docker/login-action@v3
         if: github.event_name != 'pull_request' && github.repository == 'luca-heltai/metric-flow-x'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish tested architecture
+      - name: Publish Docker-tested architecture
         if: github.event_name != 'pull_request' && github.repository == 'luca-heltai/metric-flow-x'
         run: docker push "$IMAGE"
+      - name: Install alternative container runtimes
+        if: matrix.arch == 'amd64'
+        run: |
+          # Use only the official HTTPS archives for these ephemeral CI commands.
+          cat > "$RUNNER_TEMP/metric-flow-x-apt.list" <<'SOURCES'
+          deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+          deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+          deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+          SOURCES
+          container_apt_options=(
+            -o "Dir::Etc::sourcelist=$RUNNER_TEMP/metric-flow-x-apt.list"
+            -o Dir::Etc::sourceparts=- -o Acquire::Languages=none
+            -o APT::Update::Error-Mode=any
+            -o Acquire::Retries=1 -o Acquire::http::Timeout=20
+            -o Acquire::https::Timeout=20)
+          timeout 180 sudo apt-get "${container_apt_options[@]}" update
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 120 \
+            https://github.com/apptainer/apptainer/releases/download/v1.5.4/apptainer_1.5.4_amd64.deb \
+            --output /tmp/apptainer.deb
+          timeout 300 sudo apt-get "${container_apt_options[@]}" install -y podman /tmp/apptainer.deb
+      - name: Check rootful Podman interoperability
+        if: matrix.arch == 'amd64'
+        run: |
+          docker save "$IMAGE" | sudo podman load
+          sudo bash scripts/run_container.sh --runtime podman --image "$IMAGE" \
+            --workdir "$RUNNER_TEMP/consumer" --exec bash -c './build/consumer && touch podman-output'
+          test -f "$RUNNER_TEMP/consumer/podman-output"
+          sudo podman image rm "$IMAGE"
+      - name: Check Apptainer SIF and two-rank library consumer
+        if: matrix.arch == 'amd64'
+        run: |
+          apptainer build "$RUNNER_TEMP/metric-flow-x.sif" "docker-daemon://$IMAGE"
+          bash scripts/run_container.sh --runtime apptainer --image "$RUNNER_TEMP/metric-flow-x.sif" \
+            --workdir "$RUNNER_TEMP/consumer" --ranks 2 --exec bash -c \
+            'test -n "$OMPI_COMM_WORLD_RANK" && mkdir -p "rank-$OMPI_COMM_WORLD_RANK" && cd "rank-$OMPI_COMM_WORLD_RANK" && ../build/consumer && touch ../apptainer-output'
+          test "$(stat -c %u "$RUNNER_TEMP/consumer/apptainer-output")" = "$(id -u)"
 
   publish:
     needs: build
