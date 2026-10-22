@@ -26,8 +26,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         build_type: [Debug, Release, DebugRelease]
+        backend: [PETSc, Trilinos]
     container:
       image: dealii/dealii:v9.7.1-noble
       options: --user root
@@ -36,7 +38,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and test
         run: |
-          cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DMETRIC_FLOW_X_BACKEND=${{ matrix.backend }}
           cmake --build build -j 2
           ctest --test-dir build -N
           ctest --test-dir build --no-tests=error --output-on-failure
@@ -49,6 +51,7 @@ jobs:
           mv install relocated
           for variant in Debug Release; do
             cmake -S tools/package_smoke -B "consumer-$variant" -GNinja \
+              -DMETRIC_FLOW_X_EXPECT_BACKEND=${{ matrix.backend }} \
               -DCMAKE_BUILD_TYPE="$variant" -DCMAKE_PREFIX_PATH="$PWD/relocated"
             cmake --build "consumer-$variant" -j 2
             ctest --test-dir "consumer-$variant" --no-tests=error --output-on-failure

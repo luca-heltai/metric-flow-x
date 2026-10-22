@@ -1,0 +1,7 @@
+#ifndef METRIC_FLOW_X_CONFIG_H
+#define METRIC_FLOW_X_CONFIG_H
+
+#cmakedefine METRIC_FLOW_X_WITH_PETSC 1
+#cmakedefine METRIC_FLOW_X_WITH_TRILINOS 1
+
+#endif

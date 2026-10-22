@@ -83,6 +83,17 @@ cmake -S . -B build-metric-flow-x \
 cmake --build build-metric-flow-x
 ```
 
+Select Trilinos explicitly for consumers such as ImmersX:
+
+```bash
+cmake -S . -B build-trilinos -DMETRIC_FLOW_X_BACKEND=Trilinos
+```
+
+`METRIC_FLOW_X_BACKEND` accepts `AUTO` (the default), `PETSc`, or `Trilinos`.
+`AUTO` selects real-valued PETSc when available and otherwise Trilinos.
+The installed configuration header preserves the selected vector/matrix types
+for downstream consumers. Use separate installation prefixes for the backends.
+
 The installed package exports the target `MetricFlowX::metric_flow_x`:
 
 ```bash

@@ -16,6 +16,34 @@ if(NOT ${deal.II_FOUND})
   )
 ENDIF()
 
+# Pin the public vector/matrix ABI for both this build and installed consumers.
+set(METRIC_FLOW_X_BACKEND "AUTO" CACHE STRING "Linear algebra backend: AUTO, PETSc, or Trilinos")
+set_property(CACHE METRIC_FLOW_X_BACKEND PROPERTY STRINGS AUTO PETSc Trilinos)
+string(TOUPPER "${METRIC_FLOW_X_BACKEND}" _backend)
+if(_backend STREQUAL "AUTO")
+  if(DEAL_II_WITH_PETSC AND NOT DEAL_II_PETSC_WITH_COMPLEX)
+    set(_backend "PETSC")
+  else()
+    set(_backend "TRILINOS")
+  endif()
+endif()
+if(_backend STREQUAL "PETSC")
+  if(NOT DEAL_II_WITH_PETSC OR DEAL_II_PETSC_WITH_COMPLEX)
+    message(FATAL_ERROR "MetricFlowX PETSc backend requires deal.II with real-valued PETSc")
+  endif()
+  set(METRIC_FLOW_X_WITH_PETSC ON)
+elseif(_backend STREQUAL "TRILINOS")
+  if(NOT DEAL_II_WITH_TRILINOS)
+    message(FATAL_ERROR "MetricFlowX Trilinos backend requires deal.II with Trilinos")
+  endif()
+  set(METRIC_FLOW_X_WITH_TRILINOS ON)
+else()
+  message(FATAL_ERROR "METRIC_FLOW_X_BACKEND must be AUTO, PETSc, or Trilinos")
+endif()
+message(STATUS "MetricFlowX linear algebra backend: ${_backend}")
+configure_file(include/metric_flow_x/config.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/include/metric_flow_x/config.h)
+
 # Preserve DebugRelease before deal.II can normalize CMAKE_BUILD_TYPE.
 set(_requested_build_type "${CMAKE_BUILD_TYPE}")
 if(_requested_build_type AND NOT _requested_build_type MATCHES "^(Debug|Release|DebugRelease)$")
@@ -60,6 +88,7 @@ foreach(_variant IN LISTS METRIC_FLOW_X_BUILD_TYPES)
   set(_application "blood_flow${_suffix}")
   add_library(${_library} SHARED ${METRIC_FLOW_X_SOURCES})
   target_include_directories(${_library} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   target_include_directories(${_library} SYSTEM PRIVATE
@@ -133,6 +162,10 @@ install(TARGETS ${METRIC_FLOW_X_INSTALL_TARGETS}
 
 install(DIRECTORY include/metric_flow_x
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  PATTERN "*.in" EXCLUDE
+)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/metric_flow_x/config.h
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/metric_flow_x
 )
 
 configure_package_config_file(

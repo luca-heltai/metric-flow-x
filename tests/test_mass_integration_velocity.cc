@@ -11,8 +11,6 @@
 
 #include <deal.II/base/mpi.h>
 
-#include <deal.II/lac/petsc_vector.h>
-
 #include <metric_flow_x/blood_flow_system.h>
 #include <metric_flow_x/io/vtk_utils.h>
 

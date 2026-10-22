@@ -29,17 +29,20 @@
 
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
-// Include only the selected backend: the generic header also pulls in the
-// deprecated Epetra package when PETSc is used.
-#if defined(DEAL_II_WITH_PETSC) && !defined(DEAL_II_PETSC_WITH_COMPLEX) && \
-  !(defined(DEAL_II_WITH_TRILINOS) && defined(FORCE_USE_OF_TRILINOS))
+
+#include <metric_flow_x/config.h>
+// Include only the backend selected when the library was built.
+#ifdef METRIC_FLOW_X_WITH_PETSC
 #  include <deal.II/lac/petsc_precondition.h>
 #  include <deal.II/lac/petsc_solver.h>
 #  include <deal.II/lac/petsc_sparse_matrix.h>
 #  include <deal.II/lac/petsc_vector.h>
 #  define USE_PETSC_LA
 #else
-#  include <deal.II/lac/generic_linear_algebra.h>
+#  include <deal.II/lac/trilinos_precondition.h>
+#  include <deal.II/lac/trilinos_solver.h>
+#  include <deal.II/lac/trilinos_sparse_matrix.h>
+#  include <deal.II/lac/trilinos_vector.h>
 #endif
 #include <deal.II/lac/solver_control.h>
 #include <deal.II/lac/solver_gmres.h>
@@ -102,10 +105,13 @@ namespace MetricFlowX
   using dealii::VectorOperation;
   namespace DoFTools           = dealii::DoFTools;
   namespace FEValuesExtractors = dealii::FEValuesExtractors;
-  namespace PETScWrappers      = dealii::PETScWrappers;
   namespace SUNDIALS           = dealii::SUNDIALS;
   namespace SparsityTools      = dealii::SparsityTools;
-  // namespace TrilinosWrappers      = dealii::TrilinosWrappers;
+#ifdef USE_PETSC_LA
+  namespace PETScWrappers = dealii::PETScWrappers;
+#else
+  namespace TrilinosWrappers = dealii::TrilinosWrappers;
+#endif
   namespace numbers   = dealii::numbers;
   namespace parallel  = dealii::parallel;
   namespace types     = dealii::types;
@@ -114,11 +120,8 @@ namespace MetricFlowX
   // ---------------------------------------------------------------------------
   // Linear algebra backend.
   //
-  // PETSc is picked when it is available and built with real scalars, unless
-  // FORCE_USE_OF_TRILINOS asks for the other one.  Everything below is written
-  // against the LA aliases, so the solver compiles unchanged either way; the
-  // two places where the backends genuinely differ, the direct solver and the
-  // AdditionalData of the preconditioners, are guarded by USE_PETSC_LA.
+  // CMake selects the backend and installs that choice in config.h so embedded
+  // consumers use the same public vector/matrix types as the shared library.
   // ---------------------------------------------------------------------------
   namespace LA
   {
@@ -131,8 +134,13 @@ namespace MetricFlowX
     } // namespace MPI
     using SolverGMRES = dealii::PETScWrappers::SolverGMRES;
 #elif defined(DEAL_II_WITH_TRILINOS)
-    namespace MPI     = dealii::LinearAlgebraTrilinos::MPI;
-    using SolverGMRES = dealii::LinearAlgebraTrilinos::SolverGMRES;
+    namespace MPI
+    {
+      using Vector          = dealii::TrilinosWrappers::MPI::Vector;
+      using SparseMatrix    = dealii::TrilinosWrappers::SparseMatrix;
+      using PreconditionILU = dealii::TrilinosWrappers::PreconditionILU;
+    } // namespace MPI
+    using SolverGMRES = dealii::TrilinosWrappers::SolverGMRES;
 #else
 #  error DEAL_II_WITH_PETSC or DEAL_II_WITH_TRILINOS required
 #endif

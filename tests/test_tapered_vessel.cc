@@ -17,6 +17,9 @@ test()
 {
   for (unsigned int refinement = 0; refinement < 3; ++refinement)
     {
+      // ParameterHandler actions in deal.II 9.7 retain callbacks to the
+      // previous instance. All acceptors from that iteration are destroyed.
+      ParameterAcceptor::clear();
       BloodFlowSystem<1, 3> flow;
       flow.initialize_params(PRM_DIR "constant.prm");
       flow.fe_degree            = 2;
