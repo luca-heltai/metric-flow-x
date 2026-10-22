@@ -3523,7 +3523,7 @@ namespace MetricFlowX
     if (verbosity > 1)
       {
         deallog.push("assemble_residual");
-        deallog << "t_residual=" << t << std::endl;
+        deallog << "t=" << t << std::endl;
       }
 
     update_ghosted_vectors(y);
@@ -3638,7 +3638,7 @@ namespace MetricFlowX
     TimerOutput::Scope timer(computing_timer, "assemble_jacobian");
     if (verbosity > 1)
       deallog.push("assemble_jacobian");
-    deallog << "t_jacobian=" << t << std::endl;
+    deallog << "t=" << t << std::endl;
 
     assemble_state_jacobian(t, y, ydot);
     assemble_derivative_jacobian(t, y, ydot);
@@ -4640,7 +4640,7 @@ namespace MetricFlowX
               p(ldofs[i]) =
                 base_pressure +
                 external_pressure(
-                  {t, support_point(cell, i), cell->material_id(), cell->id()},
+                  {t, cell->center(), cell->material_id(), cell->id()},
                   provider);
             }
       }
