@@ -91,6 +91,7 @@ case $runtime in
       --env HOME=/tmp --env OMP_NUM_THREADS=1 --env OPENBLAS_NUM_THREADS=1
       --env OMPI_ALLOW_RUN_AS_ROOT=1 --env OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1)
     if [[ $runtime == podman && $(id -u) != 0 ]]; then options+=(--userns=keep-id); fi
+    if [[ -t 0 && -t 1 ]]; then options+=(--interactive --tty); fi
     exec "$runtime" "${options[@]}" --entrypoint "${command[0]}" "$image" "${command[@]:1}" ;;
   apptainer)
     case $image in

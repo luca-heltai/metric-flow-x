@@ -92,7 +92,8 @@ The container workflow builds natively on GitHub's AMD64 and ARM64 runners.
 For each architecture it runs the installed executable with one and two MPI
 ranks using the inflow integration smoke test, compiles a downstream library
 consumer, and checks launcher output ownership. AMD64 additionally checks
-Podman and conversion to Apptainer SIF. These checks establish infrastructure
+rootful Podman and conversion to Apptainer SIF; both execute the installed
+library consumer. Rootless Podman remains a separate environment-dependent check. These checks establish infrastructure
 operation; they do not validate the paper's scientific results.
 
 Pull requests build and test without publishing images. Pushes to `main`,
