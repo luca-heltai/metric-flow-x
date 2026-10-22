@@ -37,7 +37,6 @@
 #  include <deal.II/lac/petsc_solver.h>
 #  include <deal.II/lac/petsc_sparse_matrix.h>
 #  include <deal.II/lac/petsc_vector.h>
-#  define USE_PETSC_LA
 #else
 #  include <deal.II/lac/trilinos_precondition.h>
 #  include <deal.II/lac/trilinos_solver.h>
@@ -107,7 +106,7 @@ namespace MetricFlowX
   namespace FEValuesExtractors = dealii::FEValuesExtractors;
   namespace SUNDIALS           = dealii::SUNDIALS;
   namespace SparsityTools      = dealii::SparsityTools;
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
   namespace PETScWrappers = dealii::PETScWrappers;
 #else
   namespace TrilinosWrappers = dealii::TrilinosWrappers;
@@ -125,7 +124,7 @@ namespace MetricFlowX
   // ---------------------------------------------------------------------------
   namespace LA
   {
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
     namespace MPI
     {
       using Vector          = dealii::PETScWrappers::MPI::Vector;
@@ -926,7 +925,7 @@ namespace MetricFlowX
     // SolverControl and solve through solve(A, x, b), so only the declaration
     // differs.
 
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
     std::unique_ptr<PETScWrappers::SparseDirectMUMPS> direct_solver;
 #  else
@@ -938,7 +937,7 @@ namespace MetricFlowX
 
     // The PETSc iterative path uses block Jacobi with a local ILU per rank.
     // Local shifts handle zero DAE pivots without changing the system matrix.
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
     using IterativePreconditioner = PETScWrappers::PreconditionBlockJacobi;
 #else
     using IterativePreconditioner = LA::MPI::PreconditionILU;

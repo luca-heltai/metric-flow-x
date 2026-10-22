@@ -464,7 +464,7 @@ namespace MetricFlowX
     const MatrixType        &matrix) const
   {
     preconditioner.initialize(matrix);
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
     // A local DAE block may have zero pivots even when the global matrix is
     // invertible. Shift the local ILU factors, without changing the operator.
     const auto check = [](const PetscErrorCode error) {
@@ -1964,7 +1964,7 @@ namespace MetricFlowX
           if (use_direct_solver)
             {
               SolverControl solver_control(1, 0.0);
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
               PETScWrappers::SparseDirectMUMPS newton_solver(solver_control);
               newton_solver.solve(linear_system_matrix, delta, rhs);

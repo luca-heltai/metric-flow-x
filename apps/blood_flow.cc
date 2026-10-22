@@ -245,7 +245,7 @@ namespace MetricFlowX
 
             if (problem.use_direct_solver)
               {
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
                 problem.direct_solver =
                   std::make_unique<PETScWrappers::SparseDirectMUMPS>(
@@ -292,7 +292,7 @@ namespace MetricFlowX
 
             if (problem.use_direct_solver)
               {
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
                 problem.direct_solver->solve(problem.linear_system_matrix,
                                              z,
