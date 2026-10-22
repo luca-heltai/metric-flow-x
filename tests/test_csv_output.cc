@@ -115,7 +115,7 @@ test()
                   ExcInternalError());
       const auto statistics = read("ida_statistics.csv");
       AssertThrow(statistics.GetRowCount() == 2 &&
-                    statistics.GetColumnCount() == 11 &&
+                    statistics.GetColumnCount() == 15 &&
                     statistics.GetCell<double>("wall_time", 0) ==
                       1.2345678901234567 &&
                     statistics.GetCell<double>("wall_time", 1) == 2.0,

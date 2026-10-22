@@ -237,6 +237,14 @@ namespace MetricFlowX
     add_parameter("Inflow CSV period", inflow_csv_period);
     add_parameter("Write terminal CSV files", write_terminal_csv);
 
+    add_parameter(
+      "Jacobian export file (Matrix Market)",
+      jacobian_export_filename,
+      "If non-empty, the first assembled IDA Jacobian is written to this file "
+      "in Matrix Market format. Leave empty to disable.");
+    add_parameter("Jacobian export time",
+                  jacobian_export_time,
+                  "Export the first Jacobian assembled at or after this time.");
     this->enter_subsection("IDA parameters");
     this->enter_my_subsection(this->prm);
     ida_parameters.add_parameters(this->prm);
@@ -1810,12 +1818,16 @@ namespace MetricFlowX
           continue;
 
         cell->get_dof_indices(ldofs);
-        const double a_d_local = compute_a_d_local(cell);
 
+        // Nodal interpolation of a_d(x).  For a linearly tapered radius a_d is
+        // quadratic in x, so for fe_degree >= 2 the vessel starts exactly at
+        // rest (A = a_d, U = 0 gives p = p0 + p_d everywhere).
         for (unsigned int i = 0; i < fe_->n_dofs_per_cell(); ++i)
           {
             const unsigned int comp = fe_->system_to_component_index(i).first;
-            dst(ldofs[i])           = (comp == 0) ? a_d_local : 0.0;
+            dst(ldofs[i]) =
+              (comp == 0) ? compute_a_d_at_point(cell, support_point(cell, i)) :
+                            0.0;
           }
 
         // Trace: seed A_hat with the diastolic area at that face and U_hat with
@@ -2180,7 +2192,13 @@ namespace MetricFlowX
         if (it != vessel_s_bounds.end())
           s_mid = 0.5 * (it->second.first + it->second.second);
 
+        // Pick the cell whose arc-length interval contains s_mid (distance 0)
+        // and probe it at the reference coordinate of s_mid.  Probing at the
+        // centre of the nearest cell instead would move the probe with the
+        // mesh (L/2, L/4, 3L/8, ... for 1, 2, 4, ... cells per vessel), and
+        // runs on different refinements would not be comparable.
         double best_dist = std::numeric_limits<double>::max();
+        double best_xi   = 0.5;
         typename DoFHandler<dim, spacedim>::active_cell_iterator best_cell;
         bool                                                     found = false;
 
@@ -2192,12 +2210,14 @@ namespace MetricFlowX
               continue;
 
             const Tensor<1, spacedim> d_hat = compute_directional_vector(cell);
-            const double              s     = cell->center() * d_hat;
-            const double              d     = std::abs(s - s_mid);
+            const double              s0    = cell->vertex(0) * d_hat;
+            const double              s1    = cell->vertex(1) * d_hat;
+            const double d = std::max(0.0, std::max(s0 - s_mid, s_mid - s1));
             if (d < best_dist)
               {
                 best_dist = d;
                 best_cell = cell;
+                best_xi   = std::clamp((s_mid - s0) / (s1 - s0), 0.0, 1.0);
                 found     = true;
               }
           }
@@ -2215,7 +2235,7 @@ namespace MetricFlowX
         if (winning_rank != this_mpi_process || !found)
           continue;
 
-        probe_targets.emplace_back(vid, best_cell);
+        probe_targets.emplace_back(vid, best_cell, best_xi);
 
         std::ofstream &os = csv_vessel[vid];
         os.open(dir + "HDG_IDA_Vessel_" + std::to_string(vid) + ".csv");
@@ -2271,11 +2291,10 @@ namespace MetricFlowX
       }
     const unsigned int dofs_per_cell = fe_->n_dofs_per_cell();
 
-    // Reference-cell midpoint (DGQ, dim == 1 -> xi = 0.5).
-    const Point<dim> xi_mid = (dim == 1) ? Point<dim>(0.5) : Point<dim>();
-
-    for (const auto &[vid, cell] : probe_targets)
+    for (const auto &[vid, cell, xi] : probe_targets)
       {
+        const Point<dim> xi_probe = (dim == 1) ? Point<dim>(xi) : Point<dim>();
+
         std::ofstream &os = csv_vessel.at(vid);
 
         // The probe cell is locally owned, so every one of its DoFs is owned
@@ -2286,7 +2305,7 @@ namespace MetricFlowX
         double A_val = 0.0, U_val = 0.0;
         for (unsigned int i = 0; i < dofs_per_cell; ++i)
           {
-            const double       phi  = fe_->shape_value(i, xi_mid);
+            const double       phi  = fe_->shape_value(i, xi_probe);
             const unsigned int comp = fe_->system_to_component_index(i).first;
             if (comp == 0)
               A_val += sol(ldofs[i]) * phi;
@@ -2297,8 +2316,15 @@ namespace MetricFlowX
         const double A_cm2  = A_val * 1.0e4;
         const double U_cmps = U_val * 1.0e2;
 
-        const double P_Pa = compute_physical_pressure(
-          A_val, vid, compute_a_d_local(cell), t, cell->center(), cell->id());
+        const Point<spacedim> x_probe =
+          cell->vertex(0) + xi * (cell->vertex(1) - cell->vertex(0));
+        const double P_Pa =
+          compute_physical_pressure(A_val,
+                                    vid,
+                                    compute_a_d_at_point(cell, x_probe),
+                                    t,
+                                    x_probe,
+                                    cell->id());
         const double P_dynpcm2 = P_Pa * 10.0;
 
         const double Q_cm3ps = A_val * U_val * 1.0e6;
@@ -2729,12 +2755,13 @@ namespace MetricFlowX
                 external_pressure(
                   {t, fev.get_quadrature_points()[q], vid, cell->id()},
                   provider) :
-                compute_physical_pressure(A,
-                                          vid,
-                                          compute_a_d_local(cell),
-                                          t,
-                                          fev.get_quadrature_points()[q],
-                                          cell_id);
+                compute_physical_pressure(
+                  A,
+                  vid,
+                  compute_a_d_at_point(cell, fev.quadrature_point(q)),
+                  t,
+                  fev.get_quadrature_points()[q],
+                  cell_id);
             const Tensor<1, spacedim> b = compute_directional_vector(cell);
 
             const double rhs_A =
@@ -2772,8 +2799,10 @@ namespace MetricFlowX
               }
           }
 
-        const double ad_local = compute_a_d_local(cell);
         // ---- Face flux: interior cell value vs. global face trace
+        //
+        // Interior and trace state sit at the same point, so both pressures
+        // use the a_d of the face.
 
         for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
           {
@@ -2821,7 +2850,7 @@ namespace MetricFlowX
                                                                    U_hat,
                                                                    vid,
                                                                    vid,
-                                                                   ad_local,
+                                                                   ad_face,
                                                                    ad_face,
                                                                    external_p,
                                                                    external_p) :
@@ -2833,7 +2862,7 @@ namespace MetricFlowX
                                                  U_hat,
                                                  vid,
                                                  vid,
-                                                 ad_local,
+                                                 ad_face,
                                                  ad_face,
                                                  external_p,
                                                  external_p);
@@ -2921,11 +2950,13 @@ namespace MetricFlowX
             const auto        &nb   = cell->neighbor(f);
             const unsigned int nb_f = cell->neighbor_of_neighbor(f);
 
-            const unsigned int vid_L   = cell->material_id();
-            const unsigned int vid_R   = nb->material_id();
-            const double       ad_L    = compute_a_d_local(cell);
-            const double       ad_R    = compute_a_d_local(nb);
-            const double       ad_face = compute_a_d_at_face(cell, f);
+            const unsigned int vid_L = cell->material_id();
+            const unsigned int vid_R = nb->material_id();
+            // A non-junction interior face joins two cells of the same vessel
+            // at one point, so both states and the trace share its a_d.
+            const double ad_face = compute_a_d_at_face(cell, f);
+            const double ad_L    = ad_face;
+            const double ad_R    = ad_face;
             // Interior cell values at face — use y_cell, not y
             fef.reinit(cell, f);
             const double bn_L =
@@ -3492,7 +3523,7 @@ namespace MetricFlowX
     if (verbosity > 1)
       {
         deallog.push("assemble_residual");
-        deallog << "t=" << t << std::endl;
+        deallog << "t_residual=" << t << std::endl;
       }
 
     update_ghosted_vectors(y);
@@ -3607,16 +3638,60 @@ namespace MetricFlowX
     TimerOutput::Scope timer(computing_timer, "assemble_jacobian");
     if (verbosity > 1)
       deallog.push("assemble_jacobian");
-    deallog << "t=" << t << std::endl;
+    deallog << "t_jacobian=" << t << std::endl;
 
     assemble_state_jacobian(t, y, ydot);
     assemble_derivative_jacobian(t, y, ydot);
 
     jacobian_matrix.copy_from(state_jacobian_matrix_);
     jacobian_matrix.add(alpha, derivative_jacobian_matrix_);
-
+    if (!jacobian_export_filename.empty() && !jacobian_exported &&
+        t >= jacobian_export_time)
+      {
+        export_jacobian_matrix_market(jacobian_export_filename, t, alpha);
+        jacobian_exported = true;
+      }
     if (verbosity > 1)
       deallog.pop();
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::export_jacobian_matrix_market(
+    const std::string &filename,
+    const double       t,
+    const double       alpha) const
+  {
+    types::global_dof_index local_nnz = 0;
+    {
+      std::ofstream part(filename + ".part" +
+                         Utilities::int_to_string(this_mpi_process, 4));
+      part << std::setprecision(17) << std::scientific;
+      for (const auto row : locally_owned_dofs_)
+        for (auto it = jacobian_matrix.begin(row);
+             it != jacobian_matrix.end(row);
+             ++it)
+          {
+            // Matrix Market is 1-based
+            part << row + 1 << ' ' << it->column() + 1 << ' ' << it->value()
+                 << '\n';
+            ++local_nnz;
+          }
+    }
+
+    const types::global_dof_index nnz =
+      Utilities::MPI::sum(local_nnz, mpi_communicator_);
+
+    if (this_mpi_process == 0)
+      {
+        std::ofstream header(filename + ".header");
+        header << "%%MatrixMarket matrix coordinate real general\n"
+               << "% IDA Jacobian J = -dR/dy + alpha*M, t = " << t
+               << ", alpha = " << alpha << ", MPI ranks = " << n_mpi_processes
+               << '\n'
+               << jacobian_matrix.m() << ' ' << jacobian_matrix.n() << ' '
+               << nnz << '\n';
+      }
   }
 
   template <int dim, int spacedim>
@@ -3710,8 +3785,10 @@ namespace MetricFlowX
     const QGauss<dim>     quad_cell(fe_->tensor_degree() + 1);
     const QGauss<dim - 1> quad_face(fe_->tensor_degree() + 1);
 
-    FEValues<dim, spacedim> fev(
-      *fe_, quad_cell, update_values | update_gradients | update_JxW_values);
+    FEValues<dim, spacedim>     fev(*fe_,
+                                quad_cell,
+                                update_values | update_gradients |
+                                  update_quadrature_points | update_JxW_values);
     FEFaceValues<dim, spacedim> fef(*fe_,
                                     quad_face,
                                     update_values | update_JxW_values |
@@ -3731,8 +3808,7 @@ namespace MetricFlowX
 
         fev.reinit(cell);
 
-        const auto                          &JxW      = fev.get_JxW_values();
-        const double                         ad_local = compute_a_d_local(cell);
+        const auto                          &JxW = fev.get_JxW_values();
         std::vector<types::global_dof_index> ldofs(n_dofs);
         cell->get_dof_indices(ldofs);
 
@@ -3749,7 +3825,8 @@ namespace MetricFlowX
           {
             const double A    = std::max(A_h[q], 1e-10);
             const double U    = U_h[q];
-            const double dpdA = compute_pressure_derivative(A, vid, ad_local);
+            const double dpdA = compute_pressure_derivative(
+              A, vid, compute_a_d_at_point(cell, fev.quadrature_point(q)));
             const double c2_A = A / rho * dpdA;
 
             for (unsigned int i = 0; i < n_dofs; ++i)
@@ -3835,7 +3912,7 @@ namespace MetricFlowX
                                                                0.0,
                                                                vid,
                                                                vid,
-                                                               ad_local,
+                                                               ad_face,
                                                                ad_face);
 
                     for (unsigned int i = 0; i < n_dofs; ++i)
@@ -3869,7 +3946,7 @@ namespace MetricFlowX
                                                                dU_hat,
                                                                vid,
                                                                vid,
-                                                               ad_local,
+                                                               ad_face,
                                                                ad_face);
 
                     for (unsigned int i = 0; i < n_dofs; ++i)
@@ -3945,13 +4022,15 @@ namespace MetricFlowX
                 continue;
             }
 
-            const auto        &nb      = cell->neighbor(f);
-            const unsigned int nb_f    = cell->neighbor_of_neighbor(f);
-            const unsigned int vid_L   = cell->material_id();
-            const unsigned int vid_R   = nb->material_id();
-            const double       ad_L    = compute_a_d_local(cell);
-            const double       ad_R    = compute_a_d_local(nb);
-            const double       ad_face = compute_a_d_at_face(cell, f);
+            const auto        &nb    = cell->neighbor(f);
+            const unsigned int nb_f  = cell->neighbor_of_neighbor(f);
+            const unsigned int vid_L = cell->material_id();
+            const unsigned int vid_R = nb->material_id();
+            // A non-junction interior face joins two cells of the same vessel
+            // at one point, so both states and the trace share its a_d.
+            const double ad_face = compute_a_d_at_face(cell, f);
+            const double ad_L    = ad_face;
+            const double ad_R    = ad_face;
             // ---- Left cell: state and normal
             // --------------------------------
             fef.reinit(cell, f);
@@ -4553,15 +4632,15 @@ namespace MetricFlowX
         for (unsigned int i = 0; i < fe_->n_dofs_per_cell(); ++i)
           if (fe_->system_to_component_index(i).first == 0)
             {
-              const double A = y(ldofs[i]);
-              const double base_pressure =
-                compute_pressure_value(A,
-                                       cell->material_id(),
-                                       compute_a_d_local(cell));
+              const double A             = y(ldofs[i]);
+              const double base_pressure = compute_pressure_value(
+                A,
+                cell->material_id(),
+                compute_a_d_at_point(cell, support_point(cell, i)));
               p(ldofs[i]) =
                 base_pressure +
                 external_pressure(
-                  {t, cell->center(), cell->material_id(), cell->id()},
+                  {t, support_point(cell, i), cell->material_id(), cell->id()},
                   provider);
             }
       }
@@ -4965,6 +5044,91 @@ namespace MetricFlowX
 
     bdf_steps.fill(0);
     bdf_prev_nst = 0;
+
+    ida_history.clear();
+    prev_nni  = 0;
+    prev_ncfn = 0;
+    prev_netf = 0;
+    prev_nre  = 0;
+    prev_nls  = 0;
+
+    if (ida_history_log.is_open())
+      ida_history_log.close();
+    if (this_mpi_process == 0)
+      {
+        const std::string dir =
+          output_directory.empty() ? "." : output_directory;
+        ida_history_log.open(dir + "/ida_step_history.csv", std::ios::trunc);
+        AssertThrow(ida_history_log,
+                    ExcMessage("Cannot open " + dir + "/ida_step_history.csv"));
+        ida_history_log
+          << "output_time,ida_time,steps_interval,steps_cumulative,"
+             "nonlin_iters_interval,nonlin_iters_cumulative,"
+             "nonlin_iters_per_step,nonlin_fails_interval,"
+             "err_test_fails_interval,residual_evals_interval,"
+             "lin_setups_interval,last_step_size,last_order\n";
+      }
+
+    is_prev_nst = is_prev_nni = is_prev_ncfn = is_prev_netf = is_prev_nls = 0;
+    is_t_accepted = ida_parameters.initial_time;
+
+    if (ida_internal_log.is_open())
+      ida_internal_log.close();
+    if (this_mpi_process == 0)
+      {
+        const std::string dir =
+          output_directory.empty() ? "." : output_directory;
+        ida_internal_log.open(dir + "/ida_internal_steps.csv", std::ios::trunc);
+        ida_internal_log
+          << "step,t,h,order,nonlin_iters,nonlin_iters_cumulative,"
+             "nonlin_conv_fails,err_test_fails,jacobian_setups\n";
+      }
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::poll_ida_internal_step(
+    const SUNDIALS::IDA<VectorType> &ida,
+    const bool                       resync_time)
+  {
+    void *mem = internal_ida_access::get_ida_mem(ida);
+    if (mem == nullptr)
+      return;
+
+    long int nst = 0;
+    IDAGetNumSteps(mem, &nst);
+    if (nst == is_prev_nst)
+      return; // no new accepted step
+
+    long int nni = 0, ncfn = 0, netf = 0, nls = 0;
+    int      klast = 0;
+    double   hlast = 0.0;
+    IDAGetNumNonlinSolvIters(mem, &nni);
+    IDAGetNumNonlinSolvConvFails(mem, &ncfn);
+    IDAGetNumErrTestFails(mem, &netf);
+    IDAGetNumLinSolvSetups(mem, &nls);
+    IDAGetLastOrder(mem, &klast);
+    IDAGetLastStep(mem, &hlast);
+
+    // Inside the residual, IDA's tn is the *trial* time, so accumulate t += h.
+    // In output_step / after solve_dae, tn is exact -> resync.
+    is_t_accepted += hlast * static_cast<double>(nst - is_prev_nst);
+    if (resync_time)
+      IDAGetCurrentTime(mem, &is_t_accepted);
+
+    if (this_mpi_process == 0 && ida_internal_log.is_open())
+      ida_internal_log << nst << ',' << std::scientific << std::setprecision(12)
+                       << is_t_accepted << ',' << std::setprecision(6) << hlast
+                       << ',' << klast << ',' << (nni - is_prev_nni) << ','
+                       << nni << ',' << (ncfn - is_prev_ncfn) << ','
+                       << (netf - is_prev_netf) << ',' << (nls - is_prev_nls)
+                       << '\n';
+
+    is_prev_nst  = nst;
+    is_prev_nni  = nni;
+    is_prev_ncfn = ncfn;
+    is_prev_netf = netf;
+    is_prev_nls  = nls;
   }
 
   // ============================================================================
@@ -4985,9 +5149,21 @@ namespace MetricFlowX
   // ============================================================================
   // record_ida_step
   //
-  // output_step fires once per output period, so every step accepted since
-  // the previous call is attributed to the order of the last accepted step.
-  // The per-order counts then sum exactly to the total number of steps.
+  // Called at the top of output_step, i.e. once per output time requested
+  // through the output period.  deal.II's solve_dae() lets IDA take as many
+  // internal (adaptive) steps as it needs to pass the requested time, then
+  // interpolates the solution back to it.  The difference of IDA's cumulative
+  // counters between two consecutive calls is therefore exactly the work IDA
+  // did to get from the previous output time to this one:
+  //
+  //   steps_interval        : internal BDF steps accepted in the interval
+  //   nonlin_iters_interval : Newton iterations over all of those steps
+  //                           (including iterations of rejected attempts)
+  //
+  // The record is kept in ida_history and streamed to ida_step_history.csv.
+  // It also feeds the BDF-order histogram: every step accepted since the
+  // previous call is attributed to the order of the last accepted step, so
+  // the per-order counts sum exactly to the total number of steps.
   // ============================================================================
   template <int dim, int spacedim>
   void
@@ -4997,16 +5173,84 @@ namespace MetricFlowX
     void *mem = internal_ida_access::get_ida_mem(ida);
     if (mem == nullptr)
       return;
+    double t = 0.0;
+    IDAGetCurrentTime(mem, &t);
+    record_ida_step(ida, t);
+  }
 
-    long int nst_now = 0;
-    int      klast   = 0;
-    IDAGetNumSteps(mem, &nst_now);
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::record_ida_step(
+    const SUNDIALS::IDA<VectorType> &ida,
+    const double                     t)
+  {
+    void *mem = internal_ida_access::get_ida_mem(ida);
+    if (mem == nullptr)
+      return;
+
+    long int nst = 0, nni = 0, ncfn = 0, netf = 0, nre = 0, nls = 0;
+    int      klast = 0;
+    double   hlast = 0.0, tcur = t;
+    IDAGetNumSteps(mem, &nst);
+    IDAGetNumNonlinSolvIters(mem, &nni);
+    IDAGetNumNonlinSolvConvFails(mem, &ncfn);
+    IDAGetNumErrTestFails(mem, &netf);
+    IDAGetNumResEvals(mem, &nre);
+    IDAGetNumLinSolvSetups(mem, &nls);
     IDAGetLastOrder(mem, &klast);
+    IDAGetLastStep(mem, &hlast);
+    IDAGetCurrentTime(mem, &tcur);
 
-    const long int delta = nst_now - bdf_prev_nst;
-    if (klast >= 1 && klast <= 5 && delta > 0)
-      bdf_steps[klast] += delta;
-    bdf_prev_nst = nst_now;
+    // ---- BDF-order histogram ------------------------------------------------
+    const long int delta_steps = nst - bdf_prev_nst;
+    if (klast >= 1 && klast <= 5 && delta_steps > 0)
+      bdf_steps[klast] += delta_steps;
+    bdf_prev_nst = nst;
+
+    // ---- per-output-time record ---------------------------------------------
+    IDAOutputRecord rec;
+    rec.output_time             = t;
+    rec.ida_time                = tcur;
+    rec.steps_interval          = delta_steps;
+    rec.steps_cumulative        = nst;
+    rec.nonlin_iters_interval   = nni - prev_nni;
+    rec.nonlin_iters_cumulative = nni;
+    rec.nonlin_fails_interval   = ncfn - prev_ncfn;
+    rec.err_test_fails_interval = netf - prev_netf;
+    rec.residual_evals_interval = nre - prev_nre;
+    rec.lin_setups_interval     = nls - prev_nls;
+    rec.last_step_size          = hlast;
+    rec.last_order              = klast;
+    ida_history.push_back(rec);
+
+    prev_nni  = nni;
+    prev_ncfn = ncfn;
+    prev_netf = netf;
+    prev_nre  = nre;
+    prev_nls  = nls;
+
+    if (this_mpi_process == 0 && ida_history_log.is_open())
+      {
+        const double iters_per_step =
+          rec.steps_interval > 0 ?
+            static_cast<double>(rec.nonlin_iters_interval) /
+              static_cast<double>(rec.steps_interval) :
+            0.0;
+
+        ida_history_log << std::scientific << std::setprecision(10)
+                        << rec.output_time << ',' << rec.ida_time << ','
+                        << rec.steps_interval << ',' << rec.steps_cumulative
+                        << ',' << rec.nonlin_iters_interval << ','
+                        << rec.nonlin_iters_cumulative << ','
+                        << std::setprecision(4) << iters_per_step << ','
+                        << rec.nonlin_fails_interval << ','
+                        << rec.err_test_fails_interval << ','
+                        << rec.residual_evals_interval << ','
+                        << rec.lin_setups_interval << ','
+                        << std::setprecision(6) << rec.last_step_size << ','
+                        << rec.last_order << '\n';
+        ida_history_log.flush();
+      }
   }
 
   // ============================================================================
@@ -5044,6 +5288,19 @@ namespace MetricFlowX
     const std::string dir = output_directory.empty() ? "." : output_directory;
     std::filesystem::create_directories(dir);
 
+    // Derived averages over the whole run.
+    const std::size_t n_outputs = ida_history.size();
+    const double      nonlin_iters_per_step =
+      nst > 0 ? static_cast<double>(nni) / static_cast<double>(nst) : 0.0;
+    const double steps_per_output =
+      n_outputs > 0 ?
+        static_cast<double>(nst) / static_cast<double>(n_outputs) :
+        0.0;
+    const double nonlin_iters_per_output =
+      n_outputs > 0 ?
+        static_cast<double>(nni) / static_cast<double>(n_outputs) :
+        0.0;
+
     auto csv = csv_append(dir + "/ida_statistics.csv",
                           {"max_order",
                            "wall_time",
@@ -5055,7 +5312,11 @@ namespace MetricFlowX
                            "bdf2_steps",
                            "bdf3_steps",
                            "bdf4_steps",
-                           "bdf5_steps"});
+                           "bdf5_steps",
+                           "n_outputs",
+                           "nonlin_iters_per_step",
+                           "steps_per_output",
+                           "nonlin_iters_per_output"});
     csv_write_row(csv,
                   ida_parameters.maximum_order,
                   wall_time,
@@ -5067,7 +5328,11 @@ namespace MetricFlowX
                   bdf_steps[2],
                   bdf_steps[3],
                   bdf_steps[4],
-                  bdf_steps[5]);
+                  bdf_steps[5],
+                  n_outputs,
+                  nonlin_iters_per_step,
+                  steps_per_output,
+                  nonlin_iters_per_output);
   }
 
   // ============================================================================
@@ -5082,6 +5347,11 @@ namespace MetricFlowX
     close_csv_files();
     if (mass_log.is_open())
       mass_log.close();
+    if (ida_history_log.is_open())
+      ida_history_log.close();
+    poll_ida_internal_step(ida, /*resync_time=*/true); // catch the last step
+    if (ida_internal_log.is_open())
+      ida_internal_log.close();
     write_ida_statistics(ida, solve_wall_time);
   }
 
