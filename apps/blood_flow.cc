@@ -63,13 +63,13 @@ namespace MetricFlowX
           else
             problem.triangulation_.refine_global(1);
 
-          problem.open_csv_files();
           if (cycle > 0)
             {
               problem.setup_system();
               problem.initialize_terminal_capacitors();
               problem.build_per_cell_mass_inv();
             }
+          problem.open_csv_files();
           problem.initialize_state(problem.solution,
                                    problem.ida_parameters.initial_time);
           problem.initialize_state_derivative(
@@ -229,9 +229,27 @@ namespace MetricFlowX
             if (problem.use_direct_solver)
               {
 #ifdef USE_PETSC_LA
+#  ifdef DEAL_II_PETSC_WITH_MUMPS
                 problem.direct_solver =
                   std::make_unique<PETScWrappers::SparseDirectMUMPS>(
                     problem.direct_solver_control);
+#  else
+                AssertThrow(
+                  problem.n_mpi_processes == 1,
+                  ExcMessage(
+                    "Parallel direct solves require PETSc with MUMPS. Set Use direct solver = false."));
+                problem.direct_lu =
+                  std::make_unique<PETScWrappers::PreconditionLU>(
+                    problem.linear_system_matrix);
+                // Inflow trace rows can have a zero diagonal at rest.
+                const PetscErrorCode error = PCFactorReorderForNonzeroDiagonal(
+                  problem.direct_lu->get_pc(),
+                  PETScWrappers::PreconditionLU::AdditionalData().zero_pivot);
+                AssertThrow(error == 0,
+                            ExcMessage(
+                              "Cannot reorder the native PETSc LU diagonal."));
+
+#  endif
 #else
                 problem.direct_solver =
                   std::make_unique<TrilinosWrappers::SolverDirect>(
@@ -242,9 +260,9 @@ namespace MetricFlowX
             else
               {
                 problem.ilu_preconditioner =
-                  std::make_unique<LA::MPI::PreconditionILU>();
-                problem.ilu_preconditioner->initialize(
-                  problem.linear_system_matrix);
+                  std::make_unique<typename Problem::IterativePreconditioner>();
+                problem.initialize_iterative_preconditioner(
+                  *problem.ilu_preconditioner, problem.linear_system_matrix);
               }
             return 0;
           };
@@ -258,9 +276,13 @@ namespace MetricFlowX
             if (problem.use_direct_solver)
               {
 #ifdef USE_PETSC_LA
+#  ifdef DEAL_II_PETSC_WITH_MUMPS
                 problem.direct_solver->solve(problem.linear_system_matrix,
                                              z,
                                              r);
+#  else
+                problem.direct_lu->vmult(z, r);
+#  endif
 #else
                 problem.direct_solver->solve(z, r);
 #endif
@@ -330,7 +352,6 @@ namespace MetricFlowX
           problem.solution_dot = 0.0;
           problem.time         = problem.ida_parameters.initial_time;
           ida.solve_dae(problem.solution, problem.solution_dot);
-
           problem.close_csv_files();
           problem.compute_pressure(problem.solution, problem.pressure_);
           problem.compute_errors(cycle);

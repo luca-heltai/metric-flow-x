@@ -30,6 +30,7 @@ jobs:
           cmake --build build -j 2
           ctest --test-dir build -N
           ctest --test-dir build --no-tests=error --output-on-failure
+          python3 tests/test_inflow_integration.py --executable build/blood_flow --mpi
       - name: Check dual-variant installation and downstream consumers
         if: matrix.build_type == 'DebugRelease'
         run: |
