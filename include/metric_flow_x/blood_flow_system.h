@@ -139,7 +139,7 @@ namespace MetricFlowX
       using SparseMatrix    = dealii::TrilinosWrappers::SparseMatrix;
       using PreconditionILU = dealii::TrilinosWrappers::PreconditionILU;
     } // namespace MPI
-    using SolverGMRES = dealii::TrilinosWrappers::SolverGMRES;
+    using SolverGMRES = dealii::SolverGMRES<MPI::Vector>;
 #else
 #  error DEAL_II_WITH_PETSC or DEAL_II_WITH_TRILINOS required
 #endif

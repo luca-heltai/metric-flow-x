@@ -463,8 +463,8 @@ namespace MetricFlowX
     IterativePreconditioner &preconditioner,
     const MatrixType        &matrix) const
   {
-    preconditioner.initialize(matrix);
 #ifdef METRIC_FLOW_X_WITH_PETSC
+    preconditioner.initialize(matrix);
     // A local DAE block may have zero pivots even when the global matrix is
     // invertible. Shift the local ILU factors, without changing the operator.
     const auto check = [](const PetscErrorCode error) {
@@ -493,6 +493,12 @@ namespace MetricFlowX
             check(PCSetFromOptions(subpc));
           }
       }
+#else
+    // Shift only the local ILU factors: algebraic DAE rows can have zero
+    // diagonal entries even when the global Jacobian is invertible.
+    typename IterativePreconditioner::AdditionalData data;
+    data.ilu_atol = 1e-5;
+    preconditioner.initialize(matrix, data);
 #endif
   }
 

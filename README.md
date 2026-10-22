@@ -350,6 +350,10 @@ subdomain blocks and can be overridden through PETSc options. This also applies
 to trace initialization. A missing PETSc MUMPS backend must never produce an
 unchanged solution while reporting a successful direct solve.
 
+The Trilinos backend uses Amesos for direct solves and deal.II GMRES with Ifpack
+ILU for iterative solves. Its local ILU factors use an absolute diagonal shift
+of `1e-5` for algebraic DAE rows; the Jacobian itself is unchanged.
+
 Validation uses a synthetic triangular waveform at one and two ranks, compares
 CSV with the equivalent analytic inlet, checks nonzero prescribed flow, and
 compares terminal pressure/flow within solver tolerance. It does not establish
