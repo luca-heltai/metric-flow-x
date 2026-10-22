@@ -107,21 +107,24 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
             command = ["bash", str(launcher), "--runtime", args.runtime,
                        "--image", args.image, "--ranks", str(mpi),
                        "--workdir", str(args.container_workdir), str(output / "parameters.prm")]
-    revision = subprocess.run(
-        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
-        capture_output=True, text=True, check=False,
-    )
-    dirty = subprocess.run(
-        ["git", "-C", str(ROOT), "status", "--porcelain"],
-        capture_output=True, text=True, check=False,
-    )
+    git = shutil.which("git")
+    revision = dirty = None
+    if git:
+        revision = subprocess.run(
+            [git, "-C", str(ROOT), "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=False,
+        )
+        dirty = subprocess.run(
+            [git, "-C", str(ROOT), "status", "--porcelain"],
+            capture_output=True, text=True, check=False,
+        )
     output.mkdir(parents=True)
     parameter_file = output / "parameters.prm"
     parameter_file.write_text(text)
     receipt = {
         "case": case, "status": "prepared", "created_utc": timestamp(),
-        "workflow_revision": revision.stdout.strip() or None,
-        "workflow_dirty": bool(dirty.stdout.strip()) if dirty.returncode == 0 else None,
+        "workflow_revision": (revision.stdout.strip() or None) if revision else None,
+        "workflow_dirty": bool(dirty.stdout.strip()) if dirty and dirty.returncode == 0 else None,
         "executable_revision": args.executable_revision,
         "executable_revision_source": "user-supplied build provenance" if args.executable_revision else None,
         "manifest_sha256": sha256(MANIFEST), "template_sha256": sha256(template),

@@ -2,12 +2,14 @@
 
 import json
 import importlib.util
+import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +42,12 @@ class PaperRunnerTest(unittest.TestCase):
         self.assertEqual(len(result.stdout.splitlines()), 43)
         for case in ("mms-p1-n4", "mms-p3-n64", "time37-r2-bdf5", "network100k-np12"):
             self.assertIn(case, result.stdout)
+
+    def test_every_canonical_template_sets_isolated_output_directory(self):
+        for template in (ROOT / "reproducibility/parameters").glob("*.prm.in"):
+            with self.subTest(template=template.name):
+                self.assertRegex(template.read_text(), r"set Output directory\s*=\s*@OUTPUT_DIR@")
+                self.assertEqual(template.read_text().count("@OUTPUT_DIR@"), 1)
 
     def test_prepare_portable_input_and_refuse_reuse(self):
         result = self.invoke("bifurcation", "--prepare-only")
@@ -81,6 +89,14 @@ class PaperRunnerTest(unittest.TestCase):
             result = self.invoke("bifurcation", "--prepare-only", *args)
             self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.root / "runs").exists())
+
+    def test_release_preparation_does_not_require_git_program(self):
+        with patch.dict(os.environ, {"PATH": ""}):
+            result = self.invoke("bifurcation", "--prepare-only")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt = json.loads((self.root / "runs/bifurcation/run.json").read_text())
+        self.assertIsNone(receipt["workflow_revision"])
+        self.assertIsNone(receipt["workflow_dirty"])
 
     def test_mms_and_all_suite_require_explicit_supported_executable_revision(self):
         for selection in (("mms-p1-n4",), ("--suite", "all")):
