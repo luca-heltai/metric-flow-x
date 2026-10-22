@@ -90,13 +90,15 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
     parameter_file.write_text(text)
     receipt = {
         "case": case, "status": "prepared", "created_utc": timestamp(),
-        "code_revision": revision.stdout.strip() or None,
-        "code_dirty": bool(dirty.stdout.strip()) if dirty.returncode == 0 else None,
+        "workflow_revision": revision.stdout.strip() or None,
+        "workflow_dirty": bool(dirty.stdout.strip()) if dirty.returncode == 0 else None,
+        "executable_revision": args.executable_revision,
         "manifest_sha256": sha256(MANIFEST), "template_sha256": sha256(template),
         "parameters_sha256": sha256(parameter_file),
         "mesh": {"path": str(mesh), "sha256": mesh_info["sha256"]},
         "settings": settings, "mpi": mpi, "command": command,
         "final_time_override": args.final_time,
+        "execution_blocker": manifest["provenance"][base].get("execution_blocker"),
         "executable_sha256": sha256(executable) if executable else None,
         "platform": platform.platform(),
         "thread_environment": {key: os.environ.get(key) for key in
@@ -135,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dataset-root", type=Path, default=ROOT)
     parser.add_argument("--output-root", type=Path, default=ROOT / "paper-runs")
     parser.add_argument("--executable", default="blood_flow")
+    parser.add_argument("--executable-revision", help="Known source revision of a reused executable (user supplied)")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--mpi", type=int, help="Override the manifest MPI count")
     parser.add_argument("--mpi-launcher", default="mpirun", help="MPI launcher executable")
@@ -144,7 +147,8 @@ def main(argv: list[str] | None = None) -> int:
     cases = manifest["runs"]
     if args.list:
         for case in cases:
-            print(f"{case['id']:24s} {case['suite']:12s} MPI={case['mpi']:2d}  {case['paper']}")
+            candidate = " [prepare only]" if manifest["provenance"][case["base"]].get("execution_blocker") else ""
+            print(f"{case['id']:24s} {case['suite']:12s} MPI={case['mpi']:2d}  {case['paper']}{candidate}")
         return 0
     if bool(args.case) == bool(args.suite):
         parser.error("Choose one case ID or --suite")
@@ -163,6 +167,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         # Refuse an overlapping suite before launching any expensive experiment.
         for case in selected:
+            blocker = manifest["provenance"][case["base"]].get("execution_blocker")
+            if blocker and not args.prepare_only:
+                raise ValueError(f"{case['id']}: {blocker} Use --prepare-only to inspect candidate inputs.")
             if (args.output_root / case["id"]).exists():
                 raise ValueError(f"Run directory already exists: {args.output_root / case['id']}")
         for case in selected:

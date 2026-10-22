@@ -10,6 +10,7 @@ getting_started
 build_and_run
 math
 tutorials
+reproducibility
 api
 references
 ```

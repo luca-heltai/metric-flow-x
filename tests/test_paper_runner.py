@@ -78,6 +78,13 @@ class PaperRunnerTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.root / "runs").exists())
 
+    def test_mms_and_all_suite_refuse_unimplemented_exact_boundary_data(self):
+        for selection in (("mms-p1-n4",), ("--suite", "all")):
+            result = self.invoke(*selection)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("MMS execution is blocked", result.stderr)
+        self.assertFalse((self.root / "runs").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

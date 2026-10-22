@@ -1,3 +1,4 @@
+# CANDIDATE ONLY: runner blocks execution; exact boundary traces are not implemented.
 # Canonical input for new runs with current MetricFlowX; import details in manifest.json.
 
 subsection Metric Flow Parameters
@@ -9,7 +10,7 @@ subsection Metric Flow Parameters
 end
 
 subsection Functions
-  set Inflow function = 0
+  set Inflow function = 4.5239e-4*0.5*sin(6.283185307179586*t)
 
   # 4 components: A ; U ; A_hat ; U_hat  (comps 2,3 masked in compute_errors)
   set Exact solution = 4.5239e-4 + 5.0e-5*(1-cos(6.283185307179586*t))*sin(6.283185307179586*x); 0.5*sin(6.283185307179586*t)*cos(6.283185307179586*x); 4.5239e-4 + 5.0e-5*(1-cos(6.283185307179586*t))*sin(6.283185307179586*x); 0.5*sin(6.283185307179586*t)*cos(6.283185307179586*x)

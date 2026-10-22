@@ -12,8 +12,9 @@
         "Rename legacy parameter sections for current parser.",
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
         "Use final time 0.1 s from manuscript; original parameter uses 1 s.",
-        "One independent mesh per run; MMS Dirichlet data come from Exact solution, unused inflow set to zero."
-      ]
+        "One independent mesh per run; prescribed candidate inlet flow A(0,t)*U(0,t). Exact manufactured boundary traces require a separate solver change."
+      ],
+      "execution_blocker": "MMS execution is blocked: the current solver does not impose manufactured exact boundary traces; Dirichlet currently falls through to reflection."
     },
     "bifurcation": {
       "source": "verification_results/aorta-bifurcation/NumData/aortic_bifurcation.prm",

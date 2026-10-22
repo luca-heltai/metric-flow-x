@@ -158,6 +158,16 @@ To extract into another directory, pass it as the first argument:
 ./scripts/download_datasets.sh /path/to/dataset-root
 ```
 
+## Paper experiment inputs
+
+The [reproduction guide](doc/reproducibility.md) describes the canonical
+current-code parameter templates, all seven paper meshes, and the 43-case
+experiment matrix. List the available cases with
+`python3 scripts/reproduce_paper.py --list`. Each prepared or executed case
+records its input checksums and configuration in a separate run directory.
+These inputs support new controlled runs; archived paper results have not
+been verified by this workflow.
+
 ## Testing
 
 ```bash

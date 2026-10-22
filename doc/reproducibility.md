@@ -57,13 +57,15 @@ templates remain portable; the runner writes absolute dataset/output paths to
 the materialized parameter file so it can run from an independent directory.
 
 Each run gets its own directory with `parameters.prm`, `run.json`,
-`solver.log` and `results/`. The receipt records the source revision and dirty
+`solver.log` and `results/`. The receipt records the workflow checkout revision and dirty
 state, parameter/template/manifest/mesh and executable hashes, command, MPI
 count, platform, thread environment, start/end times and exit code. A prepared
 case is recorded as `prepared`; only a zero solver exit status is recorded as
 `completed`. Neither status means agreement with a reference curve. Preserve
 the build's dependency versions and compiler configuration alongside the run
-when making the final paper archive.
+when making the final paper archive. When reusing a separately built executable,
+pass `--executable-revision SHA` to record its known source revision separately;
+the workflow checkout revision does not establish the executable's source.
 
 Existing case directories are rejected. This prevents timing CSV append mode
 from mixing repeated runs. To repeat an experiment, choose a fresh output
@@ -91,14 +93,18 @@ This shortened run is not a paper simulation or scientific comparison.
 | `applications` | `liver`, `cerebral` | 7999 and 19999 segments; p2; final time 2 s |
 | `scaling` | `network50k-np4` through `network100k-np12` | 50001/100001 segments; p3; 4,6,8,10,12 MPI ranks |
 
-Run an entire suite sequentially, stopping on the first solver failure:
+Run an entire supported suite sequentially, stopping on the first solver failure:
 
 ```bash
-python3 scripts/reproduce_paper.py --suite mms \
-  --executable /path/to/build/blood_flow --output-root /path/to/mms-runs
+python3 scripts/reproduce_paper.py --suite benchmarks \
+  --executable /path/to/build/blood_flow --output-root /path/to/benchmark-runs
 ```
 
-`--suite all` selects all 43 runs, including the costly scaling cases. For MPI
+`--suite all --prepare-only` prepares all 43 configurations. The 15 MMS
+configurations are candidates only: execution is blocked because the current
+solver does not implement their exact boundary data. Consequently `--suite all`
+also refuses execution before starting any run. The remaining suites contain
+28 runnable configurations, including the costly scaling cases. For MPI
 runs the runner uses `mpirun -np N`; `--mpi-launcher` chooses another compatible
 launcher executable and `--mpi` explicitly overrides the manifest count.
 Distributed direct solves require a build with PETSc/MUMPS support. Record
@@ -112,7 +118,15 @@ freezing a submission dataset:
 
 - MMS uses final time 0.1 s from the manuscript, instead of the imported
   parameter file's 1 s. Its source expressions use literal SI coefficients,
-  so they do not require per-vessel constants in `FunctionParser`.
+  so they do not require per-vessel constants in `FunctionParser`. The RHS is
+  assembled, and its exact state at t=0 agrees with the implemented rest state.
+  However, `Exact solution` is used for error calculation only: the current
+  boundary assembly prescribes inflow plus a characteristic compatibility row
+  and RCR/reflection outlets, not manufactured Dirichlet traces. The string
+  `Dirichlet` in the imported candidate does not implement such a boundary.
+  These 15 candidates may be inspected with `--prepare-only` but cannot run
+  through this workflow until a separate solver change defines the MMS boundary
+  contract. A convergence claim from the current candidate would be incorrect.
 - The imported cerebral input retains maximum BDF order 2; the manuscript
   describes orders through 5. The current pinned cerebral v2 mesh is used.
 - Liver retains the supplied parameter tolerances 1e-6 and 1e-7; the manuscript
