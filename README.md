@@ -226,7 +226,7 @@ the header (use explicit empty cells for defaults). Nonempty numeric cells must
 contain a complete valid number; `NaN`, infinity and invalid final RCR values
 are rejected. Duplicate or unknown boundary IDs are errors.
 
-Output `terminal_parameters.csv` records the effective `boundary_id`,
+Output `network_terminals.csv` records the effective `boundary_id`,
 `vessel_id`, `label`, `R1`, `R2`, `C`, and `P_out` for each terminal. Vessel
 probe files carry a `boundary_<id>_label` column for each terminal connected to
 that vessel. Existing probe filenames keep their numeric vessel IDs; labels

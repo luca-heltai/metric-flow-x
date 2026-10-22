@@ -84,7 +84,7 @@ test()
               text.find("Name=\"vessel_id\"") != std::string::npos;
           }
       AssertThrow(visualization_has_vessel_id, ExcInternalError());
-      const auto terminals = read("terminal_parameters.csv");
+      const auto terminals = read("network_terminals.csv");
       AssertThrow(terminals.GetRowCount() == 2, ExcInternalError());
       for (std::size_t row = 0; row < terminals.GetRowCount(); ++row)
         {
