@@ -43,6 +43,12 @@ class PaperRunnerTest(unittest.TestCase):
         for case in ("mms-p1-n4", "mms-p3-n64", "time37-r2-bdf5", "network100k-np12"):
             self.assertIn(case, result.stdout)
 
+    def test_every_canonical_template_sets_isolated_output_directory(self):
+        for template in (ROOT / "reproducibility/parameters").glob("*.prm.in"):
+            with self.subTest(template=template.name):
+                self.assertRegex(template.read_text(), r"set Output directory\s*=\s*@OUTPUT_DIR@")
+                self.assertEqual(template.read_text().count("@OUTPUT_DIR@"), 1)
+
     def test_prepare_portable_input_and_refuse_reuse(self):
         result = self.invoke("bifurcation", "--prepare-only")
         self.assertEqual(result.returncode, 0, result.stderr)
