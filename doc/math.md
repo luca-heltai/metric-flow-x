@@ -126,8 +126,10 @@ $$
 =U_i+4\sigma_i(c_i-c_{0,i}).
 $$
 
-`Gamma (Total pressure factor)` is $\gamma$; the manuscript uses $\gamma=1$.
-The conditions conserve trace flow and equate total head. They do not add
+`Gamma (Total pressure factor)` is $\gamma$. The total-head closure written
+in the manuscript corresponds to $\gamma=1$; $\gamma=0$ instead equates
+static pressure, so the selected value must be recorded with each run.
+The conditions conserve trace flow and do not add
 empirical junction-loss terms. Two different vessels meeting at a node use
 this closure even when there are only two branches.
 
