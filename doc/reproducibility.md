@@ -138,7 +138,47 @@ freezing a submission dataset:
   supplied 37-segment input. They do not recover unrecorded historical choices.
 
 After author review, update the canonical templates or matrix, rerun, and
-freeze the resulting receipts with the new raw outputs. Figure regeneration
-and quantitative comparison with archived paper results remain author work.
-Current CSV outputs and diagnostic tools can support that process; image-only
-plots or a successful short run do not establish scientific reproduction.
+freeze the resulting receipts with the new raw outputs. The collection below
+produces portable plot inputs. Selection of final figures and quantitative
+comparison with archived paper results remain author work; image-only plots
+or a successful short run do not establish scientific reproduction.
+
+## Collect new outputs for plotting
+
+```bash
+python3 scripts/collect_paper_outputs.py /path/to/paper-runs \
+  --output /path/to/new-plot-inputs --vessels 0 1 2 \
+  --start 28.6 --end 29.7
+```
+
+The collector reads only cases whose receipt says `completed`. It writes
+`samples.csv` with explicit SI column names, a `runs.csv` index, unmodified
+diagnostic CSV copies and `collection.json` with every source digest, selected
+vessels and time window. The sample time range is inclusive. Sample times
+are preserved without interpolation or resampling. Vessel probes represent
+the solver's midpoint sampling rule; they do not reconstruct junction traces.
+Omit `--vessels` to collect every available vessel. For large networks select
+specific vessels to keep the plot table manageable. Missing diagnostic CSVs
+are listed explicitly; no counters or timings are reconstructed from images.
+
+The vessel probe writer already converts physical SI state to historical
+display units. The collector applies the documented reverse conversions:
+`P_dynpcm2 / 10`, `Q_cm3ps / 1e6`, `A_cm2 / 1e4`, `U_cmps / 100`.
+Terminal CSVs, when enabled, already use SI and are distinct from midpoint
+probes. For scaling and BDF studies use `scaling_timings.csv` and
+`ida_statistics.csv` from each run; do not sum unrelated timing sections or
+replace missing IDA counters with numbers from a plot.
+
+Existing postprocessing tools have narrower contracts:
+
+| Tool | Input and purpose |
+| --- | --- |
+| `tools/collect_convergence.py REPORT --json OUT` | Parses the immutable historical formatted convergence report; does not parse new runner logs or validate their values. |
+| `tools/analyze_periodicity.py TRACES --period 0.827` | Requires a `time` column and explicitly named `trace_*` columns; construct these from the selected vessel/quantity before applying it. |
+| `tools/analyze_y_junction_residuals.py RESIDUALS` | Requires exported named raw residual columns; state samples cannot substitute for residuals. |
+| `tools/generate_network_diagram.py INPUT.vtk --svg OUT.svg --json OUT.json` | Deterministic topology diagram and graph metadata from a VTK input. |
+
+The manuscript's `tikz_plots.tex` reads reduced tables in its `plot_data/`
+directory. Its existing Python plotting scripts contain manuscript-specific
+paths and comparisons; the collector provides portable new-run samples
+without importing or checking those archived comparisons.
