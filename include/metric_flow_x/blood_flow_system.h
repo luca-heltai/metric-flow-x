@@ -29,17 +29,19 @@
 
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
-// Include only the selected backend: the generic header also pulls in the
-// deprecated Epetra package when PETSc is used.
-#if defined(DEAL_II_WITH_PETSC) && !defined(DEAL_II_PETSC_WITH_COMPLEX) && \
-  !(defined(DEAL_II_WITH_TRILINOS) && defined(FORCE_USE_OF_TRILINOS))
+
+#include <metric_flow_x/config.h>
+// Include only the backend selected when the library was built.
+#ifdef METRIC_FLOW_X_WITH_PETSC
 #  include <deal.II/lac/petsc_precondition.h>
 #  include <deal.II/lac/petsc_solver.h>
 #  include <deal.II/lac/petsc_sparse_matrix.h>
 #  include <deal.II/lac/petsc_vector.h>
-#  define USE_PETSC_LA
 #else
-#  include <deal.II/lac/generic_linear_algebra.h>
+#  include <deal.II/lac/trilinos_precondition.h>
+#  include <deal.II/lac/trilinos_solver.h>
+#  include <deal.II/lac/trilinos_sparse_matrix.h>
+#  include <deal.II/lac/trilinos_vector.h>
 #endif
 #include <deal.II/lac/solver_control.h>
 #include <deal.II/lac/solver_gmres.h>
@@ -55,6 +57,7 @@
 #include <metric_flow_x/parsed_tools/constants.h>
 #include <metric_flow_x/parsed_tools/function.h>
 
+#include <algorithm>
 #include <array>
 #include <fstream>
 #include <functional>
@@ -101,10 +104,13 @@ namespace MetricFlowX
   using dealii::VectorOperation;
   namespace DoFTools           = dealii::DoFTools;
   namespace FEValuesExtractors = dealii::FEValuesExtractors;
-  namespace PETScWrappers      = dealii::PETScWrappers;
   namespace SUNDIALS           = dealii::SUNDIALS;
   namespace SparsityTools      = dealii::SparsityTools;
-  // namespace TrilinosWrappers      = dealii::TrilinosWrappers;
+#ifdef METRIC_FLOW_X_WITH_PETSC
+  namespace PETScWrappers = dealii::PETScWrappers;
+#else
+  namespace TrilinosWrappers = dealii::TrilinosWrappers;
+#endif
   namespace numbers   = dealii::numbers;
   namespace parallel  = dealii::parallel;
   namespace types     = dealii::types;
@@ -113,15 +119,12 @@ namespace MetricFlowX
   // ---------------------------------------------------------------------------
   // Linear algebra backend.
   //
-  // PETSc is picked when it is available and built with real scalars, unless
-  // FORCE_USE_OF_TRILINOS asks for the other one.  Everything below is written
-  // against the LA aliases, so the solver compiles unchanged either way; the
-  // two places where the backends genuinely differ, the direct solver and the
-  // AdditionalData of the preconditioners, are guarded by USE_PETSC_LA.
+  // CMake selects the backend and installs that choice in config.h so embedded
+  // consumers use the same public vector/matrix types as the shared library.
   // ---------------------------------------------------------------------------
   namespace LA
   {
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
     namespace MPI
     {
       using Vector          = dealii::PETScWrappers::MPI::Vector;
@@ -130,8 +133,13 @@ namespace MetricFlowX
     } // namespace MPI
     using SolverGMRES = dealii::PETScWrappers::SolverGMRES;
 #elif defined(DEAL_II_WITH_TRILINOS)
-    namespace MPI     = dealii::LinearAlgebraTrilinos::MPI;
-    using SolverGMRES = dealii::LinearAlgebraTrilinos::SolverGMRES;
+    namespace MPI
+    {
+      using Vector          = dealii::TrilinosWrappers::MPI::Vector;
+      using SparseMatrix    = dealii::TrilinosWrappers::SparseMatrix;
+      using PreconditionILU = dealii::TrilinosWrappers::PreconditionILU;
+    } // namespace MPI
+    using SolverGMRES = dealii::SolverGMRES<MPI::Vector>;
 #else
 #  error DEAL_II_WITH_PETSC or DEAL_II_WITH_TRILINOS required
 #endif
@@ -449,6 +457,14 @@ namespace MetricFlowX
                       const VectorType &y,
                       const VectorType &ydot,
                       const double      alpha);
+    void
+    export_jacobian_matrix_market(const std::string &filename,
+                                  const double       t,
+                                  const double       alpha) const;
+
+    std::string jacobian_export_filename = "";
+    double      jacobian_export_time     = 0.0;
+    bool        jacobian_exported        = false;
 
     void
     assemble_state_jacobian(const double      t,
@@ -536,12 +552,15 @@ namespace MetricFlowX
     //   mass_conservation.csv    : dV/dt vs. net boundary flux
     //   ida_statistics.csv       : IDA step / failure counts + BDF-order
     //                              histogram (one row per simulation)
+    //   ida_step_history.csv     : one row per output time: internal IDA
+    //                              steps and nonlinear iterations taken to
+    //                              reach it (per interval and cumulative)
     //   scaling_timings.csv      : TimerOutput wall time per section,
     //                              tagged with the MPI process count
     //
     // Call sequence from the time-integration driver:
     //   open_output_files();                     // before ida.solve_dae()
-    //   record_ida_step(ida);                    // first line of output_step
+    //   record_ida_step(ida, t);                 // first line of output_step
     //   write_output_step(t, sol);               // inside output_step
     //   finalize_output(ida, solve_wall_time);   // after ida.solve_dae()
     //   write_scaling_timings();                 // once, at program end
@@ -554,8 +573,39 @@ namespace MetricFlowX
     void
     write_output_step(const double t, const VectorType &sol);
 
+    // Per-output-time IDA bookkeeping.  Every field is identical on all ranks
+    // because the time integration itself is global.
+    struct IDAOutputRecord
+    {
+      double   output_time             = 0.0; // the output time we asked for
+      double   ida_time                = 0.0; // IDA's internal time (>= output)
+      long int steps_interval          = 0; // internal steps since last output
+      long int steps_cumulative        = 0;
+      long int nonlin_iters_interval   = 0; // Newton iters since last output
+      long int nonlin_iters_cumulative = 0;
+      long int nonlin_fails_interval   = 0; // nonlinear conv. failures
+      long int err_test_fails_interval = 0; // local error-test failures
+      long int residual_evals_interval = 0;
+      long int lin_setups_interval     = 0; // setup_jacobian calls
+      double   last_step_size          = 0.0;
+      int      last_order              = 0;
+    };
+
     void
     record_ida_step(const SUNDIALS::IDA<VectorType> &ida);
+
+    void
+    record_ida_step(const SUNDIALS::IDA<VectorType> &ida, const double t);
+
+    const std::vector<IDAOutputRecord> &
+    ida_output_history() const
+    {
+      return ida_history;
+    }
+
+    void
+    poll_ida_internal_step(const SUNDIALS::IDA<VectorType> &ida,
+                           const bool resync_time = false);
 
     void
     finalize_output(const SUNDIALS::IDA<VectorType> &ida,
@@ -875,7 +925,7 @@ namespace MetricFlowX
     // SolverControl and solve through solve(A, x, b), so only the declaration
     // differs.
 
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
     std::unique_ptr<PETScWrappers::SparseDirectMUMPS> direct_solver;
 #  else
@@ -887,7 +937,7 @@ namespace MetricFlowX
 
     // The PETSc iterative path uses block Jacobi with a local ILU per rank.
     // Local shifts handle zero DAE pivots without changing the system matrix.
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
     using IterativePreconditioner = PETScWrappers::PreconditionBlockJacobi;
 #else
     using IterativePreconditioner = LA::MPI::PreconditionILU;
@@ -977,9 +1027,12 @@ namespace MetricFlowX
     // is written by exactly one rank and no output is duplicated.
     // -----------------------------------------------------------------------
     std::map<unsigned int, std::ofstream> csv_vessel;
+    // (vessel id, cell containing the vessel's arc-length midpoint, reference
+    // coordinate of the midpoint inside that cell).
     std::vector<
-      std::pair<unsigned int,
-                typename DoFHandler<dim, spacedim>::active_cell_iterator>>
+      std::tuple<unsigned int,
+                 typename DoFHandler<dim, spacedim>::active_cell_iterator,
+                 double>>
       probe_targets;
 
     // mass_conservation.csv state (rank 0 writes the file; every rank keeps
@@ -994,6 +1047,23 @@ namespace MetricFlowX
     // (k = 1..5), attributed at each output_step callback.
     std::array<long int, 6> bdf_steps{};
     long int                bdf_prev_nst = 0;
+
+    // ida_step_history.csv state: cumulative counters seen at the previous
+    // output, so each record can store the per-interval differences.
+    std::vector<IDAOutputRecord> ida_history;
+    std::ofstream                ida_history_log;
+    long int                     prev_nni  = 0;
+    long int                     prev_ncfn = 0;
+    long int                     prev_netf = 0;
+    long int                     prev_nre  = 0;
+    long int                     prev_nls  = 0;
+    std::ofstream                ida_internal_log;
+    long int                     is_prev_nst   = 0;
+    long int                     is_prev_nni   = 0;
+    long int                     is_prev_ncfn  = 0;
+    long int                     is_prev_netf  = 0;
+    long int                     is_prev_nls   = 0;
+    double                       is_t_accepted = 0.0;
 
     // -----------------------------------------------------------------------
     // Internal helpers — geometry
@@ -1031,17 +1101,23 @@ namespace MetricFlowX
     // Internal helpers — physics / constitutive law
     // -----------------------------------------------------------------------
 
-    // Local diastolic cross-sectional area at a cell's centroid, obtained by
-    // interpolating linearly in arc length between the inlet radius r_in and
-    // the outlet radius r_out of the parent vessel.  The arc-length bounds are
-    // the global ones, so the value a cell gets does not depend on the
+    // Local diastolic cross-sectional area at a point x of a cell, obtained by
+    // interpolating the radius linearly in arc length between the inlet radius
+    // r_in and the outlet radius r_out of the parent vessel.  The arc-length
+    // bounds are the global ones, so the value does not depend on the
     // partitioning.
+    //
+    // The pressure law is evaluated pointwise with this a_d(x): the momentum
+    // equation is written for U with flux U^2/2 + p(A, a_d(x))/rho, so the
+    // taper needs no extra source term as long as every evaluation of p --
+    // volume quadrature points and both states of a face flux -- uses a_d at
+    // the point where p is evaluated.
     //
     // If r_in == r_out == 0 (no taper data), fall back to the vessel-level a_d.
     double
-    compute_a_d_local(
-      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell)
-      const
+    compute_a_d_at_point(
+      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+      const Point<spacedim>                                          &x) const
     {
       const unsigned int vid = cell->material_id();
       const auto        &vpp = vessel_map.at(vid);
@@ -1053,14 +1129,38 @@ namespace MetricFlowX
 
       const Tensor<1, spacedim> d_hat = compute_directional_vector(cell);
 
-      const double s = cell->center() * d_hat;
+      const double s = x * d_hat;
 
+      // Clamp so that round-off at the vessel ends cannot extrapolate.
       const double xi_geometry =
-        (s_max - s_min > 1e-14) ? (s - s_min) / (s_max - s_min) : 0.5;
+        (s_max - s_min > 1e-14) ?
+          std::clamp((s - s_min) / (s_max - s_min), 0.0, 1.0) :
+          0.5;
 
       const double r = vpp.r_in + xi_geometry * (vpp.r_out - vpp.r_in);
 
       return numbers::PI * r * r;
+    }
+
+    // Physical location of the support point of local DoF i (the FE is
+    // nodal, and the 1-D cells are straight segments).
+    Point<spacedim>
+    support_point(
+      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+      const unsigned int                                              i) const
+    {
+      const double xi = fe_->unit_support_point(i)[0];
+      return cell->vertex(0) + xi * (cell->vertex(1) - cell->vertex(0));
+    }
+
+    // a_d at the cell centroid.  Only meant for point probes at the cell
+    // midpoint; residuals and Jacobians use compute_a_d_at_point().
+    double
+    compute_a_d_local(
+      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell)
+      const
+    {
+      return compute_a_d_at_point(cell, cell->center());
     }
 
     double
@@ -1068,18 +1168,7 @@ namespace MetricFlowX
       const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
       const unsigned int face_no) const
     {
-      const unsigned int vid = cell->material_id();
-      const auto        &vpp = vessel_map.at(vid);
-      if (vpp.r_in <= 0.0 || vpp.r_out <= 0.0)
-        return vpp.a_d;
-
-      const auto &[s_min, s_max]      = vessel_s_bounds.at(vid);
-      const Tensor<1, spacedim> d_hat = compute_directional_vector(cell);
-      const double              s     = cell->vertex(face_no) * d_hat;
-      const double              xi_geometry =
-        (s_max - s_min > 1e-14) ? (s - s_min) / (s_max - s_min) : 0.5;
-      const double r = vpp.r_in + xi_geometry * (vpp.r_out - vpp.r_in);
-      return numbers::PI * r * r;
+      return compute_a_d_at_point(cell, cell->vertex(face_no));
     }
 
     double

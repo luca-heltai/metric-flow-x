@@ -66,6 +66,15 @@ def validate(executable, destination, mpi):
             assert summary["n_steps"] > 0
             assert summary["wall_time"] > 0
             assert sum(summary[f"bdf{order}_steps"] for order in range(1, 6)) == summary["n_steps"]
+            with (folder / "output/ida_step_history.csv").open() as stream:
+                history = list(csv.DictReader(stream))
+            # Overlapping driver hooks must not duplicate history records or
+            # consume interval counters before the corresponding output row.
+            assert len(history) == len(mass) == summary["n_outputs"]
+            assert all(abs(float(record["output_time"]) - float(row["t"])) < 1e-14
+                       for record, row in zip(history, mass))
+            assert sum(int(row["steps_interval"]) for row in history) == summary["n_steps"]
+            assert sum(int(row["nonlin_iters_interval"]) for row in history) == summary["n_nonlin_iters"]
             with (folder / "output/scaling_timings.csv").open() as stream:
                 timings = list(csv.DictReader(stream))
             assert timings

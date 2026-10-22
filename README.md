@@ -90,6 +90,17 @@ cmake -S . -B build-metric-flow-x \
 cmake --build build-metric-flow-x
 ```
 
+Select Trilinos explicitly for consumers such as ImmersX:
+
+```bash
+cmake -S . -B build-trilinos -DMETRIC_FLOW_X_BACKEND=Trilinos
+```
+
+`METRIC_FLOW_X_BACKEND` accepts `AUTO` (the default), `PETSc`, or `Trilinos`.
+`AUTO` selects real-valued PETSc when available and otherwise Trilinos.
+The installed configuration header preserves the selected vector/matrix types
+for downstream consumers. Use separate installation prefixes for the backends.
+
 The installed package exports the target `MetricFlowX::metric_flow_x`:
 
 ```bash
@@ -355,6 +366,10 @@ for parallel GMRES with block Jacobi; local ILU shifts address zero pivots in DA
 subdomain blocks and can be overridden through PETSc options. This also applies
 to trace initialization. A missing PETSc MUMPS backend must never produce an
 unchanged solution while reporting a successful direct solve.
+
+The Trilinos backend uses Amesos for direct solves and deal.II GMRES with Ifpack
+ILU for iterative solves. Its local ILU factors use an absolute diagonal shift
+of `1e-5` for algebraic DAE rows; the Jacobian itself is unchanged.
 
 Validation uses a synthetic triangular waveform at one and two ranks, compares
 CSV with the equivalent analytic inlet, checks nonzero prescribed flow, and

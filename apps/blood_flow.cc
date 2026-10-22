@@ -16,8 +16,7 @@
 #include <deal.II/base/logstream.h> // deallog control
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/parameter_handler.h>
-
-#include <deal.II/lac/petsc_solver.h>
+#include <deal.II/base/timer.h>
 
 #include <metric_flow_x/blood_flow_system.h> // header exposing BloodFlowSystem
 
@@ -25,8 +24,10 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <stdexcept> // for std::invalid_argument
 
 using namespace dealii;
@@ -70,6 +71,11 @@ namespace MetricFlowX
               problem.initialize_terminal_capacitors();
               problem.build_per_cell_mass_inv();
             }
+
+          // After setup_system(), so the vessel probe cells and DoF indices
+          // belong to the current mesh.  Opens HDG_IDA_Vessel_*.csv,
+          // mass_conservation.csv and ida_step_history.csv, and resets the
+          // IDA counters for this cycle.
           problem.open_output_files();
           problem.initialize_state(problem.solution,
                                    problem.ida_parameters.initial_time);
@@ -221,10 +227,11 @@ namespace MetricFlowX
             return is;
           };
 
-          ida.residual = [&problem](const double      t,
-                                    const VectorType &y,
-                                    const VectorType &ydot,
-                                    VectorType       &res) -> int {
+          ida.residual = [&problem, &ida](const double      t,
+                                          const VectorType &y,
+                                          const VectorType &ydot,
+                                          VectorType       &res) -> int {
+            problem.poll_ida_internal_step(ida);
             problem.assemble_residual(t, y, ydot, res);
             return 0;
           };
@@ -239,7 +246,7 @@ namespace MetricFlowX
 
             if (problem.use_direct_solver)
               {
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
                 problem.direct_solver =
                   std::make_unique<PETScWrappers::SparseDirectMUMPS>(
@@ -286,7 +293,7 @@ namespace MetricFlowX
 
             if (problem.use_direct_solver)
               {
-#ifdef USE_PETSC_LA
+#ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
                 problem.direct_solver->solve(problem.linear_system_matrix,
                                              z,
@@ -326,16 +333,13 @@ namespace MetricFlowX
                              const VectorType & /*ydot*/,
                              const unsigned int /*step_number*/) {
               problem.time = t;
-              // Count all steps since the previous IDA callback, including
-              // callbacks at which physical file output is suppressed.
-              problem.record_ida_step(ida);
-
               const double tolerance =
                 16.0 * std::numeric_limits<double>::epsilon() *
                 std::max(std::abs(t), std::abs(next_output_time));
               const double final_time_tolerance =
                 16.0 * std::numeric_limits<double>::epsilon() *
                 std::max(std::abs(t), std::abs(final_output_time));
+              problem.poll_ida_internal_step(ida, /*resync_time=*/true);
               const bool output_due =
                 problem.time_interval == 0.0 || t >= next_output_time ||
                 next_output_time - t <= tolerance || t >= final_output_time ||
@@ -343,8 +347,15 @@ namespace MetricFlowX
               if (!output_due)
                 return;
 
+              // IDA internal steps / nonlinear iterations taken since the
+              // previous *written* output -> ida_step_history.csv.  Recorded
+              // after the output_due check so each row spans one output
+              // interval set by "Output time interval".
+              problem.record_ida_step(ida, t);
+
               problem.compute_pressure(sol, problem.pressure_);
               problem.output_results(sol, problem.pressure_, output_number++);
+              // HDG_IDA_Vessel_*.csv + mass_conservation.csv
               problem.write_output_step(t, sol);
               problem.report_flow_regime(sol, t);
 
@@ -373,7 +384,6 @@ namespace MetricFlowX
             std::chrono::duration<double>(std::chrono::steady_clock::now() -
                                           solve_start)
               .count();
-          problem.record_ida_step(ida);
           problem.finalize_output(ida, solve_wall_time);
           problem.compute_pressure(problem.solution, problem.pressure_);
           problem.compute_errors(cycle);

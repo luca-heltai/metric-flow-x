@@ -2,6 +2,15 @@
 
 #include <cmath>
 #include <fstream>
+#include <type_traits>
+
+#ifdef EXPECT_TRILINOS
+static_assert(std::is_same_v<MetricFlowX::VectorType,
+                             dealii::TrilinosWrappers::MPI::Vector>);
+#elif defined(EXPECT_PETSC)
+static_assert(
+  std::is_same_v<MetricFlowX::VectorType, dealii::PETScWrappers::MPI::Vector>);
+#endif
 
 int
 main(int argc, char **argv)
