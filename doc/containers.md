@@ -103,9 +103,10 @@ commit tag; `container-*` tags publish an explicitly named preview image. A work
 version tags also attach these files to an existing release or create a draft
 release. The workflow does not merge a pull request or publish a draft release.
 
-GHCR creates a new package as private even when its repository is public. Set
-this package's visibility to public in its GitHub package settings. Publication
-checks anonymous index access and fails clearly until that setting is applied.
+Anonymous use requires a public GHCR package. Publication checks anonymous
+index access instead of inferring it from repository visibility. If a package
+is private, its administrator can enable public access in GitHub's package
+settings. The initial MetricFlowX preview inherited public visibility.
 See [GitHub's container registry documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
 
 The Dockerfile pins the multi-architecture deal.II 9.7.1 base by digest. Rebuilds
