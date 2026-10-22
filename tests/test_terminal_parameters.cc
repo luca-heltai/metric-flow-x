@@ -5,6 +5,7 @@
 
 #include <filesystem>
 
+#include "rapidcsv.h"
 #include "tests.h"
 
 using namespace dealii;
@@ -30,7 +31,8 @@ test()
     flow.default_terminal_p_out = 321;
     auto values                 = flow.read_terminal_parameters(ids);
     AssertThrow(values.size() == 2 && values.at(1).R1 == 2e7 &&
-                  values.at(2).C == 0,
+                  values.at(2).C == 0 && values.at(1).label == "boundary_1" &&
+                  values.at(2).label == "boundary_2",
                 ExcInternalError());
     flow.terminal_parameters_csv_file = "terminal.csv";
     write("terminal.csv", "boundary_id,R1,R2,C\n2,1e7,4e7,1e-8\n");
@@ -68,7 +70,8 @@ test()
     write("terminal.csv", "label,R2,boundary_id\nunused,4e7,2\n");
     values = flow.read_terminal_parameters(ids);
     AssertThrow(values.at(2).R1 == 2e7 && values.at(2).R2 == 4e7 &&
-                  values.at(2).C == 0 && values.at(2).P_out == 321,
+                  values.at(2).C == 0 && values.at(2).P_out == 321 &&
+                  values.at(2).label == "unused",
                 ExcInternalError());
     write("terminal.csv",
           "boundary_id,R1,R2,C,external_pressure\n"
@@ -77,6 +80,13 @@ test()
     AssertThrow(values.at(1).R1 == 2e7 && values.at(1).R2 == 4e7 &&
                   values.at(1).C == 0 && values.at(2).R1 == 1e7 &&
                   values.at(2).R2 == 3e7 && values.at(2).C == 1e-8,
+                ExcInternalError());
+    write("terminal.csv",
+          "boundary_id,label\n1, \n2,\"right, \"\"iliac\"\"\nterminal\"\n");
+    values = flow.read_terminal_parameters(ids);
+    AssertThrow(values.at(1).label == "boundary_1" &&
+                  values.at(2).label == "right, \"iliac\"\nterminal" &&
+                  values.at(2).R1 == 2e7,
                 ExcInternalError());
     for (const auto &bad :
          {"boundary_id,R1,R2,C\n2,1,2,0\n2,1,2,0\n",
@@ -199,16 +209,25 @@ test()
       flow.setup();
       if (mode == 0)
         {
-          std::ostringstream csv;
-          csv << "boundary_id,R1,R2,C\n" << std::setprecision(17);
-          legacy_p_out = flow.rcr_map.begin()->second.P_out;
+          rapidcsv::Document csv;
+          for (const auto &[index, name] :
+               std::vector<std::pair<unsigned int, std::string>>{
+                 {0, "boundary_id"}, {1, "R1"}, {2, "R2"}, {3, "C"}})
+            csv.SetColumnName(index, name);
+          legacy_p_out    = flow.rcr_map.begin()->second.P_out;
+          std::size_t row = 0;
           for (const auto &[id, values] : flow.rcr_map)
             {
               AssertThrow(values.P_out == legacy_p_out, ExcInternalError());
-              csv << id << ',' << values.R1 << ',' << values.R2 << ','
-                  << values.C << '\n';
+              csv.SetCell(0, row, id);
+              csv.SetCell(1, row, values.R1);
+              csv.SetCell(2, row, values.R2);
+              csv.SetCell(3, row, values.C);
+              ++row;
             }
-          complete_csv = csv.str();
+          std::ostringstream csv_text;
+          csv.Save(csv_text);
+          complete_csv = csv_text.str();
         }
       auto y        = flow.make_state();
       auto ydot     = flow.make_state();

@@ -200,24 +200,43 @@ CSV columns are selected by their case-sensitive names, in any order:
 - `boundary_id` is required and must uniquely identify an actual terminal.
 - `R1`, `R2`, and `C` are optional. Each missing column or empty/whitespace-only
   cell uses the corresponding parameter-file default. At least one of these
-  column names must be present, so a different kind of data file is not silently
-  accepted as terminal configuration.
+  column names, or `label`, must be present, so a different kind of data file
+  is not silently accepted as terminal configuration.
+- `label` is an optional terminal name. A missing column or blank cell uses
+  `boundary_<boundary_id>` (for example, `boundary_2`), matching the existing
+  numeric terminal identity. Labels may contain spaces, commas, quotes, or
+  quoted line breaks; they are metadata and need not be unique. A file with
+  only `boundary_id,label` can name terminals while using all RCR defaults.
 - Additional named columns are ignored; they may contain arbitrary metadata or
   measurements, including quoted commas and line breaks.
 
 For example, with the defaults above:
 
-```text
+```{csv-table}
+:header-rows: 1
+
 label,R2,boundary_id,C
 outlet_b,4e7,2,
 ```
 
-Terminal 2 receives R1=2e7, R2=4e7, C=0. Omitted terminal IDs use all defaults;
+Terminal 2 is named `outlet_b` and receives R1=2e7, R2=4e7, C=0. Omitted terminal IDs use all defaults;
 with no CSV configured, every terminal uses the defaults. Headers must be
 nonempty and unique, and every data row must have the same number of cells as
 the header (use explicit empty cells for defaults). Nonempty numeric cells must
 contain a complete valid number; `NaN`, infinity and invalid final RCR values
 are rejected. Duplicate or unknown boundary IDs are errors.
+
+Output `terminal_parameters.csv` records the effective `boundary_id`,
+`vessel_id`, `label`, `R1`, `R2`, `C`, and `P_out` for each terminal. Vessel
+probe files carry a `boundary_<id>_label` column for each terminal connected to
+that vessel. Existing probe filenames keep their numeric vessel IDs; labels
+never become filesystem paths. Visualization files include `vessel_id` cell
+data, which links them to the terminal table. Global mass and timing summaries
+retain their aggregate columns.
+
+All solver CSV output uses Rapidcsv for quoting and escaping. Records are
+written progressively, with round-trip precision for double values and a
+locale-independent decimal point.
 
 Resistances are in Pa*s/m3, compliance in m3/Pa, and P_out in Pa. P_out remains
 the global default in Parameters mode; CSV rows do not override it. VTK mode

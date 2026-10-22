@@ -50,13 +50,67 @@
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <locale>
 #include <sstream>
+#include <type_traits>
 
 #include "rapidcsv.h"
 
 namespace MetricFlowX
 {
   using namespace dealii;
+
+  namespace
+  {
+    template <typename T>
+    std::string
+    csv_cell(const T &value)
+    {
+      if constexpr (std::is_convertible_v<T, std::string>)
+        return value;
+      else
+        {
+          std::ostringstream text;
+          text.imbue(std::locale::classic());
+          text << std::setprecision(std::numeric_limits<double>::max_digits10)
+               << value;
+          return text.str();
+        }
+    }
+
+    // Serialize only the current record, preserving bounded memory and live
+    // output even for long simulations. Rapidcsv owns quoting and escaping.
+    void
+    csv_write_record(std::ostream                   &stream,
+                     const std::vector<std::string> &values)
+    {
+      rapidcsv::Document row("", rapidcsv::LabelParams(-1, -1));
+      row.SetRow(0, values);
+      row.Save(stream);
+      stream.flush();
+      AssertThrow(stream.good(), ExcMessage("Cannot write CSV record."));
+    }
+
+    template <typename... Values>
+    void
+    csv_write_row(std::ostream &stream, const Values &...values)
+    {
+      csv_write_record(stream, {csv_cell(values)...});
+    }
+
+    std::ofstream
+    csv_append(const std::string              &filename,
+               const std::vector<std::string> &header)
+    {
+      const bool empty = !std::filesystem::exists(filename) ||
+                         std::filesystem::file_size(filename) == 0;
+      std::ofstream stream(filename, std::ios::app);
+      AssertThrow(stream, ExcMessage("Cannot open " + filename));
+      if (empty)
+        csv_write_record(stream, header);
+      return stream;
+    }
+  } // namespace
 
   // ===========================================================================
   // IDA statistics access shim.
@@ -449,7 +503,11 @@ namespace MetricFlowX
     validate(defaults);
     std::map<types::boundary_id, RCRPhysics> result;
     for (const auto id : terminal_ids)
-      result.emplace(id, defaults);
+      {
+        auto value  = defaults;
+        value.label = "boundary_" + std::to_string(id);
+        result.emplace(id, value);
+      }
     if (terminal_parameters_csv_file.empty())
       return result;
     rapidcsv::SeparatorParams separators(',', true);
@@ -467,9 +525,9 @@ namespace MetricFlowX
                 ExcMessage("Terminal CSV requires a boundary_id column."));
     AssertThrow(
       csv.GetColumnIdx("R1") >= 0 || csv.GetColumnIdx("R2") >= 0 ||
-        csv.GetColumnIdx("C") >= 0,
+        csv.GetColumnIdx("C") >= 0 || csv.GetColumnIdx("label") >= 0,
       ExcMessage(
-        "Terminal CSV requires at least one of R1, R2 or C; other columns are ignored."));
+        "Terminal CSV requires at least one of R1, R2, C or label; other columns are ignored."));
     const auto parse_value = [](const std::string &text, double &value) {
       std::size_t consumed = 0;
       value                = std::stod(text, &consumed);
@@ -511,6 +569,10 @@ namespace MetricFlowX
         AssertThrow(seen.insert(id).second,
                     ExcMessage("Duplicate boundary ID in terminal CSV: " +
                                std::to_string(id)));
+        value.label = result.at(id).label;
+        if (csv.GetColumnIdx("label") >= 0 &&
+            !csv.GetCell<std::string>("label", row).empty())
+          value.label = csv.GetCell<std::string>("label", row);
         validate(value);
         result.at(id) = value;
       }
@@ -619,10 +681,22 @@ namespace MetricFlowX
                 rcr.R2    = point_R2[v];
                 rcr.C     = point_C[v];
                 rcr.P_out = point_P_out[v];
+                rcr.label = "boundary_" + std::to_string(bid);
                 if (rcr.R2 > 0.0)
                   rcr_map[bid] = rcr;
               }
       }
+
+    vessel_terminals.clear();
+    for (const auto &cell : serial_triangulation.active_cell_iterators())
+      for (const auto face : cell->face_indices())
+        if (cell->face(face)->at_boundary() &&
+            vertex_degree[cell->face(face)->vertex_index(0)] == 1)
+          {
+            const auto id = cell->face(face)->boundary_id();
+            if (id != 0 && rcr_map.count(id))
+              vessel_terminals[cell->material_id()].insert(id);
+          }
 
     serial_triangulation.refine_global(n_global_refinements);
 
@@ -1920,7 +1994,33 @@ namespace MetricFlowX
       }
     probe_targets.clear();
 
-    const std::string hdr = "time_s,P_dynpcm2,Q_cm3ps,A_cm2,U_cmps\n";
+    if (this_mpi_process == 0)
+      {
+        std::ofstream terminals(dir + "terminal_parameters.csv");
+        AssertThrow(terminals,
+                    ExcMessage("Cannot open terminal_parameters.csv"));
+        csv_write_row(terminals,
+                      "boundary_id",
+                      "vessel_id",
+                      "label",
+                      "R1",
+                      "R2",
+                      "C",
+                      "P_out");
+        for (const auto &[vid, ids] : vessel_terminals)
+          for (const auto id : ids)
+            {
+              const auto &rcr = rcr_map.at(id);
+              csv_write_row(terminals,
+                            id,
+                            vid,
+                            rcr.label,
+                            rcr.R1,
+                            rcr.R2,
+                            rcr.C,
+                            rcr.P_out);
+            }
+      }
 
     for (const auto &[vid, vpp] : vessel_map)
       {
@@ -1970,7 +2070,12 @@ namespace MetricFlowX
 
         std::ofstream &os = csv_vessel[vid];
         os.open(dir + "HDG_IDA_Vessel_" + std::to_string(vid) + ".csv");
-        os << hdr;
+        AssertThrow(os, ExcMessage("Cannot open vessel probe CSV."));
+        std::vector<std::string> header{
+          "time_s", "P_dynpcm2", "Q_cm3ps", "A_cm2", "U_cmps"};
+        for (const auto id : vessel_terminals[vid])
+          header.push_back("boundary_" + std::to_string(id) + "_label");
+        csv_write_record(os, header);
       }
   }
 
@@ -2042,9 +2147,14 @@ namespace MetricFlowX
 
         const double Q_cm3ps = A_val * U_val * 1.0e6;
 
-        os << std::scientific << std::setprecision(8) << t << "," << P_dynpcm2
-           << "," << Q_cm3ps << "," << A_cm2 << "," << U_cmps << "\n";
-        os.flush();
+        std::vector<std::string> values{csv_cell(t),
+                                        csv_cell(P_dynpcm2),
+                                        csv_cell(Q_cm3ps),
+                                        csv_cell(A_cm2),
+                                        csv_cell(U_cmps)};
+        for (const auto id : vessel_terminals.at(vid))
+          values.push_back(rcr_map.at(id).label);
+        csv_write_record(os, values);
       }
   }
 
@@ -4442,6 +4552,11 @@ namespace MetricFlowX
     for (unsigned int i = 0; i < subdomain.size(); ++i)
       subdomain(i) = triangulation_.locally_owned_subdomain();
     data_out.add_data_vector(subdomain, "subdomain");
+    Vector<double> vessel_ids(triangulation_.n_active_cells());
+    for (const auto &cell : triangulation_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        vessel_ids(cell->active_cell_index()) = cell->material_id();
+    data_out.add_data_vector(vessel_ids, "vessel_id");
 
     data_out.build_patches();
 
@@ -4645,10 +4760,8 @@ namespace MetricFlowX
 
     if (this_mpi_process == 0 && mass_log.is_open())
       {
-        mass_log << std::scientific << std::setprecision(8) << t << ","
-                 << total_volume << "," << dVdt << "," << net_flux << ","
-                 << imbalance << "," << rel_imbalance << "\n";
-        mass_log.flush();
+        csv_write_row(
+          mass_log, t, total_volume, dVdt, net_flux, imbalance, rel_imbalance);
       }
 
     // Two independent gates: relative-to-peak-flow AND an absolute floor, so
@@ -4694,7 +4807,13 @@ namespace MetricFlowX
         AssertThrow(mass_log,
                     ExcMessage("Cannot open " + dir +
                                "/mass_conservation.csv"));
-        mass_log << "t,total_volume,dVdt,net_flux,imbalance,rel_imbalance\n";
+        csv_write_row(mass_log,
+                      "t",
+                      "total_volume",
+                      "dVdt",
+                      "net_flux",
+                      "imbalance",
+                      "rel_imbalance");
       }
 
     bdf_steps.fill(0);
@@ -4778,21 +4897,30 @@ namespace MetricFlowX
     const std::string dir = output_directory.empty() ? "." : output_directory;
     std::filesystem::create_directories(dir);
 
-    const std::string filename    = dir + "/ida_statistics.csv";
-    const bool        file_exists = std::ifstream(filename).good();
-
-    std::ofstream csv(filename, std::ios::app);
-    AssertThrow(csv, ExcMessage("Cannot open " + filename));
-
-    if (!file_exists)
-      csv << "max_order,wall_time,n_steps,n_err_test_fails,"
-             "n_nonlin_iters,n_nonlin_conv_fails,"
-             "bdf1_steps,bdf2_steps,bdf3_steps,bdf4_steps,bdf5_steps\n";
-
-    csv << ida_parameters.maximum_order << ',' << wall_time << ',' << nst << ','
-        << netf << ',' << nni << ',' << ncfn << ',' << bdf_steps[1] << ','
-        << bdf_steps[2] << ',' << bdf_steps[3] << ',' << bdf_steps[4] << ','
-        << bdf_steps[5] << '\n';
+    auto csv = csv_append(dir + "/ida_statistics.csv",
+                          {"max_order",
+                           "wall_time",
+                           "n_steps",
+                           "n_err_test_fails",
+                           "n_nonlin_iters",
+                           "n_nonlin_conv_fails",
+                           "bdf1_steps",
+                           "bdf2_steps",
+                           "bdf3_steps",
+                           "bdf4_steps",
+                           "bdf5_steps"});
+    csv_write_row(csv,
+                  ida_parameters.maximum_order,
+                  wall_time,
+                  nst,
+                  netf,
+                  nni,
+                  ncfn,
+                  bdf_steps[1],
+                  bdf_steps[2],
+                  bdf_steps[3],
+                  bdf_steps[4],
+                  bdf_steps[5]);
   }
 
   // ============================================================================
@@ -4830,18 +4958,10 @@ namespace MetricFlowX
     const std::string dir = output_directory.empty() ? "." : output_directory;
     std::filesystem::create_directories(dir);
 
-    const std::string filename    = dir + "/scaling_timings.csv";
-    const bool        file_exists = std::ifstream(filename).good();
-
-    std::ofstream csv(filename, std::ios::app);
-    AssertThrow(csv, ExcMessage("Cannot open " + filename));
-
-    if (!file_exists)
-      csv << "n_mpi_processes,section,wall_time\n";
-
+    auto csv = csv_append(dir + "/scaling_timings.csv",
+                          {"n_mpi_processes", "section", "wall_time"});
     for (const auto &entry : summary)
-      csv << n_mpi_processes << "," << entry.first << "," << entry.second
-          << "\n";
+      csv_write_row(csv, n_mpi_processes, entry.first, entry.second);
   }
 
   // Explicit instantiation
