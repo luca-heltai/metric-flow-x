@@ -82,11 +82,11 @@ class PaperRunnerTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.root / "runs").exists())
 
-    def test_mms_and_all_suite_refuse_unimplemented_exact_boundary_data(self):
+    def test_mms_and_all_suite_require_explicit_supported_executable_revision(self):
         for selection in (("mms-p1-n4",), ("--suite", "all")):
             result = self.invoke(*selection)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("MMS execution is blocked", result.stderr)
+            self.assertIn("MMS execution requires --executable-revision", result.stderr)
         self.assertFalse((self.root / "runs").exists())
 
     def test_native_mms_revision_attestation_checks_real_ancestry(self):
@@ -105,6 +105,48 @@ class PaperRunnerTest(unittest.TestCase):
         for unsupported in (None, "arbitrary string", old, "a" * 40):
             with self.assertRaises(ValueError):
                 RUNNER.verify_executable_revision(required, unsupported, checkout)
+
+    def container_fixture(self):
+        checkout = self.root / "container checkout"
+        (checkout / "scripts").mkdir(parents=True)
+        shutil.copyfile(SCRIPT, checkout / "scripts/reproduce_paper.py")
+        shutil.copytree(ROOT / "reproducibility", checkout / "reproducibility")
+        (checkout / "scripts/run_container.sh").write_text(
+            "#!/bin/bash\npython3 - \"$@\" <<'PY'\n"
+            "import json, pathlib, sys\n"
+            "(pathlib.Path(sys.argv[-1]).parent / 'launcher_args.json').write_text(json.dumps(sys.argv[1:]))\n"
+            "sys.exit(9)\nPY\n")
+        return checkout / "scripts/reproduce_paper.py"
+
+    def test_container_failure_records_launcher_ranks_mount_and_image_reference(self):
+        script = self.container_fixture()
+        image = "ghcr.io/example/solver:chosen-tag"
+        result = subprocess.run([
+            sys.executable, str(script), "bifurcation", "--runtime", "docker",
+            "--image", image, "--mpi", "3", "--container-workdir", str(self.root),
+            "--dataset-root", str(self.root / "data"), "--output-root", str(self.root / "runs"),
+        ], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 9, result.stderr)
+        run = self.root / "runs/bifurcation"
+        arguments = json.loads((run / "launcher_args.json").read_text())
+        self.assertEqual(arguments[:8], ["--runtime", "docker", "--image", image,
+                                       "--ranks", "3", "--workdir", str(self.root.resolve())])
+        receipt = json.loads((run / "run.json").read_text())
+        self.assertEqual(receipt["status"], "failed")
+        self.assertEqual(receipt["runtime"], "docker")
+        self.assertEqual(receipt["image_reference"], image)
+        self.assertIsNone(receipt["image_digest"])
+
+    def test_container_does_not_automatically_mount_common_filesystem_root(self):
+        script = self.container_fixture()
+        result = subprocess.run([
+            sys.executable, str(script), "bifurcation", "--runtime", "podman",
+            "--image", "ghcr.io/example/solver:chosen-tag",
+            "--dataset-root", str(self.root / "data"), "--output-root", str(self.root / "runs"),
+        ], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--container-workdir", result.stderr)
+        self.assertFalse((self.root / "runs").exists())
 
 
 if __name__ == "__main__":

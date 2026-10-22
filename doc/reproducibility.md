@@ -82,6 +82,35 @@ python3 scripts/reproduce_paper.py bifurcation \
 
 This shortened run is not a paper simulation or scientific comparison.
 
+## Run through a container
+
+Use the container launcher through the runner so the receipt transitions to
+`completed` or `failed` and the collector can discover the outputs:
+
+```bash
+python3 scripts/reproduce_paper.py bifurcation --runtime docker \
+  --image ghcr.io/luca-heltai/metric-flow-x:main \
+  --dataset-root datasets --output-root paper-runs
+```
+
+The published `main` image becomes available after the container publication
+workflow is merged and succeeds. Use an explicitly published preview tag when
+testing before that point. `--runtime podman` and `--runtime apptainer` use
+the same launcher contract. A container engine must be installed on the host;
+the application and its compiled libraries are supplied by the image.
+This mode requires `scripts/run_container.sh` from the container distribution
+change. It forwards the manifest rank count with `--ranks` and records the
+image reference. If an explicit `@sha256:...` reference is supplied, that digest
+is recorded too; an image tag is not reported as a resolved immutable digest.
+
+By default the checkout is the shared mount root. Both datasets and run output
+must lie underneath it. If they are elsewhere, pass `--container-workdir` with
+an explicit common parent directory. The runner never chooses the filesystem
+root automatically. The launcher mounts that directory at its original absolute
+path as well as `/work`, so prepared absolute parameter paths remain usable.
+Preparing inputs and separately invoking the standalone launcher is still
+possible, but the prepared receipt is not updated by that separate invocation.
+
 ## Experiment matrix
 
 | Suite | Canonical cases | Configuration |
@@ -100,11 +129,30 @@ python3 scripts/reproduce_paper.py --suite benchmarks \
   --executable /path/to/build/blood_flow --output-root /path/to/benchmark-runs
 ```
 
-`--suite all --prepare-only` prepares all 43 configurations. The 15 MMS
-configurations are candidates only: execution is blocked because the current
-solver does not implement their exact boundary data. Consequently `--suite all`
-also refuses execution before starting any run. The remaining suites contain
-28 runnable configurations, including the costly scaling cases. For MPI
+`--suite all --prepare-only` prepares all 43 configurations. `--suite all`
+executes the full matrix, including the costly scaling cases. MMS execution
+requires a build containing the manufactured Dirichlet boundary support:
+
+```bash
+python3 scripts/reproduce_paper.py --suite mms \
+  --executable /path/to/build/blood_flow \
+  --executable-revision FULL_SOURCE_COMMIT --output-root /path/to/mms-runs
+```
+
+Record `git -C /path/to/build-source rev-parse HEAD` and the source dirty state
+when building the executable. Supply that **full 40-character commit** from
+the build record; the current workflow checkout revision is not a substitute
+for a reused binary's provenance. The manifest pins the minimum supported
+commit. The runner accepts that exact commit even in a release/shallow checkout;
+for a later commit it requires Git history proving ancestry. Fetch the relevant
+commits into this checkout if history is missing. A missing, older or unknown
+revision fails before any suite run starts. The same explicit source attestation
+is required for MMS container runs; obtain it from the image's build provenance
+or `org.opencontainers.image.revision` label. This is a user-supplied attestation,
+not automatic certification of a binary's source. `--prepare-only` needs no
+executable attestation.
+
+For MPI
 runs the runner uses `mpirun -np N`; `--mpi-launcher` chooses another compatible
 launcher executable and `--mpi` explicitly overrides the manifest count.
 Distributed direct solves require a build with PETSc/MUMPS support. Record
@@ -120,13 +168,10 @@ freezing a submission dataset:
   parameter file's 1 s. Its source expressions use literal SI coefficients,
   so they do not require per-vessel constants in `FunctionParser`. The RHS is
   assembled, and its exact state at t=0 agrees with the implemented rest state.
-  However, `Exact solution` is used for error calculation only: the current
-  boundary assembly prescribes inflow plus a characteristic compatibility row
-  and RCR/reflection outlets, not manufactured Dirichlet traces. The string
-  `Dirichlet` in the imported candidate does not implement such a boundary.
-  These 15 candidates may be inspected with `--prepare-only` but cannot run
-  through this workflow until a separate solver change defines the MMS boundary
-  contract. A convergence claim from the current candidate would be incorrect.
+  The manufactured `Dirichlet` boundary support uses components 0 and 1 of
+  `Exact solution` at both endpoints; this is why old executable revisions
+  cannot be used for MMS runs. Boundary functional tests establish that contract;
+  they do not establish the paper's convergence table.
 - The imported cerebral input retains maximum BDF order 2; the manuscript
   describes orders through 5. The current pinned cerebral v2 mesh is used.
 - Liver retains the supplied parameter tolerances 1e-6 and 1e-7; the manuscript

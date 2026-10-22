@@ -1,4 +1,3 @@
-# CANDIDATE ONLY: runner blocks execution; exact boundary traces are not implemented.
 # Canonical input for new runs with current MetricFlowX; import details in manifest.json.
 
 subsection Metric Flow Parameters

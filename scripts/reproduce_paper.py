@@ -85,16 +85,28 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
     command = []
     executable = None
     if not args.prepare_only:
-        found = shutil.which(args.executable)
-        if found is None:
-            raise ValueError(f"Executable not found or not executable: {args.executable}")
-        executable = Path(found).resolve()
-        if mpi > 1:
-            launcher = shutil.which(args.mpi_launcher)
-            if launcher is None:
-                raise ValueError(f"MPI launcher not found: {args.mpi_launcher}")
-            command = [launcher, "-np", str(mpi)]
-        command += [str(executable), str(output / "parameters.prm")]
+        if args.runtime == "native":
+            found = shutil.which(args.executable)
+            if found is None:
+                raise ValueError(f"Executable not found or not executable: {args.executable}")
+            executable = Path(found).resolve()
+            if mpi > 1:
+                launcher = shutil.which(args.mpi_launcher)
+                if launcher is None:
+                    raise ValueError(f"MPI launcher not found: {args.mpi_launcher}")
+                command = [launcher, "-np", str(mpi)]
+            command += [str(executable), str(output / "parameters.prm")]
+        else:
+            for path in (mesh, output):
+                if not path.is_relative_to(args.container_workdir):
+                    raise ValueError(f"{path} is outside container workdir {args.container_workdir}; "
+                                     "choose an explicit --container-workdir containing both datasets and outputs")
+            launcher = ROOT / "scripts/run_container.sh"
+            if not launcher.is_file():
+                raise ValueError("scripts/run_container.sh is missing; use a checkout that includes the container launcher")
+            command = ["bash", str(launcher), "--runtime", args.runtime,
+                       "--image", args.image, "--ranks", str(mpi),
+                       "--workdir", str(args.container_workdir), str(output / "parameters.prm")]
     revision = subprocess.run(
         ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
         capture_output=True, text=True, check=False,
@@ -111,11 +123,15 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
         "workflow_revision": revision.stdout.strip() or None,
         "workflow_dirty": bool(dirty.stdout.strip()) if dirty.returncode == 0 else None,
         "executable_revision": args.executable_revision,
-        "executable_revision_source": "user-supplied build provenance",
+        "executable_revision_source": "user-supplied build provenance" if args.executable_revision else None,
         "manifest_sha256": sha256(MANIFEST), "template_sha256": sha256(template),
         "parameters_sha256": sha256(parameter_file),
         "mesh": {"path": str(mesh), "sha256": mesh_info["sha256"]},
         "settings": settings, "mpi": mpi, "command": command,
+        "runtime": args.runtime,
+        "container_workdir": str(args.container_workdir) if args.runtime != "native" else None,
+        "image_reference": args.image,
+        "image_digest": args.image.split("@", 1)[1] if args.image and "@" in args.image else None,
         "final_time_override": args.final_time,
         "execution_blocker": manifest["provenance"][base].get("execution_blocker"),
         "executable_sha256": sha256(executable) if executable else None,
@@ -157,6 +173,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-root", type=Path, default=ROOT / "paper-runs")
     parser.add_argument("--executable", default="blood_flow")
     parser.add_argument("--executable-revision", help="Known source revision of a reused executable (user supplied)")
+    parser.add_argument("--runtime", choices=("native", "docker", "podman", "apptainer"), default="native")
+    parser.add_argument("--image", help="Explicit container tag or digest; tags are recorded without claiming a resolved digest")
+    parser.add_argument("--container-workdir", type=Path, default=ROOT,
+                        help="Shared container mount root containing datasets and outputs (default: checkout)")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--mpi", type=int, help="Override the manifest MPI count")
     parser.add_argument("--mpi-launcher", default="mpirun", help="MPI launcher executable")
@@ -175,12 +195,15 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--mpi must be positive")
     if args.final_time is not None and (not math.isfinite(args.final_time) or args.final_time <= 0):
         parser.error("--final-time must be finite and positive")
+    if args.runtime != "native" and not args.prepare_only and not args.image:
+        parser.error("Container execution requires an explicit --image tag or digest")
     selected = [case for case in cases if case["id"] == args.case or
                 (args.suite and args.suite in ("all", case["suite"]))]
     if not selected:
         parser.error("Unknown case or suite; use --list")
     args.dataset_root = args.dataset_root.resolve()
     args.output_root = args.output_root.resolve()
+    args.container_workdir = args.container_workdir.resolve()
     if any(character in str(args.dataset_root) + str(args.output_root) for character in "\n\r#"):
         parser.error("Paths cannot contain newlines or # (deal.II parameter syntax)")
     try:

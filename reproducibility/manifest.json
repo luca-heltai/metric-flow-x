@@ -3,7 +3,7 @@
   "status": "Canonical inputs for future current-code runs; archived results have not been validated or reproduced.",
   "units": "SI (m, kg, s, Pa); derived display units must be stated by postprocessing.",
   "source_manuscript": "2026_1d_blood_flow",
-  "code_baseline": "77cc1d7239ef015a1dcf73cb408a0cfb3ece9fe2",
+  "code_baseline": "cc75f51e87d47459d86eb2e18e8cf0c3617736c4",
   "provenance": {
     "mms": {
       "source": "convergence_results/mms_single_vessel.prm",
@@ -12,9 +12,9 @@
         "Rename legacy parameter sections for current parser.",
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
         "Use final time 0.1 s from manuscript; original parameter uses 1 s.",
-        "One independent mesh per run; prescribed candidate inlet flow A(0,t)*U(0,t). Exact manufactured boundary traces require a separate solver change."
+        "One independent mesh per run; Dirichlet mode imposes exact A/U traces at both endpoints in supported executable revisions. Prescribed candidate inflow is unused in this mode."
       ],
-      "execution_blocker": "MMS execution is blocked: the current solver does not impose manufactured exact boundary traces; Dirichlet currently falls through to reflection."
+      "minimum_executable_revision": "cc75f51e87d47459d86eb2e18e8cf0c3617736c4"
     },
     "bifurcation": {
       "source": "verification_results/aorta-bifurcation/NumData/aortic_bifurcation.prm",
