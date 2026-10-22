@@ -207,7 +207,9 @@ CSV columns are selected by their case-sensitive names, in any order:
 
 For example, with the defaults above:
 
-```text
+```{csv-table}
+:header-rows: 1
+
 label,R2,boundary_id,C
 outlet_b,4e7,2,
 ```
