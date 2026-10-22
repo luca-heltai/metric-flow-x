@@ -170,6 +170,99 @@ observables without using ImmersX.
 The formulation and derivation remain documented in `doc/math.md` and
 `latex/blood_flow.tex`.
 
+Terminal RCR CSV input uses the vendored header-only
+[rapidcsv v9.07](https://github.com/d99kris/rapidcsv/tree/v9.07) dependency;
+see `third_party/rapidcsv/README.md` for provenance and its BSD 3-Clause license.
+No extra package or network download is needed to build the CSV reader.
+
 ## License
 
 This project is licensed under the MIT License (see `LICENSE.md`).
+
+
+### Terminal RCR defaults and CSV overrides
+
+Existing parameter files keep `Terminal parameter source = VTK`: terminal R1,
+R2, C and P_out are read from the mesh exactly as before. To migrate explicitly,
+set the following in `MetricFlowSystem<1, 3>`:
+
+```text
+set Terminal parameter source = Parameters
+set Default terminal R1 = 2e7
+set Default terminal R2 = 3e7
+set Default terminal C = 0
+set Default terminal P_out = 0
+set Terminal parameters CSV file = terminals.csv
+```
+
+CSV columns are selected by their case-sensitive names, in any order:
+
+- `boundary_id` is required and must uniquely identify an actual terminal.
+- `R1`, `R2`, and `C` are optional. Each missing column or empty/whitespace-only
+  cell uses the corresponding parameter-file default. At least one of these
+  column names, or `label`, must be present, so a different kind of data file
+  is not silently accepted as terminal configuration.
+- `label` is an optional terminal name. A missing column or blank cell uses
+  `boundary_<boundary_id>` (for example, `boundary_2`), matching the existing
+  numeric terminal identity. Labels may contain spaces, commas, quotes, or
+  quoted line breaks; they are metadata and need not be unique. A file with
+  only `boundary_id,label` can name terminals while using all RCR defaults.
+- Additional named columns are ignored; they may contain arbitrary metadata or
+  measurements, including quoted commas and line breaks.
+
+For example, with the defaults above:
+
+```{csv-table}
+:header-rows: 1
+
+label,R2,boundary_id,C
+outlet_b,4e7,2,
+```
+
+Terminal 2 is named `outlet_b` and receives R1=2e7, R2=4e7, C=0. Omitted terminal IDs use all defaults;
+with no CSV configured, every terminal uses the defaults. Headers must be
+nonempty and unique, and every data row must have the same number of cells as
+the header (use explicit empty cells for defaults). Nonempty numeric cells must
+contain a complete valid number; `NaN`, infinity and invalid final RCR values
+are rejected. Duplicate or unknown boundary IDs are errors.
+
+Output `network_terminals.csv` records the effective `boundary_id`,
+`vessel_id`, `label`, `R1`, `R2`, `C`, and `P_out` for each terminal. Vessel
+probe files carry a `boundary_<id>_label` column for each terminal connected to
+that vessel. Existing probe filenames keep their numeric vessel IDs; labels
+never become filesystem paths. Visualization files include `vessel_id` cell
+data, which links them to the terminal table. Global mass and timing summaries
+retain their aggregate columns.
+
+All solver CSV output uses Rapidcsv for quoting and escaping. Records are
+written progressively, with round-trip precision for double values and a
+locale-independent decimal point.
+
+Resistances are in Pa*s/m3, compliance in m3/Pa, and P_out in Pa. P_out remains
+the global default in Parameters mode; CSV rows do not override it. VTK mode
+preserves existing per-terminal P_out values. No units, pressure datum or flow
+sign convention are inferred from unused columns.
+
+This is a constant-parameter table, with one row per terminal, not a time-series
+reader. Future prescribed pressure/flow series should have a separate schema
+with `boundary_id` and `time_s`, explicit units and driving-variable selection,
+strictly increasing times per terminal, and explicit interpolation, coverage
+and periodicity policies. External-file adapters can map column names and units
+to that contract while retaining other columns as unused data.
+
+Parameters mode requires geometry, vessel fields and boundary IDs in VTK, but
+no R1/R2/C/P_out arrays. Actual graph endpoints identify terminals, excluding
+junctions and inlet boundary 0. CSV IDs must identify these terminals uniquely;
+unreadable/malformed files, duplicate/unknown IDs, nonfinite or invalid physical
+values cause an error. A configured CSV requires Parameters mode. Each C>0
+terminal gets one capacitor unknown across MPI ranks; C=0 gets none and uses
+the series resistance R1+R2 (PR #18).
+
+Geometry and arrays now share one VTK reader per rank. On lnx3 with GCC 13.2,
+deal.II 9.8.0 and the 20001-cell, degree-1 SI 10k tree, the measured setup time
+fell from 3.697 s to 1.340 s in a paired run. Whole-process peak RSS, including
+subsequent assembly, was 657904/656936 KiB; this is not a measurement of memory
+per initialization phase. Nonzero-state residual norms/checksums agree, and
+CSV/legacy residuals and both Jacobian blocks are regression-tested with one
+and two ranks. Rank-zero reading/distribution remains a profiling follow-up;
+each rank currently loads one dataset.

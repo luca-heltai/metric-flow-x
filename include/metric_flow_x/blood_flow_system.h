@@ -593,6 +593,13 @@ namespace MetricFlowX
     // &cell,
     //          const unsigned int face_no) const;
 
+    std::string terminal_parameter_source = "VTK";
+    std::string terminal_parameters_csv_file;
+    double      default_terminal_r1    = 0.0;
+    double      default_terminal_r2    = 1e8;
+    double      default_terminal_c     = 0.0;
+    double      default_terminal_p_out = 0.0;
+
     ParsedTools::Constants    par;
     AffineConstraints<double> constraints_;
     double                    current_dt  = 0.0;
@@ -614,9 +621,18 @@ namespace MetricFlowX
 
     struct RCRPhysics
     {
-      double R1, R2, C, P_out;
+      double      R1, R2, C, P_out;
+      std::string label;
     };
-    std::map<unsigned int, RCRPhysics>   rcr_map;
+    std::map<unsigned int, RCRPhysics> rcr_map;
+    // Coarse-mesh incidence, replicated before partitioning; output owners
+    // need labels even when the terminal itself belongs to another rank.
+    std::map<unsigned int, std::set<types::boundary_id>> vessel_terminals;
+
+    std::map<types::boundary_id, RCRPhysics>
+    read_terminal_parameters(
+      const std::set<types::boundary_id> &terminal_ids) const;
+
     std::map<unsigned int, unsigned int> vid_to_rcr_vertex; // key = vessel id
     std::map<types::boundary_id, double> terminal_Pc_storage;
     std::set<types::boundary_id>         terminal_boundary_ids;

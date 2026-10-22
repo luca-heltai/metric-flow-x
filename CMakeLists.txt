@@ -61,6 +61,8 @@ foreach(_variant IN LISTS METRIC_FLOW_X_BUILD_TYPES)
   target_include_directories(${_library} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+  target_include_directories(${_library} SYSTEM PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rapidcsv")
   deal_ii_setup_target(${_library} ${_variant_upper})
   set_target_properties(${_library} PROPERTIES EXPORT_NAME metric_flow_x_${_variant})
 
