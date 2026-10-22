@@ -24,7 +24,7 @@ Rows are appended at IDA output times. The header and columns are emitted by `Bl
 
 ## Terminal names and effective parameters
 
-`terminal_parameters.csv` contains one row per terminal with `boundary_id`,
+`network_terminals.csv` contains one row per terminal with `boundary_id`,
 `vessel_id`, `label`, `R1`, `R2`, `C`, and `P_out` (physical values in SI).
 The optional input CSV column `label` supplies the name; a missing or blank
 label defaults to `boundary_<boundary_id>`. In VTK mode the same default is
