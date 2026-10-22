@@ -72,6 +72,13 @@ established VTU/PVD and CSV outputs. The library Problem owns physics and
 spatial assembly; applications embedding it can own time integration and call
 the residual/Jacobian API directly.
 
+## Container execution
+
+The [container guide](doc/containers.md) describes the downloadable launcher
+for Docker, Podman, and Apptainer, the compiled library SDK, and publication
+of versioned images. A container runtime is the only required host dependency.
+Images become available after the container publication workflow succeeds.
+
 ## Building
 
 MetricFlowX uses an out-of-source CMake build and requires deal.II 9.5 or newer:

@@ -8,6 +8,7 @@
 overview
 getting_started
 build_and_run
+containers
 math
 tutorials
 api
