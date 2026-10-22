@@ -1252,7 +1252,7 @@ namespace MetricFlowX
 
     // Numbering: identical on every rank, no communication needed -- rcr_map
     // is replicated, so every rank enumerates it the same way.
-    if (outlet_type != "Reflection")
+    if (outlet_type != "Reflection" && outlet_type != "Dirichlet")
       for (const auto &[bid, rcr] : rcr_map)
         {
           if (bid == 0)
@@ -3094,6 +3094,8 @@ namespace MetricFlowX
                                     update_values | update_quadrature_points);
 
     inflow_function.set_time(t);
+    if (outlet_type == "Dirichlet")
+      exact_solution.set_time(t);
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
@@ -3147,7 +3149,12 @@ namespace MetricFlowX
 
             double res_A = 0.0, res_U = 0.0;
 
-            if (bid == 0) // inflow
+            if (outlet_type == "Dirichlet")
+              {
+                res_A = A_hat_cur - exact_solution.value(point, 0);
+                res_U = U_hat_cur - exact_solution.value(point, 1);
+              }
+            else if (bid == 0) // inflow
               {
                 inflow_function.set_time(t);
                 const double Q_in   = (inflow_series.empty() ?
@@ -4267,7 +4274,12 @@ namespace MetricFlowX
             std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
             cell->get_dof_indices(ldofs);
 
-            if (bid == 0) // inflow
+            if (outlet_type == "Dirichlet")
+              {
+                jacobian_matrix.add(a_row, a_row, 1.0);
+                jacobian_matrix.add(u_row, u_row, 1.0);
+              }
+            else if (bid == 0) // inflow
               {
                 // R1 = A_hat * U_hat - Q_in(t)
                 // R2 = U_hat - 4(c_hat - c0) - W2_int

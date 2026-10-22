@@ -72,6 +72,13 @@ established VTU/PVD and CSV outputs. The library Problem owns physics and
 spatial assembly; applications embedding it can own time integration and call
 the residual/Jacobian API directly.
 
+## Container execution
+
+The [container guide](doc/containers.md) describes the downloadable launcher
+for Docker, Podman, and Apptainer, the compiled library SDK, and publication
+of versioned images. A container runtime is the only required host dependency.
+Images become available after the container publication workflow succeeds.
+
 ## Building
 
 MetricFlowX uses an out-of-source CMake build and requires deal.II 9.5 or newer:
@@ -168,6 +175,16 @@ To extract into another directory, pass it as the first argument:
 ```bash
 ./scripts/download_datasets.sh /path/to/dataset-root
 ```
+
+## Paper experiment inputs
+
+The [reproduction guide](doc/reproducibility.md) describes the canonical
+current-code parameter templates, all seven paper meshes, and the 43-case
+experiment matrix. List the available cases with
+`python3 scripts/reproduce_paper.py --list`. Each prepared or executed case
+records its input checksums and configuration in a separate run directory.
+These inputs support new controlled runs; archived paper results have not
+been verified by this workflow.
 
 ## Testing
 

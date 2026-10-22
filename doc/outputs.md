@@ -53,6 +53,20 @@ label is carried in each record; unnamed boundaries use `boundary_<id>`,
 including `boundary_0` at the inlet. Rapidcsv handles quoting and escaping.
 Numeric filenames and ID columns remain the stable keys.
 
+## Global diagnostics
+
+The standalone driver opens `mass_conservation.csv` before time integration
+and writes volume and boundary-flow diagnostics at the physical output
+cadence. It writes one `ida_statistics.csv` summary per solve and the
+`scaling_timings.csv` section timings at the end of the run. MPI diagnostics
+are collective; rank zero writes the global files.
+
+IDA's accepted-step and iteration totals are cumulative solver counters.
+The BDF-order histogram attributes all steps between consecutive IDA output
+callbacks to the last observed order. Its total equals the accepted-step
+count, but the distribution is a sampled estimate when the order changes
+between callbacks. It does not provide a per-internal-step order trace.
+
 ## Logs and parameter receipt
 
 `ParameterAcceptor::initialize()` writes `last_used_parameters.prm` after reading the input. deal.II logging is controlled by `Verbosity (console depth)`, and rank zero is the visible writer in the MPI run.

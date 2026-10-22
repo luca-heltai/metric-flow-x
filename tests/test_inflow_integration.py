@@ -49,6 +49,37 @@ def validate(executable, destination, mpi):
             (folder / "run.log").write_text(result.stdout + result.stderr)
             if result.returncode:
                 raise RuntimeError(f"{kind}, ranks={ranks}: {result.stdout}\n{result.stderr}")
+            # The standalone driver must produce the diagnostics used by new
+            # paper runs, in addition to the terminal and visualization files.
+            with (folder / "output/mass_conservation.csv").open() as stream:
+                mass = list(csv.DictReader(stream))
+            assert len(mass) == 11
+            assert abs(float(mass[0]["t"])) < 1e-14
+            assert abs(float(mass[-1]["t"]) - 0.01) < 1e-14
+            assert all(math.isfinite(float(value)) for row in mass for value in row.values())
+            assert all(float(row["total_volume"]) > 0 for row in mass)
+            with (folder / "output/ida_statistics.csv").open() as stream:
+                statistics = list(csv.DictReader(stream))
+            assert len(statistics) == 1
+            summary = {key: float(value) for key, value in statistics[0].items()}
+            assert all(math.isfinite(value) for value in summary.values())
+            assert summary["n_steps"] > 0
+            assert summary["wall_time"] > 0
+            assert sum(summary[f"bdf{order}_steps"] for order in range(1, 6)) == summary["n_steps"]
+            with (folder / "output/ida_step_history.csv").open() as stream:
+                history = list(csv.DictReader(stream))
+            # Overlapping driver hooks must not duplicate history records or
+            # consume interval counters before the corresponding output row.
+            assert len(history) == len(mass) == summary["n_outputs"]
+            assert [float(row["output_time"]) for row in history] == [float(row["t"]) for row in mass]
+            assert sum(int(row["steps_interval"]) for row in history) == summary["n_steps"]
+            assert sum(int(row["nonlin_iters_interval"]) for row in history) == summary["n_nonlin_iters"]
+            with (folder / "output/scaling_timings.csv").open() as stream:
+                timings = list(csv.DictReader(stream))
+            assert timings
+            assert all(int(row["n_mpi_processes"]) == ranks for row in timings)
+            assert all(math.isfinite(float(row["wall_time"])) and float(row["wall_time"]) >= 0
+                       for row in timings)
             files = sorted((folder / "output").glob("terminal_*.csv"))
             assert [path.name for path in files] == ["terminal_0.csv", "terminal_1.csv"]
             traces[kind, ranks] = {}

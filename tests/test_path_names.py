@@ -6,7 +6,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 STANDARD_FILENAMES = {
-    "CMakeLists.txt", ".clang-format", "README.md", "LICENSE.md", "CITATION.cff", "Doxyfile"
+    "CMakeLists.txt", ".clang-format", "README.md", "LICENSE.md", "CITATION.cff", "Doxyfile", "Dockerfile"
 }
 
 

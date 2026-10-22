@@ -21,6 +21,7 @@
 #include <metric_flow_x/blood_flow_system.h> // header exposing BloodFlowSystem
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
@@ -332,7 +333,6 @@ namespace MetricFlowX
                              const VectorType & /*ydot*/,
                              const unsigned int /*step_number*/) {
               problem.time = t;
-
               const double tolerance =
                 16.0 * std::numeric_limits<double>::epsilon() *
                 std::max(std::abs(t), std::abs(next_output_time));
@@ -376,23 +376,18 @@ namespace MetricFlowX
                 }
             };
 
-          problem.solution_dot = 0.0;
-          problem.time         = problem.ida_parameters.initial_time;
-
-          Timer solve_timer;
-          solve_timer.start();
+          problem.solution_dot   = 0.0;
+          problem.time           = problem.ida_parameters.initial_time;
+          const auto solve_start = std::chrono::steady_clock::now();
           ida.solve_dae(problem.solution, problem.solution_dot);
-          solve_timer.stop();
-
-          // Closes the vessel / mass / step-history CSVs and appends one row
-          // to ida_statistics.csv.  Must run while `ida` is still alive.
-          problem.finalize_output(ida, solve_timer.wall_time());
-
+          const double solve_wall_time =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                          solve_start)
+              .count();
+          problem.finalize_output(ida, solve_wall_time);
           problem.compute_pressure(problem.solution, problem.pressure_);
           problem.compute_errors(cycle);
         }
-
-      // One row per TimerOutput section -> scaling_timings.csv
       problem.write_scaling_timings();
     }
   };

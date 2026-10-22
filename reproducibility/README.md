@@ -1,0 +1,11 @@
+# Canonical paper inputs
+
+The editable parameter sources are `parameters/*.prm.in` in this directory.
+`manifest.json` defines the experiment matrix, mesh checksums and provenance of
+the inputs imported from the manuscript directory `2026_1d_blood_flow`.
+Changes for future paper runs belong here; generated `parameters.prm` files
+and manuscript copies are not a second source of configuration.
+
+See [the reproduction guide](../doc/reproducibility.md) for downloading,
+preparing, running and recording experiments. These inputs target the current
+code and SI dataset releases. They do not certify archived paper results.

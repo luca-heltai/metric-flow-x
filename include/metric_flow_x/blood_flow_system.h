@@ -932,7 +932,7 @@ namespace MetricFlowX
     std::unique_ptr<PETScWrappers::PreconditionLU> direct_lu;
 #  endif
 #else
-    std::unique_ptr<TrilinosWrappers::SolverDirect> direct_solver;
+    std::unique_ptr<dealii::TrilinosWrappers::SolverDirect> direct_solver;
 #endif
 
     // The PETSc iterative path uses block Jacobi with a local ILU per rank.
