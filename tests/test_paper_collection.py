@@ -60,6 +60,26 @@ class PaperCollectionTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Missing requested vessels", result.stderr)
 
+    def test_mms_errors_retain_reported_log_precision(self):
+        (self.run / "run.json").write_text(json.dumps({
+            "status": "completed", "case": {"id": "mms-p2-n8", "base": "mms"},
+            "mpi": 1, "settings": {"Finite element degree": "2"},
+        }))
+        (self.run / "solver.log").write_text(
+            "=== Errors t=1.000e-01 cycle 1 ===\n"
+            " A  L2=1.234e-06 rate=0.000e+00\n"
+            " A  H1=2.345e-05 rate=0.000e+00\n"
+            " U  L2=3.456e-04 rate=0.000e+00\n"
+            " U  H1=4.567e-03 rate=0.000e+00\n")
+        result = self.invoke()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with (self.root / "collected/mms_errors.csv").open() as stream:
+            row = next(csv.DictReader(stream))
+        self.assertEqual(row["p"], "2")
+        self.assertEqual(row["cells"], "8")
+        self.assertEqual(row["area_l2"], "1.234e-06")
+        self.assertEqual(row["velocity_h1"], "4.567e-03")
+
 
 if __name__ == "__main__":
     unittest.main()

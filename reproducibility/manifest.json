@@ -38,7 +38,8 @@
       "adaptations": [
         "Rename legacy parameter sections for current parser.",
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
-        "Retain supplied tolerances 1e-6/1e-7; manuscript table lists 1e-8/1e-9. Review before final paper rerun."
+        "Retain supplied tolerances 1e-6/1e-7; manuscript table lists 1e-8/1e-9. Review before final paper rerun.",
+        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs."
       ]
     },
     "cerebral": {
@@ -48,7 +49,8 @@
         "Rename legacy parameter sections for current parser.",
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
         "Keep supplied maximum BDF order 2; manuscript describes orders through 5. Review before final paper rerun.",
-        "Use the current pinned cerebral v2 dataset, not a private manuscript copy."
+        "Use the current pinned cerebral v2 dataset, not a private manuscript copy.",
+        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs."
       ]
     },
     "network50k": {
@@ -57,7 +59,8 @@
       "adaptations": [
         "Rename legacy parameter sections for current parser.",
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
-        "Use corrected SI mesh from datasets_si_v1.json; archived paper meshes are not replayed."
+        "Use corrected SI mesh from datasets_si_v1.json; archived paper meshes are not replayed.",
+        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs."
       ]
     },
     "network100k": {
@@ -66,7 +69,8 @@
       "adaptations": [
         "Rename legacy parameter sections for current parser.",
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
-        "Use corrected SI mesh from datasets_si_v1.json; archived paper meshes are not replayed."
+        "Use corrected SI mesh from datasets_si_v1.json; archived paper meshes are not replayed.",
+        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs."
       ]
     }
   },

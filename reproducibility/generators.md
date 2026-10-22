@@ -29,7 +29,7 @@ select the source geometry and conversion options. In particular the
 binary tree's terminal count is different from its segment count. The
 converter reads source length/time units from the archive or requires them
 explicitly with `--length-unit` and `--time-unit`; it never infers them.
-It requires NumPy and svVascularize; only load trusted NPZ files because the
+The converter requires NumPy; only load trusted NPZ files because the
 upstream tree format stores Python objects. The raw VTK/VTP visualisation
 exports in the network archive retain their source units and are not solver
 inputs.

@@ -134,6 +134,10 @@ freezing a submission dataset:
 - The synthetic cases use the corrected SI release meshes. These are new
   runs, not replays with the archived paper meshes. The historical filenames
   “50k” and “100k” describe 50001 and 100001 computational segments.
+- The imported large-network inputs retain `Gamma (Total pressure factor) = 0`,
+  which equates static pressure at junctions. The paper's total-head formula
+  corresponds to gamma=1. The selected junction model must be reconciled by
+  the authors before freezing final runs.
 - The mesh/time sweeps are explicit new configurations derived from the
   supplied 37-segment input. They do not recover unrecorded historical choices.
 
@@ -160,6 +164,11 @@ the solver's midpoint sampling rule; they do not reconstruct junction traces.
 Omit `--vessels` to collect every available vessel. For large networks select
 specific vessels to keep the plot table manageable. Missing diagnostic CSVs
 are listed explicitly; no counters or timings are reconstructed from images.
+For completed MMS cases, `mms_errors.csv` extracts the four reported A/U L2/H1
+errors and final time from `solver.log`, alongside polynomial degree and cell
+count. It preserves the solver's displayed precision (currently three decimal
+places in scientific notation), reports a missing error block as an error,
+and does not infer convergence rates or compare against archived values.
 
 The vessel probe writer already converts physical SI state to historical
 display units. The collector applies the documented reverse conversions:

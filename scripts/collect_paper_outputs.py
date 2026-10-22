@@ -18,6 +18,13 @@ SOURCE_COLUMNS = ("time_s", "P_dynpcm2", "Q_cm3ps", "A_cm2", "U_cmps")
 OUTPUT_COLUMNS = ("time_s", "pressure_pa", "flow_m3_s", "area_m2", "velocity_m_s")
 FACTORS = (1.0, 0.1, 1e-6, 1e-4, 1e-2)
 DIAGNOSTICS = ("mass_conservation.csv", "ida_statistics.csv", "scaling_timings.csv")
+ERRORS = re.compile(
+    r"=== Errors t=(\S+) cycle \d+ ===\s*\n"
+    r"\s*A\s+L2=(\S+) rate=\S+\s*\n"
+    r"\s*A\s+H1=(\S+) rate=\S+\s*\n"
+    r"\s*U\s+L2=(\S+) rate=\S+\s*\n"
+    r"\s*U\s+H1=(\S+) rate=\S+"
+)
 
 
 def digest(path: Path) -> str:
@@ -49,12 +56,16 @@ def collect(root: Path, output: Path, vessels: list[int] | None,
     }
     rows = 0
     with (output / "samples.csv").open("w", newline="") as samples, \
-            (output / "runs.csv").open("w", newline="") as runs:
+            (output / "runs.csv").open("w", newline="") as runs, \
+            (output / "mms_errors.csv").open("w", newline="") as errors:
         writer = csv.writer(samples)
         writer.writerow(("case_id", "vessel_id", *OUTPUT_COLUMNS))
         summary = csv.writer(runs)
         summary.writerow(("case_id", "mpi", "final_time_override", "workflow_revision",
                           "executable_revision", "receipt_sha256"))
+        error_writer = csv.writer(errors)
+        error_writer.writerow(("case_id", "p", "cells", "time_s", "area_l2", "area_h1",
+                               "velocity_l2", "velocity_h1"))
         for receipt_path, receipt in completed:
             case_id = receipt["case"]["id"]
             if not re.fullmatch(r"[a-z0-9_\-]+", case_id):
@@ -64,6 +75,19 @@ def collect(root: Path, output: Path, vessels: list[int] | None,
                               receipt.get("workflow_revision"), receipt.get("executable_revision"),
                               digest(receipt_path)))
             results = receipt_path.parent / "results"
+            if receipt["case"].get("base") == "mms":
+                log = receipt_path.parent / "solver.log"
+                matches = ERRORS.findall(log.read_text())
+                if len(matches) != 1:
+                    raise ValueError(f"Expected one MMS error block in {log}; found {len(matches)}")
+                if not all(math.isfinite(float(value)) for value in matches[0]):
+                    raise ValueError(f"Non-finite MMS errors in {log}")
+                cells = re.search(r"-n(\d+)$", case_id)
+                if cells is None:
+                    raise ValueError(f"MMS case ID has no cell count: {case_id}")
+                error_writer.writerow((case_id, receipt["settings"]["Finite element degree"],
+                                       cells[1], *matches[0]))
+                provenance["sources"].append({"path": str(log), "sha256": digest(log)})
             probes = sorted(results.glob("HDG_IDA_Vessel_*.csv"))
             if not probes:
                 raise ValueError(f"No vessel probe CSVs in completed case {case_id}")
@@ -95,6 +119,7 @@ def collect(root: Path, output: Path, vessels: list[int] | None,
                 else:
                     provenance["missing_diagnostics"].append({"case_id": case_id, "file": name})
     provenance["sample_rows"] = rows
+    provenance["mms_error_precision"] = "Reported solver log strings, currently three digits after the decimal in scientific notation; no rates inferred."
     provenance["completed_runs"] = len(completed)
     (output / "collection.json").write_text(json.dumps(provenance, indent=2) + "\n")
     return provenance
