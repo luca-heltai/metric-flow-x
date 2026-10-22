@@ -4,7 +4,7 @@
 The volume equations assembled by ``MetricFlowSystem`` are
 
   A_t + (A U)_x = f_A
-  U_t + (U^2/2 + p(A)/rho)_x - eta U/A = f_U,
+  U_t + (U^2/2 + p(A)/rho)_x + eta U/A = f_U,
 
 where ``eta = 2*(xi + 2)*pi*mu/rho`` and
 ``p(A) = p0 + pd + beta/ad*(sqrt(A) - sqrt(ad))`` with
@@ -92,7 +92,7 @@ def derive_profile(profile: MMSProfile) -> Dict[str, str]:
     eta = 2 * (xi + 2) * sp.pi * mu / rho
     mass = sp.factor(sp.diff(A, t) + sp.diff(A * U, x))
     momentum = sp.factor(
-        sp.diff(U, t) + sp.diff(U**2 / 2 + pressure / rho, x) - eta * U / A
+        sp.diff(U, t) + sp.diff(U**2 / 2 + pressure / rho, x) + eta * U / A
     )
     return {
         "area": _parser(A),

@@ -22,7 +22,7 @@ The following entries are registered by `BloodFlowSystem` in `include/metric_flo
 | `Verbosity (console depth)` | deal.II log depth; rank zero controls the visible log. |
 | `Numerical flux type` | Exactly `HLL`, `HLL_HDG`, or `LAX_FRIEDRICHS`. Other strings are rejected. |
 | `Use Riemann Invariants` | Select the configured boundary treatment using Riemann invariants. |
-| `Outlet boundary condition type` | Outlet mode, including the `RCR` mode used by the aortic example. |
+| `Outlet boundary condition type` | `RCR` or `Reflection` for characteristic boundaries; `Dirichlet` prescribes area and velocity from the first two `Exact solution` components at every physical endpoint, including the inlet, and allocates no capacitor unknowns. |
 | `Use junction mesh` | Select the mesh construction mode for network junctions. |
 | `Vtk file path for mesh input` | Legacy VTK network mesh read during setup. |
 

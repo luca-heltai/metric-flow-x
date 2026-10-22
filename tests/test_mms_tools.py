@@ -28,6 +28,19 @@ class ConvergenceTests(unittest.TestCase):
 
 @unittest.skipIf(generate_mms_expressions.sp is None, "SymPy is not installed")
 class SymbolicDerivativeTests(unittest.TestCase):
+    def test_steady_uniform_flow_requires_positive_friction_forcing(self):
+        # With no time or spatial derivatives, the only momentum balance is
+        # imposed source = viscous loss. For A=2, U=3, rho=5, mu=7, xi=0,
+        # the required forcing is 8.4*pi and must act against the loss.
+        profile = generate_mms_expressions.MMSProfile("uniform", "2", "3")
+        result = generate_mms_expressions.derive_profile(profile)
+        sp = generate_mms_expressions.sp
+        source = sp.sympify(result["momentum_source"].replace("^", "**"),
+                            locals={"PI": sp.pi})
+        value = source.subs({"rho": 5, "mu": 7, "xi": 0})
+        self.assertEqual(sp.simplify(value - sp.Rational(42, 5) * sp.pi), 0)
+        self.assertEqual(result["mass_source"], "0")
+
     def test_sources_are_exact_symbolic_derivatives(self):
         profile = generate_mms_expressions.PROFILES["p2"]
         result = generate_mms_expressions.derive_profile(profile)
