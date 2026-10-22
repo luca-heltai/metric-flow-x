@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install converter test dependency
-        run: python3 -m pip install numpy
+      - name: Install dataset and manufactured-source test dependencies
+        run: python3 -m pip install numpy sympy
       - name: Test svVascularize SI conversion
         run: |
           python3 -m unittest discover -s tests -p test_svv_conversion.py -v
@@ -22,6 +22,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_path_names.py -v
       - name: Test release dataset downloader
         run: python3 -m unittest discover -s tests -p test_download_datasets.py -v
+      - name: Test manufactured sources
+        run: python3 -m unittest discover -s tests -p test_mms_tools.py -v
 
   test:
     runs-on: ubuntu-latest
