@@ -1,0 +1,152 @@
+name: Container
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*', 'container-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/luca-heltai/metric-flow-x:sha-${{ github.sha }}-${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reserve space for the deal.II SDK image
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          df -h /
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE }}
+          build-args: VCS_REF=${{ github.sha }}
+          cache-from: type=gha,scope=metric-flow-x-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=metric-flow-x-${{ matrix.arch }}
+      - name: Check installed executable with one and two MPI ranks
+        run: |
+          docker run --rm --mount "type=bind,source=$PWD,target=/source,readonly" \
+            --entrypoint python3 "$IMAGE" /source/tests/test_inflow_integration.py \
+            --executable /opt/metric-flow-x/bin/blood_flow --mpi
+      - name: Check the standalone launcher, ownership, and installed SDK
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cp tools/package_smoke/main.cc "$RUNNER_TEMP/consumer/main.cc"
+          cat > "$RUNNER_TEMP/consumer/CMakeLists.txt" <<'CMAKE'
+          cmake_minimum_required(VERSION 3.23)
+          project(ContainerConsumer LANGUAGES CXX)
+          find_package(MetricFlowX CONFIG REQUIRED)
+          deal_ii_initialize_cached_variables()
+          add_executable(consumer main.cc)
+          deal_ii_setup_target(consumer)
+          target_link_libraries(consumer MetricFlowX::metric_flow_x)
+          CMAKE
+          bash scripts/run_container.sh --runtime docker --image "$IMAGE" \
+            --workdir "$RUNNER_TEMP/consumer" --exec bash -c \
+            'cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=Release && cmake --build build -j2 && ./build/consumer && touch ownership'
+          test "$(stat -c %u "$RUNNER_TEMP/consumer/ownership")" = "$(id -u)"
+          bash scripts/run_container.sh --runtime docker --image "$IMAGE" --ranks 2 \
+            --exec bash -c 'test -n "$OMPI_COMM_WORLD_RANK"'
+      - name: Check Podman and Apptainer interoperability
+        if: matrix.arch == 'amd64'
+        run: |
+          sudo apt-get update
+          curl --fail --location --retry 3 \
+            https://github.com/apptainer/apptainer/releases/download/v1.5.4/apptainer_1.5.4_amd64.deb \
+            --output /tmp/apptainer.deb
+          sudo apt-get install -y podman /tmp/apptainer.deb
+          docker save "$IMAGE" | sudo podman load
+          sudo bash scripts/run_container.sh --runtime podman --image "$IMAGE" \
+            --workdir "$RUNNER_TEMP/consumer" --exec bash -c 'touch podman-output'
+          test -f "$RUNNER_TEMP/consumer/podman-output"
+          sudo podman image rm "$IMAGE"
+          apptainer build "$RUNNER_TEMP/metric-flow-x.sif" "docker-daemon://$IMAGE"
+          bash scripts/run_container.sh --runtime apptainer --image "$RUNNER_TEMP/metric-flow-x.sif" \
+            --workdir "$RUNNER_TEMP/consumer" --ranks 2 --exec bash -c \
+            'test -n "$OMPI_COMM_WORLD_RANK"; touch apptainer-output'
+          test "$(stat -c %u "$RUNNER_TEMP/consumer/apptainer-output")" = "$(id -u)"
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request' && github.repository == 'luca-heltai/metric-flow-x'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish tested architecture
+        if: github.event_name != 'pull_request' && github.repository == 'luca-heltai/metric-flow-x'
+        run: docker push "$IMAGE"
+
+  publish:
+    needs: build
+    if: github.event_name != 'pull_request' && github.repository == 'luca-heltai/metric-flow-x'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ghcr.io/luca-heltai/metric-flow-x
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish the tested multi-architecture index
+        run: |
+          tags=(--tag "$IMAGE:sha-$GITHUB_SHA")
+          if [[ "$GITHUB_REF" == refs/heads/main ]]; then tags+=(--tag "$IMAGE:main"); fi
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then tags+=(--tag "$IMAGE:${GITHUB_REF#refs/tags/}"); fi
+          docker buildx imagetools create "${tags[@]}" \
+            "$IMAGE:sha-$GITHUB_SHA-amd64" "$IMAGE:sha-$GITHUB_SHA-arm64"
+          digest=$(docker buildx imagetools inspect "$IMAGE:sha-$GITHUB_SHA" --format '{{.Manifest.Digest}}')
+          printf '%s@%s\n' "$IMAGE" "$digest" > container-image.txt
+          sed "s|ghcr.io/luca-heltai/metric-flow-x:main|$IMAGE@$digest|g" \
+            scripts/run_container.sh > run_container.sh
+          sha256sum run_container.sh container-image.txt > container-SHA256SUMS
+          printf '### Published container\n\n`%s@%s`\n' "$IMAGE" "$digest" >> "$GITHUB_STEP_SUMMARY"
+      - name: Require anonymous access
+        run: |
+          # New GHCR packages default to private. Configure this package as public
+          # in GitHub's package settings; repository visibility alone is insufficient.
+          DOCKER_CONFIG=$(mktemp -d) docker manifest inspect "$IMAGE:sha-$GITHUB_SHA" > /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: container-launcher
+          path: |
+            run_container.sh
+            container-image.txt
+            container-SHA256SUMS
+      - name: Attach launcher and image digest to a release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" run_container.sh container-image.txt container-SHA256SUMS --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft \
+              --title "$GITHUB_REF_NAME" --notes 'MetricFlowX container and standalone launcher.' \
+              run_container.sh container-image.txt container-SHA256SUMS
+          fi

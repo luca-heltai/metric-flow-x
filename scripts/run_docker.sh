@@ -1,7 +1,4 @@
-#!/bin/bash
-IMG=`grep image .gitlab-ci.yml | awk '{print $2}'` 
-echo $IMG
-
-CMD=`grep -e '- ' .gitlab-ci.yml | sed 's/- //'`
-
-docker run --rm -t -i -v `pwd`:/builds/app $IMG /bin/sh -c "cd /builds/app; $CMD" 
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+exec bash "$SCRIPT_DIR/run_container.sh" --runtime docker "$@"
