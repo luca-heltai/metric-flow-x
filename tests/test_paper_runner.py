@@ -1,6 +1,7 @@
 """Exercise CLI preparation, data integrity and run receipts without a solver."""
 
 import json
+import importlib.util
 from pathlib import Path
 import shutil
 import subprocess
@@ -11,6 +12,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/reproduce_paper.py"
+SPEC = importlib.util.spec_from_file_location("paper_runner", SCRIPT)
+RUNNER = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(RUNNER)
 
 
 class PaperRunnerTest(unittest.TestCase):
@@ -84,6 +88,23 @@ class PaperRunnerTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("MMS execution is blocked", result.stderr)
         self.assertFalse((self.root / "runs").exists())
+
+    def test_native_mms_revision_attestation_checks_real_ancestry(self):
+        checkout = self.root / "source"
+        subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+        revisions = []
+        for name in ("old implementation", "MMS support", "descendant"):
+            subprocess.run(["git", "-C", str(checkout), "-c", "user.name=Test",
+                            "-c", "user.email=test@example.invalid", "commit",
+                            "--allow-empty", "-qm", name], check=True)
+            revisions.append(subprocess.check_output(
+                ["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True).strip())
+        old, required, descendant = revisions
+        RUNNER.verify_executable_revision(required, descendant, checkout)
+        RUNNER.verify_executable_revision(required, required, self.root / "no git history")
+        for unsupported in (None, "arbitrary string", old, "a" * 40):
+            with self.assertRaises(ValueError):
+                RUNNER.verify_executable_revision(required, unsupported, checkout)
 
 
 if __name__ == "__main__":

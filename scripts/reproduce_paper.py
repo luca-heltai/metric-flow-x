@@ -41,6 +41,24 @@ def timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def verify_executable_revision(required: str, actual: str | None, root: Path = ROOT) -> None:
+    """Check the explicitly attested build revision against the MMS prerequisite."""
+    if actual is None or re.fullmatch(r"[0-9a-fA-F]{40}", actual) is None:
+        raise ValueError("MMS execution requires --executable-revision with the full 40-character "
+                         "source commit recorded when the executable was built")
+    if actual.lower() == required.lower():
+        return  # Exact required revision also works without a complete Git history.
+    result = subprocess.run(
+        ["git", "-C", str(root), "merge-base", "--is-ancestor", required, actual],
+        capture_output=True, text=True, check=False,
+    )
+    if result.returncode:
+        raise ValueError(f"Cannot establish that executable revision {actual} includes the MMS "
+                         f"prerequisite {required}. Use a supported build and fetch its commit "
+                         "history into this checkout (including shallow/release checkouts), "
+                         "or attest the exact prerequisite revision if that is what was built.")
+
+
 def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
     base = case["base"]
     mesh_info = manifest["meshes"][base]
@@ -93,6 +111,7 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
         "workflow_revision": revision.stdout.strip() or None,
         "workflow_dirty": bool(dirty.stdout.strip()) if dirty.returncode == 0 else None,
         "executable_revision": args.executable_revision,
+        "executable_revision_source": "user-supplied build provenance",
         "manifest_sha256": sha256(MANIFEST), "template_sha256": sha256(template),
         "parameters_sha256": sha256(parameter_file),
         "mesh": {"path": str(mesh), "sha256": mesh_info["sha256"]},
@@ -165,6 +184,13 @@ def main(argv: list[str] | None = None) -> int:
     if any(character in str(args.dataset_root) + str(args.output_root) for character in "\n\r#"):
         parser.error("Paths cannot contain newlines or # (deal.II parameter syntax)")
     try:
+        prerequisites = {
+            manifest["provenance"][case["base"]].get("minimum_executable_revision")
+            for case in selected
+        } - {None}
+        if not args.prepare_only:
+            for required in prerequisites:
+                verify_executable_revision(required, args.executable_revision)
         # Refuse an overlapping suite before launching any expensive experiment.
         for case in selected:
             blocker = manifest["provenance"][case["base"]].get("execution_blocker")
