@@ -55,8 +55,9 @@ bash run_container.sh --image ghcr.io/luca-heltai/metric-flow-x@sha256:DIGEST \
 ```
 
 `DIGEST` must be replaced with a published image digest. `main` becomes available after a successful publication from `main`;
-`:main` is the moving development image; `:sha-COMMIT` identifies a tested source revision. Release
-tags such as `:vX.Y.Z` are published when the corresponding Git tag is pushed.
+`:main` is the moving development image; `:sha-COMMIT` identifies the source
+revision used to build an image. A documentation-only commit does not create
+a new image or change its recorded build revision.
 Record the digest for archival reproduction because registry tags can move.
 `METRIC_FLOW_X_IMAGE` provides an alternative default image reference.
 
@@ -96,15 +97,30 @@ rootful Podman and conversion to Apptainer SIF; both execute the installed
 library consumer. Rootless Podman remains a separate environment-dependent check. These checks establish infrastructure
 operation; they do not validate the paper's scientific results.
 
-Pull requests build and test without publishing images. Pushes to `main`,
-version tags, `container-*` preview tags, and manual workflow runs publish tested architecture images and
-then their combined OCI index. Architecture tags are pushed after Docker and
-SDK checks; the combined index waits for Podman and Apptainer checks as well.
-The CI runtime installation uses the official Ubuntu HTTPS archives with
-bounded retries and timeouts, avoiding stalled optional mirror fallbacks. Manual runs on a feature branch publish only its
-commit tag; `container-*` tags publish an explicitly named preview image. A workflow artifact records the digest and a launcher pinned to it;
-version tags also attach these files to an existing release or create a draft
-release. The workflow does not merge a pull request or publish a draft release.
+Image generation runs only on `main`, scheduled at midnight in `Europe/Rome`
+(including daylight-saving changes). GitHub may delay scheduled jobs. Pull
+requests run lightweight launcher/fingerprint checks; pushes, tags and manual
+dispatches do not generate images.
+
+Before building, the workflow hashes tracked sources, headers, build files,
+vendored dependencies, the launcher and container verification contracts.
+Documentation, manuscript figures, canonical parameters and datasets are
+distributed separately and do not trigger an image rebuild. The registry is
+queried for the tested `inputs-FINGERPRINT` index without downloading image
+layers. If it exists, compilation is skipped and `main` reuses that index,
+including when runtime changes have been reverted. Its original build
+revision remains intact. Registry/network failures stop the check rather than
+being treated as a missing image. A failed publication is retried on the next
+night because no completed input index exists.
+
+New architecture images are pushed after Docker and SDK checks; the combined
+index and fingerprint tag wait for Podman and Apptainer checks as well. The
+CI runtime installation uses the official Ubuntu HTTPS archives with bounded
+retries and timeouts. A workflow artifact records the digest and a launcher
+pinned to it. Public release snapshots can also distribute that launcher;
+the initial integrated preview is available in the
+[paper workflow preview release](https://github.com/luca-heltai/metric-flow-x/releases/tag/container-paper-preview-20261022-2).
+The workflow does not merge pull requests or publish releases automatically.
 
 Anonymous use requires a public GHCR package. Publication checks anonymous
 index access instead of inferring it from repository visibility. If a package
