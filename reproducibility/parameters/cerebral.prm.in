@@ -1,0 +1,67 @@
+# Canonical input for new runs with current MetricFlowX; import details in manifest.json.
+subsection MetricFlowSystem<1, 3>
+  set Finite element degree                = 2
+  set Number of global refinement          = 0
+  set Number of refinement cycles          = 1
+  set Vtk file path for mesh input         = @DATASET_ROOT@/notebooks/cerebral_data/standard_cco.vtk
+  set Numerical flux type                  = HLL
+  set Outlet boundary condition type       = RCR
+  set Output directory                     = @OUTPUT_DIR@
+  set Output filename                      = solution
+  set Output time interval                 = 0.01
+  set Problem constants                    = 1.0
+  set Theta Boundary (stability parameter) = 0.5
+  set Theta (penalty parameter)            = 0.5
+  set Gamma (Total pressure factor)        = 0.0
+  set Use Riemann Invariants               = true
+  set Use direct solver                    = true
+  set Use junction mesh                    = true
+  set Verbosity (console depth)            = 1
+  subsection IDA parameters
+    set Final time                        = 2.0
+    set Initial time                      = 0
+    set Time interval between each output = 5e-5
+    subsection Error control
+      set Absolute error tolerance = 1e-08
+      set Relative error tolerance = 1e-06
+    end
+    subsection Running parameters
+      set Initial step size                      = 5e-05
+      set Maximum number of nonlinear iterations = 35
+      set Maximum order of BDF                   = 2
+      set Minimum step size                      = 1e-08
+    end
+  end
+end
+subsection Metric Flow Parameters
+  set Density (rho)                                   = 1050
+  set Profile constant for friction term (xi)         = 2
+  set Reflection coefficient at outflow boundary (Rt) = 0
+  set Tube law exponent (m)                           = 0.5
+  set Viscosity coefficient (mu)                      = 0.003
+end
+#Q_in is written as:
+#(1) The network seen from the root is lumped into a two-element Windkessel:
+#        Q_in(t) = (P_in(t) - P_out)/R_net + C_net * dP_in/dt
+#    R_net = (P_root - P_out)/sum(Q_term) = 5.16e10 Pa s/m^3
+#            (root pressure 66.4 mmHg, P_out = 10, from the CCO data)
+#    C_net = sum_i 2 L_i A_d,i^(3/2) / beta_i = 1.87e-12 m^3/Pa
+#            (compliance of all 19,999 vessels, from standard_cco.vtk)
+#    tau   = R_net*C_net = 97 ms
+#
+# (2) Q_in is rescaled so that its mean equals the total terminal flow of the
+#    CCO data, sum(Q_term) = 1.715e-7 m^3/s. This makes it consistent with
+#    the terminal resistances R2 in standard_cco.vtk; the root flow of the
+#    data (2.055e-7) is not used, because the CCO mean flows are not conserved
+#    at the junctions. The pressure file therefore sets only the SHAPE
+#    of the pulse.
+#    Result: mean 1.715e-7, min 1.26e-7, max 2.42e-7 m^3/s,
+#            pulsatility index (Qmax-Qmin)/Qmean = 0.68.
+#
+# (3) Written as a 25-harmonic Fourier series in t (period 1 s, omega_k = 2*pi*k),
+#    so Q_in is periodic for any final time.
+#
+#
+subsection Functions
+set Inflow function = 1.715234e-07-1.082656e-08*cos(6.283185307*t)+2.640906e-08*sin(6.283185307*t)-1.415397e-08*cos(12.566370614*t)+1.604104e-08*sin(12.566370614*t)-1.241154e-08*cos(18.849555922*t)+2.486107e-09*sin(18.849555922*t)-1.106462e-08*cos(25.132741229*t)-2.705747e-09*sin(25.132741229*t)-3.629186e-09*cos(31.415926536*t)-1.030169e-08*sin(31.415926536*t)+1.977481e-09*cos(37.699111843*t)-2.989191e-09*sin(37.699111843*t)+4.508787e-10*cos(43.982297150*t)-4.944338e-09*sin(43.982297150*t)+4.704062e-09*cos(50.265482457*t)-9.516225e-10*sin(50.265482457*t)+1.042601e-09*cos(56.548667765*t)+3.019106e-11*sin(56.548667765*t)+3.043936e-09*cos(62.831853072*t)+6.343767e-10*sin(62.831853072*t)-1.618905e-10*cos(69.115038379*t)+2.042706e-09*sin(69.115038379*t)+6.170478e-10*cos(75.398223686*t)+2.158706e-10*sin(75.398223686*t)-3.037049e-10*cos(81.681408993*t)+1.686625e-09*sin(81.681408993*t)-6.528771e-10*cos(87.964594301*t)-9.131139e-11*sin(87.964594301*t)-1.453538e-10*cos(94.247779608*t)+6.866516e-10*sin(94.247779608*t)-8.522858e-10*cos(100.530964915*t)-1.648673e-10*sin(100.530964915*t)+2.321191e-11*cos(106.814150222*t)-7.775973e-11*sin(106.814150222*t)-5.199182e-10*cos(113.097335529*t)-7.417579e-11*sin(113.097335529*t)+4.950745e-11*cos(119.380520836*t)-3.843904e-10*sin(119.380520836*t)-9.781340e-11*cos(125.663706144*t)-1.251944e-11*sin(125.663706144*t)+2.751261e-11*cos(131.946891451*t)-3.097574e-10*sin(131.946891451*t)+1.223872e-10*cos(138.230076758*t)+6.183515e-12*sin(138.230076758*t)+3.441506e-12*cos(144.513262065*t)-1.288128e-10*sin(144.513262065*t)+1.526139e-10*cos(150.796447372*t)-4.996579e-12*sin(150.796447372*t)+3.397373e-12*cos(157.079632679*t)+2.138454e-12*sin(157.079632679*t)
+end

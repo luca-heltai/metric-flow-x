@@ -16,6 +16,8 @@ ASSETS = (
      "ee7c831a626109639c32edeea5085e5cb8a6cd15cd6dce31cbd75bf173787c1a"),
     ("cerebral_datasets_v2.tar.gz", "notebooks/cerebral_data/standard_cco.vtk",
      "3f94081c6a256e2d341a45c51889e9090056273664cc9503cb22a2ffa98c5ee1"),
+    ("paper_inputs_v1.tar.gz", "notebooks/paper_inputs/liver_vascular_tree.vtk",
+     "452d1df2db7d62dd0c20fed3237c516d9b45cfe61553e472f53db4e97212f30c"),
 )
 
 
@@ -95,6 +97,13 @@ shutil.copyfile(pathlib.Path(os.environ['FIXTURES']) / url.rsplit('/', 1)[1],
         result = self.run_script()
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.repo / "notebooks").exists())
+
+    def test_corrupt_paper_archive_is_not_extracted(self):
+        (self.root / ASSETS[2][0]).write_bytes(b"corrupt")
+        result = self.run_script()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.repo / ASSETS[1][1]).exists())
+        self.assertFalse((self.repo / ASSETS[2][1]).exists())
 
 
 if __name__ == "__main__":
