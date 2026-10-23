@@ -2853,7 +2853,7 @@ namespace MetricFlowX
                        A * U * (b * fev[area_extractor].gradient(i, q))) *
                       JxW[q];
                   }
-                else if (comp != 0)
+                else if (comp == 1)
                   {
                     const double phi_u = fev[velocity_extractor].value(i, q);
                     if (pressure_only)
@@ -3914,6 +3914,8 @@ namespace MetricFlowX
             for (unsigned int i = 0; i < n_dofs; ++i)
               {
                 const unsigned int ci = fe_->system_to_component_index(i).first;
+                if (ci >= 2)
+                  continue;
                 const Tensor<1, spacedim> grad_phiA =
                   fev[area_extractor].gradient(i, q);
                 const Tensor<1, spacedim> grad_phiU =
@@ -3923,6 +3925,8 @@ namespace MetricFlowX
 
                 for (unsigned int j = 0; j < n_dofs; ++j)
                   {
+                    if (fe_->system_to_component_index(j).first >= 2)
+                      continue;
                     const double trial_A = fev[area_extractor].value(j, q);
                     const double trial_U = fev[velocity_extractor].value(j, q);
 
@@ -3985,6 +3989,8 @@ namespace MetricFlowX
                   {
                     const double dA = fef[area_extractor].value(j, q);
                     const double dU = fef[velocity_extractor].value(j, q);
+                    if (dA == 0.0 && dU == 0.0)
+                      continue;
 
                     const auto [dFA, dFU] = numerical_flux_jac(bn,
                                                                bn,

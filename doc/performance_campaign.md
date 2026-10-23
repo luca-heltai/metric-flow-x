@@ -93,3 +93,24 @@ and 32 trajectory CSVs/2372 rows match exactly**; five focused Release
 BUILD/RUN/DIFF tests and empty-rank cache checks at MPI2/MPI4 pass.
 One full quiet-core confirmation followed diagnosed primary-core contention;
 all primary/exploratory records remain unchanged locally.
+
+## 8. Select nonzero finite-element supports
+
+Use the existing velocity selector and skip zero trace rows/columns and zero
+face trials in cell Jacobians, preserving the active arithmetic and ordering.
+Five alternating Release/PETSc pairs use lnx3 cores 8/9 at MPI1/MPI2; identical
+GCC/AVX2 flags compile the baseline on lnx2 and candidate on lnx3.
+
+The state Jacobian improves **1.11–1.28x**, with all **20/20 pairs** faster.
+Residual paired speedups are **0.976/1.017x** on ADAN56 MPI1/MPI2 and
+**1.018/1.016x** on the network. ADAN56 MPI1 residual pairs span **0.933–1.114x**;
+its target cell scope is flat (~1.003x), while unchanged trace controls slow
+too. No uniform residual improvement or precise statistical bound is claimed.
+
+All **54 snapshots** and **32 physical CSVs / 2372 rows** match exactly;
+**27 Release golden regressions** and clang-format 16 pass. The fixed local
+64-epsilon bounds accept zero observed error. Both physical archives ran on
+lnx3. [Final results](performance_data/08_fe_support_selector/results.json)
+retain all paired ratios, ranges, provenance and this residual limitation.
+
+![Nonzero finite-element supports](performance_data/08_fe_support_selector/comparison.svg)
