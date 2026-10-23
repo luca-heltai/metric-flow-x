@@ -1,0 +1,167 @@
+{
+  "before": "2042e28a647fff293f633f8d6b4472131b983bd9",
+  "after": "7908e4f954714aa26157ad58dfb3676166525dd4",
+  "excluded": "scaling_timings.csv and wall_time field of ida_statistics.csv only",
+  "comparisons": [
+    {
+      "path": "analytic-1/output/HDG_IDA_Vessel_0.csv",
+      "rows": 11,
+      "normalized_sha256": "6dea18b130b2dee49e9b4bb04e711c1ddc79a777404f50f9882ce990f6e33658"
+    },
+    {
+      "path": "analytic-1/output/ida_internal_steps.csv",
+      "rows": 536,
+      "normalized_sha256": "d4dcccf49c8d9088b6699af5297ac41452f61abd48d51d8a22fd1d1fc7c2f778"
+    },
+    {
+      "path": "analytic-1/output/ida_statistics.csv",
+      "rows": 1,
+      "normalized_sha256": "7374daffe7ca8c96f62950df7622f6cd26a32af3660610ec0a17686ef33d5ef6"
+    },
+    {
+      "path": "analytic-1/output/ida_step_history.csv",
+      "rows": 11,
+      "normalized_sha256": "2ffa4f6aeda421fe2afc4f3814d6424d6e15df1ba784f31ada5ba0ceee2ed52f"
+    },
+    {
+      "path": "analytic-1/output/mass_conservation.csv",
+      "rows": 11,
+      "normalized_sha256": "9dfbc3a9752e18ca15c90c6f4004561d1a767b0e9cf4efcfe3434b9b38e7724a"
+    },
+    {
+      "path": "analytic-1/output/network_terminals.csv",
+      "rows": 1,
+      "normalized_sha256": "db54d412022059cf665685a304e63ad13f3d0a45466fb1bf72f9934a284f2989"
+    },
+    {
+      "path": "analytic-1/output/terminal_0.csv",
+      "rows": 11,
+      "normalized_sha256": "09c39cabcdbd023ec1761004f6e0b5d2ed408afbefe48e180cc251235dbb6a99"
+    },
+    {
+      "path": "analytic-1/output/terminal_1.csv",
+      "rows": 11,
+      "normalized_sha256": "b032626a39373a076b6e9d48df0b7eed06f086319d8fd286003db8de6fb35f6e"
+    },
+    {
+      "path": "analytic-2/output/HDG_IDA_Vessel_0.csv",
+      "rows": 11,
+      "normalized_sha256": "fb8c0bbb9c55133e92f530728c717caee02c73b3ebf3d5f3007453c2888b1ced"
+    },
+    {
+      "path": "analytic-2/output/ida_internal_steps.csv",
+      "rows": 536,
+      "normalized_sha256": "4e1be370e2f755e78339e74a39fdaea358c28cedb480752fd0a3806c418ac189"
+    },
+    {
+      "path": "analytic-2/output/ida_statistics.csv",
+      "rows": 1,
+      "normalized_sha256": "7374daffe7ca8c96f62950df7622f6cd26a32af3660610ec0a17686ef33d5ef6"
+    },
+    {
+      "path": "analytic-2/output/ida_step_history.csv",
+      "rows": 11,
+      "normalized_sha256": "32976bbc604504d17eee766ed3795063627e6ddf1c762117377b1f2d94c8f9a0"
+    },
+    {
+      "path": "analytic-2/output/mass_conservation.csv",
+      "rows": 11,
+      "normalized_sha256": "3c7be0d9cca4113cab2dcd047ac79e0171bc1c3e7174c2ed3b2bda11e825b64d"
+    },
+    {
+      "path": "analytic-2/output/network_terminals.csv",
+      "rows": 1,
+      "normalized_sha256": "db54d412022059cf665685a304e63ad13f3d0a45466fb1bf72f9934a284f2989"
+    },
+    {
+      "path": "analytic-2/output/terminal_0.csv",
+      "rows": 11,
+      "normalized_sha256": "1122503c85aba4da80036e5c4ea354d084d85ee206f2edb75c79711b644697b6"
+    },
+    {
+      "path": "analytic-2/output/terminal_1.csv",
+      "rows": 11,
+      "normalized_sha256": "6b0dd20d955c7dbee4ae6bf63df8326d7a5a6d516cb0731d03d937ae81214789"
+    },
+    {
+      "path": "csv-1/output/HDG_IDA_Vessel_0.csv",
+      "rows": 11,
+      "normalized_sha256": "b1185842763a930606c713075ef468e070fffc0ddb2f0e9bb53f0dc47b865521"
+    },
+    {
+      "path": "csv-1/output/ida_internal_steps.csv",
+      "rows": 536,
+      "normalized_sha256": "fe2468f08e315a9afb424eda502636e6924c9fb006b6f5654f6b5a4e20eb0f5f"
+    },
+    {
+      "path": "csv-1/output/ida_statistics.csv",
+      "rows": 1,
+      "normalized_sha256": "7374daffe7ca8c96f62950df7622f6cd26a32af3660610ec0a17686ef33d5ef6"
+    },
+    {
+      "path": "csv-1/output/ida_step_history.csv",
+      "rows": 11,
+      "normalized_sha256": "00d5ad8ede276fa28011da3a56ab689013422889ab367eb23d901bdbea58da3b"
+    },
+    {
+      "path": "csv-1/output/mass_conservation.csv",
+      "rows": 11,
+      "normalized_sha256": "fad2ef32d739c80ca4847462160cccec923d10238de85519c46a00d13e3276a4"
+    },
+    {
+      "path": "csv-1/output/network_terminals.csv",
+      "rows": 1,
+      "normalized_sha256": "db54d412022059cf665685a304e63ad13f3d0a45466fb1bf72f9934a284f2989"
+    },
+    {
+      "path": "csv-1/output/terminal_0.csv",
+      "rows": 11,
+      "normalized_sha256": "726647f516bc16b35d0002c753649ac90d1393a4000def994f78edcf39100acd"
+    },
+    {
+      "path": "csv-1/output/terminal_1.csv",
+      "rows": 11,
+      "normalized_sha256": "22a083228de25494249a951c973b63b35db0f90d8700a41e613884d2d37d5fcb"
+    },
+    {
+      "path": "csv-2/output/HDG_IDA_Vessel_0.csv",
+      "rows": 11,
+      "normalized_sha256": "a75d0eaf09e587bcbffd54ca853ae69ee623e824435fab0bf992cc36472c143a"
+    },
+    {
+      "path": "csv-2/output/ida_internal_steps.csv",
+      "rows": 536,
+      "normalized_sha256": "5f31d92a4221a6698631b4e4b7f3e307b0c779c5bf7bb5d7d42026b289a47842"
+    },
+    {
+      "path": "csv-2/output/ida_statistics.csv",
+      "rows": 1,
+      "normalized_sha256": "7374daffe7ca8c96f62950df7622f6cd26a32af3660610ec0a17686ef33d5ef6"
+    },
+    {
+      "path": "csv-2/output/ida_step_history.csv",
+      "rows": 11,
+      "normalized_sha256": "7b5b2913dd76f0a087e4fc2aa4e4092bd6bedfe788acd1a3225116472a41f82d"
+    },
+    {
+      "path": "csv-2/output/mass_conservation.csv",
+      "rows": 11,
+      "normalized_sha256": "887e44a9017e0db6c87383c40972901bcbf4684de0c90d7e52087effb3955f4b"
+    },
+    {
+      "path": "csv-2/output/network_terminals.csv",
+      "rows": 1,
+      "normalized_sha256": "db54d412022059cf665685a304e63ad13f3d0a45466fb1bf72f9934a284f2989"
+    },
+    {
+      "path": "csv-2/output/terminal_0.csv",
+      "rows": 11,
+      "normalized_sha256": "102e8149797c52bd6c872980cd53d365dffae78c5452de2c640a57569daff1e5"
+    },
+    {
+      "path": "csv-2/output/terminal_1.csv",
+      "rows": 11,
+      "normalized_sha256": "f4b972de5113819e5cdb0413e3cd784b0eedc813866916da08a63b13ec77f131"
+    }
+  ]
+}

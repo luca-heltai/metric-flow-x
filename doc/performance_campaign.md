@@ -188,3 +188,51 @@ executable also reproduced all 32 trajectory CSVs exactly. Separate
 [final-revision receipts](performance_data/02_bulk_vectors/final_revision_equivalence.json)
 and [trajectory receipts](performance_data/02_bulk_vectors/final_trajectory_equivalence.json)
 identify the recompiled library; the original timed build remains archived.
+
+## Intervention 3: reuse the derivative Jacobian
+
+The derivative Jacobian depends on mesh mass matrices and terminal
+capacitances, rather than the supplied time or state. It now reuses its
+existing assembled matrix. Parameter reload, sparsity reconstruction and mass
+reconstruction invalidate the cache. The first call after invalidation retains
+the original assembly sequence; no additional matrix is allocated.
+
+Both cumulative builds, `2042e28` before and `7908e4f` after, were compiled and
+measured on **lnx2** using five alternating pairs for ADAN56 and the 10k network
+at MPI1/MPI2. The benchmark warms up each operation, so these measurements
+represent repeated calls with a valid cache. The after values reach the cost of
+a function call and cache lookup; no large speedup ratio or end-to-end solve
+improvement is inferred from those nanosecond values.
+
+| Case | Before derivative (ms) | Cached derivative (ms) |
+|---|---:|---:|
+| adan56_mpi1 | 4.937 | <0.001 |
+| adan56_mpi2 | 3.137 | <0.001 |
+| network10k_mpi1 | 35.659 | <0.001 |
+| network10k_mpi2 | 22.058 | <0.001 |
+
+![Repeated calls after warm-up, lnx2; valid derivative cache](performance_data/03_derivative_cache/comparison.svg)
+
+All **54 snapshot pairs matched exactly**, covering 1,179,248,416 bytes per
+side. Both archives passed the analytic/CSV inflow checks with MPI1/MPI2, and
+all **32 trajectory CSVs (2372 rows)** matched exactly after excluding only
+scaling timings and the wall-clock statistics field. The short 0.01 s trajectory
+is a numerical regression, not a full cardiac-cycle simulation.
+
+All **26 Release tests passed BUILD/RUN/DIFF and CTest**. The new regression
+also passed with MPI2 and MPI4, including empty ranks. It verifies state
+independence, the analytical factor-two mass change after scaling geometry,
+and rebuilt mesh/terminal capacitance. The
+[full report](performance_data/03_derivative_cache/README.md),
+[snapshot receipt](performance_data/03_derivative_cache/equivalence.json),
+[trajectory receipt](performance_data/03_derivative_cache/trajectory_equivalence.json),
+[raw timings](performance_data/03_derivative_cache/timings.jsonl) and
+[test log](performance_data/03_derivative_cache/release_tests.log) preserve the evidence.
+
+The node was busy; host-load records and the unchanged residual/state-Jacobian
+controls are included in the report. No improvement is claimed for those
+controls. The measured candidate was rebased onto the published intervention-2
+documentation without changing executable source, inputs, tools or tests; the
+[tree-equivalence receipt](performance_data/03_derivative_cache/runtime_rebase_equivalence.json)
+identifies both revisions. Exact measured inputs are retained as deterministic
+`.prm.gz` files with decompression hashes checked against their manifest.

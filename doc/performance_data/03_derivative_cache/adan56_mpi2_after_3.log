@@ -1,0 +1,29 @@
+BENCHMARK {"parameter_file":"/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_derivative/inputs/adan56.prm","deal_ii":"9.8.0","compiler":"13.2.0","mpi_ranks":2,"cells":2464,"dofs":24671,"startup_s":0.15780371800000001,"residual_min_s":0.0105995402,"residual_median_s":0.010628608899999999,"residual_max_s":0.010646374300000001,"jacobian_min_s":0.030031505,"jacobian_median_s":0.0301336585,"jacobian_max_s":0.030790412499999999,"residual_l2":51481.867933721966,"residual_checksum":-2664131482.0160122,"derivative_min_s":3.5499999999999999e-09,"derivative_median_s":4.5999999999999998e-09,"derivative_max_s":1.7900000000000001e-08}
+
+
++----------------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start           |      1.05s |            |
+|                                                    |            |            |
+| Section                                | no. calls |  wall time | % of total |
++----------------------------------------+-----------+------------+------------+
+| assemble_cell_residuals                |        61 |     0.223s |        21% |
+| assemble_jacobian_cell_block           |         7 |     0.124s |        12% |
+| assemble_jacobian_trace_boundary_block |         7 |   0.00325s |      0.31% |
+| assemble_jacobian_trace_interior_block |         7 |     0.075s |       7.1% |
+| assemble_jacobian_trace_junction_block |         7 |   0.00183s |      0.17% |
+| assemble_residual                      |        61 |     0.649s |        62% |
+| assemble_trace_boundary_equations      |        61 |   0.00958s |      0.91% |
+| assemble_trace_continuity_equations    |        61 |    0.0223s |       2.1% |
+| assemble_trace_interior_equations      |        61 |     0.311s |        30% |
+| assemble_trace_junction_equations      |        61 |   0.00777s |      0.74% |
+| build_extended_sparsity_pattern        |         1 |     0.108s |        10% |
+| build_face_dof_map                     |         1 |   0.00202s |      0.19% |
+| build_global_vessel_data               |         1 |  9.83e-05s |         0% |
+| build_per_cell_mass_inv                |         1 |   0.00331s |      0.31% |
+| build_rcr_dof_map                      |         1 |  1.43e-05s |         0% |
+| create_triangulation                   |         1 |    0.0198s |       1.9% |
+| detect_junctions                       |         1 |  0.000734s |         0% |
+| initialize_params                      |         1 |    0.0162s |       1.5% |
+| setup_system                           |         1 |     0.114s |        11% |
+| update_ghosted_vectors                 |        68 |    0.0106s |         1% |
++----------------------------------------+-----------+------------+------------+
