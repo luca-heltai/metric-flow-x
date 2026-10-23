@@ -77,3 +77,19 @@ every measured numerical error is zero.
 configuration, ranges, paired improvements and validation summary.
 
 ![Interior-face topology cache](performance_data/06_face_topology/comparison.svg)
+
+## 7. Reuse local state across face constraints
+
+Boundary/junction residuals and Jacobians gather each local cell state once
+for both scalar FE views, reusing scratch vectors and DoF indices.
+Five alternating one-node Release/PETSc pairs on lnx4, physical cores 8/9,
+measure 10k residual speedups of **1.051/1.084x** and Jacobian **1.025/1.015x**
+at MPI1/MPI2; all ten 10k residual pairs improve, with ADAN within 0.6%.
+
+![Face-constraint state reuse](performance_data/07_face_local_state/comparison.svg)
+
+[Results](performance_data/07_face_local_state/results.json): **54 full snapshots
+and 32 trajectory CSVs/2372 rows match exactly**; five focused Release
+BUILD/RUN/DIFF tests and empty-rank cache checks at MPI2/MPI4 pass.
+One full quiet-core confirmation followed diagnosed primary-core contention;
+all primary/exploratory records remain unchanged locally.
