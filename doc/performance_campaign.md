@@ -236,3 +236,10 @@ documentation without changing executable source, inputs, tools or tests; the
 [tree-equivalence receipt](performance_data/03_derivative_cache/runtime_rebase_equivalence.json)
 identifies both revisions. Exact measured inputs are retained as deterministic
 `.prm.gz` files with decompression hashes checked against their manifest.
+
+The subsequent indentation fix from PR40 passed full-file clang-format 16
+checks on every changed C++ file. After rebuilding on lnx2, the shared library,
+benchmark and driver were byte-identical to the measured candidate. The
+[ELF equivalence receipt](performance_data/03_derivative_cache/formatting_binary_equivalence.json)
+and [format check](performance_data/03_derivative_cache/formatting_check.json)
+record this follow-up without changing numeric data.

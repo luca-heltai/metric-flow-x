@@ -1,0 +1,14 @@
+{
+  "clang_format_version": "clang-format version 16.0.6 (/tmp/dealiiclang852519129/llvm/tools/clang 7cbf1a2591520c2491aa35339f227775f4d3adf6)",
+  "scope": "entire file for every changed C++ file; no selected ranges",
+  "command_options": [
+    "--dry-run",
+    "--Werror"
+  ],
+  "exit_code": 0,
+  "files": {
+    "source/blood_flow_system.cc": "a0e0c82613833226f526c0d8baa96ff18a2332c2fc5d26d9e166f9580dd27fce",
+    "include/metric_flow_x/blood_flow_system.h": "2a011309344bfc7a29a00acc40e03fae6264fe6d813fc91424d3d9ba4b4bd9ee",
+    "tests/test_derivative_jacobian_cache.cc": "2e1f3a84ecb1c1b6cde6289abdb6bc5cabfcef3b1b58476b7b1693bb6b80a2ba"
+  }
+}

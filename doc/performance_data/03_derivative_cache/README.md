@@ -62,10 +62,18 @@ in `metadata.json`. CI for a published PR has not been run by this report.
 
 The measured candidate was then rebased onto the published bulk-vector report
 without changing executable source or tests. `runtime_rebase_equivalence.json`
-records the unchanged Git trees and resulting submission commit. Full original
+records the unchanged Git trees and first rebased runtime commit. Full original
 benchmark logs remain under `build/performance_campaign/lnx2_derivative/`; the
 committed excerpts start at BENCHMARK and retain the complete TimerOutput table.
 `log_excerpt_receipts.json` records both hashes and the extraction line. The exact measured inputs are
 archived as deterministic `inputs/*.prm.gz`; for example, extract with
 `gzip -dc inputs/adan56.prm.gz > adan56.prm`. Their decompressed SHA256 hashes
 match `input_sha256` in `inputs/manifest.json`.
+
+The subsequent PR40 indentation fix was propagated to this branch. Full-file
+clang-format 16 checks passed for the source, header, and cache regression
+(`formatting_check.json`). Rebuilding on lnx2 produced **byte-identical ELF
+files** for the shared library, assembly benchmark and standalone driver
+compared with the measured candidate. `formatting_binary_equivalence.json`
+records both SHA256 hashes, so the original timing and numerical receipts also
+apply to the formatted runtime commit. No numeric timing data were changed.

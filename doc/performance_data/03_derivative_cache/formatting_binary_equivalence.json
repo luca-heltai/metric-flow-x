@@ -1,0 +1,24 @@
+{
+  "measured_candidate": "7908e4f954714aa26157ad58dfb3676166525dd4",
+  "first_documentation_rebase": "a6ddd98a064bf4a409774e596fc6ac7d7eabedea",
+  "formatting_runtime": "25aa477b09bba4f7e8af9ad8fac57f5b9e5e3d0b",
+  "formatting_base": "789e761959c9f238c1901912b88dd79d1951ce2b",
+  "formatting_only": true,
+  "comparison": {
+    "libmetric_flow_x.so": {
+      "measured_sha256": "583359f4ab03bfaabb3a388813f46f1d8dcbc6b845969586c96b3a79baab3ff3",
+      "rebuilt_sha256": "583359f4ab03bfaabb3a388813f46f1d8dcbc6b845969586c96b3a79baab3ff3",
+      "identical": true
+    },
+    "benchmark_assembly": {
+      "measured_sha256": "9ae946c422982c194630ccd3944f523d2b2e188948b5820b312b9aac78a9322b",
+      "rebuilt_sha256": "9ae946c422982c194630ccd3944f523d2b2e188948b5820b312b9aac78a9322b",
+      "identical": true
+    },
+    "blood_flow": {
+      "measured_sha256": "e760b75c572e1d315a6c97842771fadf85276c89c419ca59665f476de9a17b20",
+      "rebuilt_sha256": "e760b75c572e1d315a6c97842771fadf85276c89c419ca59665f476de9a17b20",
+      "identical": true
+    }
+  }
+}
