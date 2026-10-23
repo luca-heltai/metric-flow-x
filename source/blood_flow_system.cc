@@ -3876,31 +3876,36 @@ namespace MetricFlowX
     const double eta =
       2.0 * (friction_profile + 2.0) * numbers::PI * viscosity / rho;
     (void)t;
-    std::vector<double> local_values(fe_->n_dofs_per_cell());
+    const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
+    std::vector<double>                  local_values(n_dofs);
+    std::vector<types::global_dof_index> ldofs(n_dofs);
+    std::vector<double>                  A_h(fev.n_quadrature_points),
+      U_h(fev.n_quadrature_points);
+    std::vector<double> Ah_q(fef.n_quadrature_points),
+      Uh_q(fef.n_quadrature_points);
+    std::vector<double> Ahat_q(fef.n_quadrature_points),
+      Uhat_q(fef.n_quadrature_points);
+    FullMatrix<double> cell_matrix(n_dofs, n_dofs);
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
 
-        const unsigned int vid    = cell->material_id();
-        const unsigned int n_dofs = fe_->n_dofs_per_cell();
+        const unsigned int vid = cell->material_id();
 
         fev.reinit(cell);
 
-        const auto                          &JxW = fev.get_JxW_values();
-        std::vector<types::global_dof_index> ldofs(n_dofs);
+        const auto &JxW = fev.get_JxW_values();
         cell->get_dof_indices(ldofs);
         y_cell.extract_subvector_to(ldofs, local_values);
 
-        std::vector<double> A_h(fev.n_quadrature_points);
-        std::vector<double> U_h(fev.n_quadrature_points);
         fev[area_extractor].get_function_values_from_local_dof_values(
           local_values, A_h);
         fev[velocity_extractor].get_function_values_from_local_dof_values(
           local_values, U_h);
 
-        FullMatrix<double> cell_matrix(n_dofs, n_dofs);
+        cell_matrix = 0.0;
 
         // ---- Block (1,1) volume - cell_matrix
         // -------------------------------
@@ -3951,11 +3956,9 @@ namespace MetricFlowX
         for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
           {
             fef.reinit(cell, f);
-            const auto         &normals = fef.get_normal_vectors();
-            const auto         &JxW_f   = fef.get_JxW_values();
-            const double        ad_face = compute_a_d_at_face(cell, f);
-            std::vector<double> Ah_q(fef.n_quadrature_points);
-            std::vector<double> Uh_q(fef.n_quadrature_points);
+            const auto  &normals = fef.get_normal_vectors();
+            const auto  &JxW_f   = fef.get_JxW_values();
+            const double ad_face = compute_a_d_at_face(cell, f);
             fef[area_extractor].get_function_values_from_local_dof_values(
               local_values, Ah_q);
             fef[velocity_extractor].get_function_values_from_local_dof_values(
@@ -3965,8 +3968,6 @@ namespace MetricFlowX
             // match the extractor read in assemble_cell_residuals,
             // otherwise the analytic Jacobian differentiates w.r.t.
             // the wrong column.
-            std::vector<double> Ahat_q(fef.n_quadrature_points);
-            std::vector<double> Uhat_q(fef.n_quadrature_points);
             fef[a_hat_extractor].get_function_values_from_local_dof_values(
               local_values, Ahat_q);
             fef[u_hat_extractor].get_function_values_from_local_dof_values(

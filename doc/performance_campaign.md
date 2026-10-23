@@ -147,3 +147,42 @@ python3 tools/compare_inflow_trajectories.py --before BEFORE --after AFTER \
 Record the policy before measuring. The tool reads the actual solver weights,
 checks unchanged effective inputs and propagates bounds in SI units; it rejects
 unsupported componentwise tolerances or fixtures. It accepts no tolerance overrides.
+
+## 10. Reuse cell-Jacobian scratch storage
+
+Reuse local vectors and dense blocks across cells and interior faces without
+changing active arithmetic. Five alternating Release/PETSc pairs on lnx3
+cores 8/9 use 20 repetitions at MPI1/MPI2 against the accepted stiffness cache.
+
+The full Jacobian improves **1.043–1.100x**, with **18/20 pairs** faster;
+the target cell Jacobian improves **1.09–1.14x**. Residual variation follows
+unchanged controls, so no causal residual improvement is claimed. The tiny
+unchanged network interior Jacobian's apparent 40–51x change is not claimed.
+
+All **54 snapshots** and **32 trajectory CSVs / 2372 rows** match exactly;
+**28 Release regressions** and cache MPI2/MPI4 checks pass.
+[Final results](performance_data/10_cell_scratch/results.json) retain all pairs,
+ranges, controls and provenance.
+
+![Cell Jacobian scratch reuse](performance_data/10_cell_scratch/comparison.svg)
+
+## Overall result of steps 6–10
+
+Three alternating Release/PETSc pairs on lnx3 compare the consolidated
+baseline with all five further interventions at MPI1/2/4/8, using 20 repetitions
+and eight verified quiet physical cores. ADAN56 residual improves **1.43–1.49x**
+and Jacobian **1.52–1.62x**; the network improves **1.13–1.17x** and
+**1.29–1.43x**, respectively. All **270 full assembly snapshots match exactly**
+under the predeclared 64-epsilon bounds. The cumulative 32-CSV physical
+comparison remains strictly below actual solver tolerances (maximum normalized
+error **0.365**); effective solver inputs remain identical.
+
+![Overall result of the five further interventions](performance_data/06_10_overall/comparison.svg)
+
+[Overall results](performance_data/06_10_overall/results.json) retain every pair,
+source/build provenance, physical bounds and completion details. These measure
+assembly work on one node; they do not establish full-solver speedups.
+
+Rounded reporting-rank diagnostics locate remaining ADAN56 assembly costs in
+cell and interior-face work; network costs concentrate in cells, junctions and
+boundaries. These diagnostics are not a full solver profile.
