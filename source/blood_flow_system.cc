@@ -1378,7 +1378,7 @@ namespace MetricFlowX
             std::abort();
           }
       }
-    const auto indices = locally_owned_fe_dofs.get_index_vector();
+    const auto          indices = locally_owned_fe_dofs.get_index_vector();
     std::vector<double> values(indices.size());
     y.extract_subvector_to(indices, values);
     y_fe_owned.set(indices, values);
