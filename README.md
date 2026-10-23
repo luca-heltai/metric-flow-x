@@ -43,6 +43,15 @@ by an external multiphysics application. Constitutive access is provided by
 `vessel_properties()`, `pressure()`, `pressure_derivative()`, and
 `wave_speed()`.
 
+Mesh/property owners can use `setup(mesh_initializer)` to prepare the mesh
+before native DoFs are distributed. The initializer receives the unrefined
+serial input mesh with its material/boundary ids and the requested
+`Number of global refinement`. It must populate the mutable
+`flow.triangulation()` collectively, including refinement and partitioning.
+This lets an embedding Domain retain and transfer all imported properties
+while preparing the mesh. Construct the flow before its observing Domain so
+that the mesh outlives the Domain. Ordinary `setup()` keeps native mesh setup.
+
 An optional prescribed surrounding pressure can be supplied with
 `set_external_pressure_provider()`. The provider receives time, physical
 point, vessel id, and the incident centerline `CellId`, and returns pressure

@@ -345,6 +345,20 @@ namespace MetricFlowX
     void
     setup();
 
+    /** Initialize the final mesh using an external mesh/property owner.
+     *
+     * Called collectively with the unrefined input mesh (including material
+     * and boundary ids) and the requested global refinement count. The
+     * callback must populate triangulation() before returning, preserving
+     * the physical network and its ids. It is responsible for refinement and
+     * partitioning; native DoFs are distributed only after it returns.
+     */
+    using MeshInitializer =
+      std::function<void(const Triangulation<dim, spacedim> &, unsigned int)>;
+
+    void
+    setup(const MeshInitializer &initialize_mesh);
+
     VectorType
     make_state() const;
 
@@ -370,6 +384,9 @@ namespace MetricFlowX
 
     void
     initialize_state_derivative(VectorType &state_dot, const double t0) const;
+
+    parallel::fullydistributed::Triangulation<dim, spacedim> &
+    triangulation();
 
     const parallel::fullydistributed::Triangulation<dim, spacedim> &
     triangulation() const;
@@ -412,6 +429,9 @@ namespace MetricFlowX
     // small enough to be replicated on every rank.
     void
     create_triangulation();
+
+    void
+    create_triangulation(const MeshInitializer &initialize_mesh);
 
     void
     setup_system();
