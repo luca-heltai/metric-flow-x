@@ -292,3 +292,60 @@ measured candidate. The
 and [tree audit](performance_data/04_matrix_bulk/runtime_rebase_equivalence.json)
 connect the measured build to the submitted runtime. Exact measured inputs are
 archived as deterministic `.prm.gz` files with their decompression hashes.
+
+## Intervention 5: gather and scatter residual cell vectors in bulk
+
+Cell residual assembly now adds its local vector through the backend's bulk
+interface. Forming `M*ydot - F` gathers both input vectors and scatters the
+result in bulk. Cell/index order, subtraction and compression remain unchanged;
+the cell DoFs are discontinuous and belong to the rank owning the cell. No
+cache or new invalidation rule is introduced.
+
+Both cumulative builds, `6a4a3b7` before and `619a481` after, were compiled and
+measured on **lnx2**. The primary campaign used five alternating pairs with
+20 repetitions for all four cases. Seventeen of twenty residual process pairs
+improved. The state-Jacobian controls were close to one in the first three
+cases, but shifted substantially in 10k/MPI2. That case received one predeclared
+confirmation using the same frozen binaries and exact input, five complete
+pairs and 50 repetitions. No individual sample was discarded.
+
+| Case / experiment | Before residual (ms) | After residual (ms) | Median paired speedup |
+|---|---:|---:|---:|
+| adan56_mpi1 | 20.612 | 19.298 | 1.074 |
+| adan56_mpi2 | 10.564 | 10.044 | 1.041 |
+| network10k_mpi1 | 182.341 | 179.546 | 1.044 |
+| network10k_mpi2, original | 102.904 | 85.370 | 1.084 |
+| network10k_mpi2, confirmation | 101.472 | 96.740 | 1.040 |
+
+![Original residual gather/scatter comparison](performance_data/05_residual_vectors/comparison.svg)
+
+The original 10k/MPI2 state-Jacobian control had a paired speedup of 1.206;
+in the confirmation it was 1.003. The confirmation supports a modest median
+residual benefit of approximately 4%, with three improved pairs out of five
+and two slower pairs. Both experiments, their ranges, controls, host loads and
+all process records are retained in the
+[full report](performance_data/05_residual_vectors/README.md). No statistically
+precise speedup bound or end-to-end solve improvement is claimed.
+
+![Predeclared 10k MPI2 confirmation](performance_data/05_residual_vectors/confirmation/comparison.svg)
+
+All **54 primary snapshot pairs matched exactly**, covering 1,179,248,416 bytes
+per side. The confirmation matched another **18 snapshot pairs** exactly.
+A separate one-cell MPI4 regression matched **36 further pairs**, exercising
+three ranks with zero owned rows. Both archives passed analytic/CSV inflow
+checks with MPI1/MPI2; all **32 CSVs (2372 rows)** matched exactly after excluding
+only scaling timings and the wall-clock statistics field. All **26 Release
+tests passed BUILD/RUN/DIFF and CTest**; the existing cache regression also
+passed with MPI2/MPI4.
+
+The [primary numerical receipt](performance_data/05_residual_vectors/equivalence.json),
+[confirmation receipt](performance_data/05_residual_vectors/confirmation/equivalence.json),
+[empty-rank receipt](performance_data/05_residual_vectors/empty_ranks/equivalence.json),
+[trajectory receipt](performance_data/05_residual_vectors/trajectory_equivalence.json)
+and [test log](performance_data/05_residual_vectors/release_tests.log) record
+these checks. The source is identical to the root whole-stack audit runtime
+on every executable/config/test path. A subsequent documentation-only rebase
+preserved those paths; both tree-equivalence receipts accompany the report.
+Inputs are retained as deterministic `.prm.gz` files with verified decompression
+hashes. Original timing records remain byte-identical, and committed log
+excerpts retain BENCHMARK and TimerOutput with hashes of the full originals.

@@ -1,0 +1,28 @@
+{
+  "host": "lnx2",
+  "platform": "Linux-5.15.0-140-generic-x86_64-with-glibc2.35",
+  "cpu_info": "processor\t: 0\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 79\nmodel name\t: Intel(R) Xeon(R) CPU E5-2650 v4 @ 2.20GHz\nstepping\t: 1\nmicrocode\t: 0xb000040\ncpu MHz\t\t: 1200.000\ncache size\t: 30720 KB\nphysical id\t: 0\nsiblings\t: 24\ncore id\t\t: 0\ncpu cores\t: 12\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 20\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 invpcid_single pti intel_ppin ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm cqm rdt_a rdseed adx smap intel_pt xsaveopt cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts md_clear flush_l1d\nvmx flags\t: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid ple shadow_vmcs pml\nbugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs taa itlb_multihit mmio_stale_data\nbogomips\t: 4399.82\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 46 bits physical, 48 bits virtual\npower management:",
+  "runs": 5,
+  "repetitions": 50,
+  "builds": {
+    "before": {
+      "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/baseline",
+      "revision": "6a4a3b718ca40070aedcda5ec7f4848c02998888",
+      "executable_sha256": "87579a95a3edafe3e74dca885893278b1fec0824d1f3d92c5f3f3e44ae9b5538",
+      "library_sha256": "ebf8a621915b90c22539225868c1ced7f7b924d00070a4bc1c1cb4fad16351bb"
+    },
+    "after": {
+      "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/candidate",
+      "revision": "619a48133ce410e26884996dff2c9d08fe1b7ad7",
+      "executable_sha256": "7ae1fd6460bf9896193ef918f2a1a735f357dee1d2297f666c4a7c2ce0857c7a",
+      "library_sha256": "ecba8f42096f4a71915bf615c930859cb7bdf030a6e1fb786fe299bd6a3f036c"
+    }
+  },
+  "inputs": {
+    "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/inputs/network10k.prm": "b48e009f37aade7521ab14ea45acccaed9bb1b244be45ef1d49dc6eadb3555b4"
+  },
+  "thread_environment": {
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  }
+}

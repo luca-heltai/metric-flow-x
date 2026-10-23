@@ -1,0 +1,58 @@
+Internal ctest changing into directory: /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/residual_stack_build
+Test project /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/residual_stack_build
+      Start  1: tests/template.release
+ 1/26 Test  #1: tests/template.release ..............................   Passed    0.45 sec
+      Start  2: tests/test_component_tolerances.release
+ 2/26 Test  #2: tests/test_component_tolerances.release .............   Passed    0.28 sec
+      Start  3: tests/test_constant.release
+ 3/26 Test  #3: tests/test_constant.release .........................   Passed    0.26 sec
+      Start  4: tests/test_coupling_readiness.release
+ 4/26 Test  #4: tests/test_coupling_readiness.release ...............   Passed    0.28 sec
+      Start  5: tests/test_csv_output.release
+ 5/26 Test  #5: tests/test_csv_output.release .......................   Passed    0.31 sec
+      Start  6: tests/test_derivative_jacobian_cache.release
+ 6/26 Test  #6: tests/test_derivative_jacobian_cache.release ........   Passed    0.26 sec
+      Start  7: tests/test_dirichlet_boundary.release
+ 7/26 Test  #7: tests/test_dirichlet_boundary.release ...............   Passed    0.26 sec
+      Start  8: tests/test_external_pressure.release
+ 8/26 Test  #8: tests/test_external_pressure.release ................   Passed    0.28 sec
+      Start  9: tests/test_inflow_series.release
+ 9/26 Test  #9: tests/test_inflow_series.release ....................   Passed    0.31 sec
+      Start 10: tests/test_iterative_trace_initialization.release
+10/26 Test #10: tests/test_iterative_trace_initialization.release ...   Passed    0.26 sec
+      Start 11: tests/test_jacobian_boundary.release
+11/26 Test #11: tests/test_jacobian_boundary.release ................   Passed    0.28 sec
+      Start 12: tests/test_jacobian_cell.release
+12/26 Test #12: tests/test_jacobian_cell.release ....................   Passed    0.28 sec
+      Start 13: tests/test_jacobian_eta.release
+13/26 Test #13: tests/test_jacobian_eta.release .....................   Passed    0.32 sec
+      Start 14: tests/test_jacobian_interior.release
+14/26 Test #14: tests/test_jacobian_interior.release ................   Passed    0.26 sec
+      Start 15: tests/test_jacobian_junction.release
+15/26 Test #15: tests/test_jacobian_junction.release ................   Passed    0.27 sec
+      Start 16: tests/test_mass_integration.release
+16/26 Test #16: tests/test_mass_integration.release .................   Passed    0.29 sec
+      Start 17: tests/test_mass_integration_velocity.release
+17/26 Test #17: tests/test_mass_integration_velocity.release ........   Passed    0.31 sec
+      Start 18: tests/test_mass_ones.release
+18/26 Test #18: tests/test_mass_ones.release ........................   Passed    0.26 sec
+      Start 19: tests/test_mesh_initializer.release
+19/26 Test #19: tests/test_mesh_initializer.release .................   Passed    0.26 sec
+      Start 20: tests/test_physical_constants_reload.release
+20/26 Test #20: tests/test_physical_constants_reload.release ........   Passed    0.29 sec
+      Start 21: tests/test_rcr_zero_capacitance.release
+21/26 Test #21: tests/test_rcr_zero_capacitance.release .............   Passed    0.29 sec
+      Start 22: tests/test_tapered_vessel.release
+22/26 Test #22: tests/test_tapered_vessel.release ...................   Passed    0.28 sec
+      Start 23: tests/test_terminal_exports.release
+23/26 Test #23: tests/test_terminal_exports.release .................   Passed    0.26 sec
+      Start 24: tests/test_terminal_parameters.release
+24/26 Test #24: tests/test_terminal_parameters.release ..............   Passed    0.26 sec
+      Start 25: tests/test_trace_residual.release
+25/26 Test #25: tests/test_trace_residual.release ...................   Passed    0.31 sec
+      Start 26: tests/test_vtk.release
+26/26 Test #26: tests/test_vtk.release ..............................   Passed    0.26 sec
+
+100% tests passed, 0 tests failed out of 26
+
+Total Test time (real) =   7.72 sec

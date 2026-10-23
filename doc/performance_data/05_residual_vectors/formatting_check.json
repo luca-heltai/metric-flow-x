@@ -1,0 +1,15 @@
+{
+  "clang_format_version": "16.0.6",
+  "scope": "Entire changed C++ files, without selected ranges; checked before measurement at runtime619a481",
+  "command_options": [
+    "--dry-run",
+    "--Werror"
+  ],
+  "exit_code": 0,
+  "files": {
+    "source/blood_flow_system.cc": "0d55d00cf80df1594ecdf1d20cc81d4bdf1b318fafb5d32946001927f9514210",
+    "include/metric_flow_x/blood_flow_system.h": "2a011309344bfc7a29a00acc40e03fae6264fe6d813fc91424d3d9ba4b4bd9ee",
+    "tests/test_derivative_jacobian_cache.cc": "2e1f3a84ecb1c1b6cde6289abdb6bc5cabfcef3b1b58476b7b1693bb6b80a2ba"
+  },
+  "identical_after_documentation_rebase": true
+}

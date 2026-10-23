@@ -1,0 +1,282 @@
+[
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi1_after_0.log",
+    "original_sha256": "240bd6512355e1e22676cb3cb95738abefc2a64405ab2fe201ffd4cd71bfa431",
+    "original_lines": 30,
+    "excerpt_sha256": "07475d922b46180a2490f73cd7888a826786623b6a37aff6ab0ef32eeab7c39e",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi1_after_1.log",
+    "original_sha256": "8651ef73cad73f9095e1833604caedc40fdb62984d897b1082b054f982f13232",
+    "original_lines": 30,
+    "excerpt_sha256": "6c882b9587ef656415fcf8265df7d448097f825ab0fd68f794e5060afbe22c07",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi1_after_2.log",
+    "original_sha256": "2e725fe58ac69d26784e34cf1e0ab4e8991fbc1c948bb7fb787196d3c75861b6",
+    "original_lines": 30,
+    "excerpt_sha256": "7b3416fe46008c5a836ec16c67daa9c7f9005becddc182b3427424387fd6dade",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi1_after_3.log",
+    "original_sha256": "9a8dfca6a315407699a36f71ede481e7ec80ce141156b9cc38b875aa2e52bc27",
+    "original_lines": 30,
+    "excerpt_sha256": "36774e7609c15c2cfc25b481cf4f4bfabd58c605c1e4860e851a2799c2b33bef",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi1_after_4.log",
+    "original_sha256": "1aa1d4cbcb4be3401b9a777cc2730add4beff69302f1da6bd87588a6a3ae0bf8",
+    "original_lines": 30,
+    "excerpt_sha256": "defb6d58645c6644ac24d4213441d38e7c6b30ab79049db2b7d9578f3f662822",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi1_before_0.log",
+    "original_sha256": "a544cc4873340f4afdf9d16bd50b2b15f8aa53f257df73f584df032d79b55ed8",
+    "original_lines": 30,
+    "excerpt_sha256": "79de6d8ed0c2212d8545dde9573cd0f542bc8aeba278cd89d2fea9cf17c76e42",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi1_before_1.log",
+    "original_sha256": "56f2535938c8eb4a9c6f9fdc0c22de40ffca8e7cc35261283f729fae8e559894",
+    "original_lines": 30,
+    "excerpt_sha256": "54e580c4ba2c09b59847d429a47d935ff47a4b3b30fa1322518d1ee3c27e788b",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi1_before_2.log",
+    "original_sha256": "81c66f57580d425cd9b609cdab874103a071343b3e54649463863a87ac8440e1",
+    "original_lines": 30,
+    "excerpt_sha256": "15340d53ae62ce43d37345e848b7f7566df747f39affb017cdb11c679e7eda8f",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi1_before_3.log",
+    "original_sha256": "80087df38383d2b5a1bd2a3a7c8ccda97b533a31851a265310fc167b02776261",
+    "original_lines": 30,
+    "excerpt_sha256": "406ed32f823b63781cfb1ee6d587fc2157a8d1283fb68b94d10b45fcecd5e23f",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi1_before_4.log",
+    "original_sha256": "c7ed41723850e3d9869c8ec601f1a6491df5c6dc172a04e35b77cac5d7c8084f",
+    "original_lines": 30,
+    "excerpt_sha256": "508f36c508a37273bcbb151ed583c37067b3d13100498eb61f6cf156ccd63575",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi2_after_0.log",
+    "original_sha256": "7f826ad90ea6b77c6d841d762796b98336f22f8fdc69dbcc18bee1bba3efaf82",
+    "original_lines": 30,
+    "excerpt_sha256": "bb062acf2eee5599345a50b78be828d48ec9d6d419668468368dc3d49dcbf039",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi2_after_1.log",
+    "original_sha256": "85537928fd7d38469961e625911355e2ca76c14eff3ed8f4c04717400aee80d2",
+    "original_lines": 30,
+    "excerpt_sha256": "fcfb07850f54d6df4e9e85672788f76ec098d9ba2c2cfa74962f9aa2af6b9d81",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi2_after_2.log",
+    "original_sha256": "f21cd97619f97deb95b57ba78a64b8cbb8a7390c88d4bc84ab9df8658384e60d",
+    "original_lines": 30,
+    "excerpt_sha256": "90d4847163b60e1c2ef471e2200bc50317647690b3fb89024d4927d34b1b4b28",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi2_after_3.log",
+    "original_sha256": "b38b5ea1aca6cde0e4a0ee6f50e475ea31e21c960a36a195ed2487e909b73dec",
+    "original_lines": 30,
+    "excerpt_sha256": "602c826b1d8795e9a1453e472bf35cb00c91ccb3f3bc0ad7c691909af362a49e",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi2_after_4.log",
+    "original_sha256": "707bf862d23377edf6a5337e78741f44847ffa8a647b893705bf53bdb440581c",
+    "original_lines": 30,
+    "excerpt_sha256": "060d70c29d19a144cd0bb71b0f1756d9460e462c18f4eea364fef96bb77fcc91",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi2_before_0.log",
+    "original_sha256": "85b12ab75874119a428ece2f82851801ce5123027ff3525874e2663c37c3df07",
+    "original_lines": 30,
+    "excerpt_sha256": "58c837e509ae66f967a3066889cad5a32aa29ec8e094a4397a3fbf45a2a10909",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi2_before_1.log",
+    "original_sha256": "61b5c55d96d2d58630560dbff6dfffb36b3067b7aaf174c6266e33d1827c3261",
+    "original_lines": 30,
+    "excerpt_sha256": "51656fe8505d72b0e0fc31c8f1e8b57897b869556b36781dcda53bd607c86f71",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi2_before_2.log",
+    "original_sha256": "8bd859ba441f23f822d9dc1f022cea02a2d4d9d238ffc7831b093bef2e607a30",
+    "original_lines": 30,
+    "excerpt_sha256": "a50f2070e7cb11f74a935c9434ec9665b70f569265ac7131afa6e1ce2f14be7e",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi2_before_3.log",
+    "original_sha256": "4129abfa14585990b456759d93f72875be30158a9cfe42a48b5ac096d7a315f8",
+    "original_lines": 30,
+    "excerpt_sha256": "f23172ef09d34fe7cde0757ea133d407c5ddaa82ac4bd86eef21f80710aebd8b",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/adan56_mpi2_before_4.log",
+    "original_sha256": "35d5743e931646bb81da963af4811378cf337482ebd32625b2553d24237f05ca",
+    "original_lines": 30,
+    "excerpt_sha256": "e2867c037d6652ecca5af589c58dd2fc33eee45834ac4ee44ed3a2a3fdb1f7c5",
+    "excerpt_starts_at_line": 1
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi1_after_0.log",
+    "original_sha256": "ce4ba8c98f67ff1ff7eb42141467ad0e53073ef3ffb91ce6290ac74593de56e9",
+    "original_lines": 20043,
+    "excerpt_sha256": "101530a78a31ec2bd91609e9093b821632b4931dc07933bdb5214809d0f87bbe",
+    "excerpt_starts_at_line": 20014
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi1_after_1.log",
+    "original_sha256": "9de4eb1525991e5eb088392854ee067651cf45508660c0a6c026e4f039e534e3",
+    "original_lines": 20043,
+    "excerpt_sha256": "3317cf40b100a0a67a332e4c26e74af427fe832b42df5e7278a8e9c885218fcc",
+    "excerpt_starts_at_line": 20014
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi1_after_2.log",
+    "original_sha256": "63a4cf8dd9e84ab13667c940db15d49f3fdc83887d604ca272840d293e4389d0",
+    "original_lines": 20043,
+    "excerpt_sha256": "8241f836ff6d39cb4bc2684a48edbf4557d531c7626e00eca819cd4d56366975",
+    "excerpt_starts_at_line": 20014
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi1_after_3.log",
+    "original_sha256": "d56564d8e2eb0fcb0a2ef3b0e8083222254a184fbda27226da6881d2eebb0740",
+    "original_lines": 20043,
+    "excerpt_sha256": "ae71f173bb43e85b419afe557439a7f53a21bdc3504b97b0aedd35641f510f39",
+    "excerpt_starts_at_line": 20014
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi1_after_4.log",
+    "original_sha256": "f51f5774e38f8aebb36f46b20be619f6f848931ad63c102ec1081be1278fc3ae",
+    "original_lines": 20043,
+    "excerpt_sha256": "dc7a6ce328175f741cdcaf172aeec7d67f955986cdc31d5ea775099afb26befb",
+    "excerpt_starts_at_line": 20014
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi1_before_0.log",
+    "original_sha256": "787d992a32d2cb9a51819a5d57c7c3bb94fdeed0983b2a3bd4dfd2fdb979892b",
+    "original_lines": 20043,
+    "excerpt_sha256": "7e4aeb7ec04a37f2e8a377acf84e78eca0584af45f3b65e6aea16a7168f8de45",
+    "excerpt_starts_at_line": 20014
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi1_before_1.log",
+    "original_sha256": "22261602d2cdba7854fc38c3317d8d455bd5df1426e6a0ea9559bde1b0cd50c0",
+    "original_lines": 20043,
+    "excerpt_sha256": "ed171e8e072f9e2711039ff559708ce8034a4b3b886cec27f9986fd5941a3a88",
+    "excerpt_starts_at_line": 20014
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi1_before_2.log",
+    "original_sha256": "613d5c9c2e3d1520b06d34b289c1a48472760fdae2ee38f0f84a0c9c66076d1b",
+    "original_lines": 20043,
+    "excerpt_sha256": "1849c897d572c2a70246ef205eb3814157c79c1d527342c840aefd837dd0489c",
+    "excerpt_starts_at_line": 20014
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi1_before_3.log",
+    "original_sha256": "4bb0dc164ee1de00937f9f6162a277a09e7581b1a276daf296676f5cb00cdf98",
+    "original_lines": 20043,
+    "excerpt_sha256": "495abe69e07cb86e6da12d7062be2e94f9b3be440b7c939ca5417c5557498e80",
+    "excerpt_starts_at_line": 20014
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi1_before_4.log",
+    "original_sha256": "1ad1d636eccd4d2c76237f1df24ca7b1f728090c027ee3fcc61ba0d55e1e7441",
+    "original_lines": 20043,
+    "excerpt_sha256": "7e5d412a63b213b1e29d35bbcdb682370d08af2766d6b3c1a3ff1b1efc9e4681",
+    "excerpt_starts_at_line": 20014
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi2_after_0.log",
+    "original_sha256": "61f731d9de4283c5429478399e12c78b0183a7290b272ed5bf0df31b2ec57588",
+    "original_lines": 20044,
+    "excerpt_sha256": "7ab3831d0aa21963c6b3b95210d33e6e4f3ec1177c8c45b5cbeec9ece902f758",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi2_after_1.log",
+    "original_sha256": "d54d696078b2a3a6c0f7fb880b20d0b663aef76d3ab3ea36429f9265a3f12fc3",
+    "original_lines": 20044,
+    "excerpt_sha256": "4cdb719470a768695f837f54e230167ae30c554abec1bc2f004c512d2201d678",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi2_after_2.log",
+    "original_sha256": "1a3a49386bb8654708a4fc6050f3b92ac71c26716466f6e90ed9bbc1d5e4864f",
+    "original_lines": 20044,
+    "excerpt_sha256": "77930fa6227688dec0a34466bf6bdcd42cd2ea016cca865611707cab850c1f01",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi2_after_3.log",
+    "original_sha256": "f1b4b84490e83657c092244f85039b1e774f8dda478da622f5fa2bad30806a0d",
+    "original_lines": 20044,
+    "excerpt_sha256": "91c2ead6f3e97f0538b3a6352d46d49f6d879e7161c8c7de77ec009e9465b732",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi2_after_4.log",
+    "original_sha256": "ab0093049d24f35c9fd6d54f1dc754ba2632d376a8904d8a4fe95a0165a2829d",
+    "original_lines": 20044,
+    "excerpt_sha256": "c7147fa87cf1be77030de548439686c9f9418c21311c8afe6bfb6a4320b15df7",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi2_before_0.log",
+    "original_sha256": "f1cc27a9bfc4291f07cb96e353f03b7e5ce998a254f1d7cadef48b3dd68e2a56",
+    "original_lines": 20044,
+    "excerpt_sha256": "be7f98667bfadd7a5cc7af50f6f7efbb2c577a051a7bc495dad5e100e01de250",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi2_before_1.log",
+    "original_sha256": "c3f85841a2352e659fc26911db8f6e123b060adf0cb64961c605f8de9fc97290",
+    "original_lines": 20044,
+    "excerpt_sha256": "9cfd01624c55a4cbbb4a715ef5257947f452260e6fef1571bd9d620d1ff633b9",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi2_before_2.log",
+    "original_sha256": "414b60398de5460fb92f3f7bef307e7c3c8242224d75b3c7141afa15e5e7cc6b",
+    "original_lines": 20044,
+    "excerpt_sha256": "8fb39fa6ed6f938fc5dd55cd0ae4f1dcf388d7cbe2896affde050badf671bc58",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi2_before_3.log",
+    "original_sha256": "a27bdfc004deca31833cf8abc3b83b63bc047cd69302e151cab5cc5c49eb3bd0",
+    "original_lines": 20044,
+    "excerpt_sha256": "76dfeec3e11fa6b53ff413d8fb3c3875f5a3cc65032b3370c24415f6a611a7f4",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results/network10k_mpi2_before_4.log",
+    "original_sha256": "359a9fa642143b63bd28722d64f26639198b589ebd02632d2f1d0f0f445f6141",
+    "original_lines": 20044,
+    "excerpt_sha256": "5d613db937a8c439526925fd16414415490269384413a67da4143ca2cf450020",
+    "excerpt_starts_at_line": 20015
+  }
+]

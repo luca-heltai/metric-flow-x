@@ -1,0 +1,58 @@
+[
+  {
+    "case": "adan56_mpi1",
+    "median_paired_speedup": 1.0736336364102952,
+    "paired_speedups": [
+      0.9947360917588576,
+      1.0806214063331907,
+      1.0691351448538777,
+      1.0736336364102952,
+      1.1208768014100403
+    ],
+    "pairs_improved": 4,
+    "before_median_ms": 20.612349199999997,
+    "after_median_ms": 19.29810425
+  },
+  {
+    "case": "adan56_mpi2",
+    "median_paired_speedup": 1.0411569365874611,
+    "paired_speedups": [
+      1.0824387014166972,
+      1.0501611725241549,
+      1.0356826040226117,
+      1.0411569365874611,
+      0.9911561750775073
+    ],
+    "pairs_improved": 4,
+    "before_median_ms": 10.56362265,
+    "after_median_ms": 10.0436294
+  },
+  {
+    "case": "network10k_mpi1",
+    "median_paired_speedup": 1.043766712887583,
+    "paired_speedups": [
+      1.0819471975128447,
+      1.0528726159912483,
+      1.043766712887583,
+      1.0127075568656736,
+      0.9528707399020879
+    ],
+    "pairs_improved": 4,
+    "before_median_ms": 182.34115835,
+    "after_median_ms": 179.54571515
+  },
+  {
+    "case": "network10k_mpi2",
+    "median_paired_speedup": 1.0841986533531234,
+    "paired_speedups": [
+      1.2350341278156372,
+      1.0841986533531234,
+      1.071877888210899,
+      1.038768879724053,
+      1.2000398627835163
+    ],
+    "pairs_improved": 5,
+    "before_median_ms": 102.904051,
+    "after_median_ms": 85.37035549999999
+  }
+]

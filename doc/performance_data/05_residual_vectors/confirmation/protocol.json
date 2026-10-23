@@ -1,0 +1,29 @@
+{
+  "declared_utc": "2026-10-23T15:21:36.704900+00:00",
+  "reason": "Resolve 10k/MPI2 control confounding observed in the original complete campaign",
+  "policy": "Five complete alternating pairs; no sample selection; original campaign preserved",
+  "command": [
+    "python3",
+    "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/residual_stack_source/tools/compare_assembly.py",
+    "--before",
+    "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/baseline",
+    "--after",
+    "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/candidate",
+    "--inputs",
+    "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/inputs/network10k.prm",
+    "--ranks",
+    "2",
+    "--runs",
+    "5",
+    "--repetitions",
+    "50",
+    "--output",
+    "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation"
+  ],
+  "original_data_sha256": {
+    "timings.jsonl": "8cd725d6a94af1bd0a7808c85604cd80610720d607071ef8fc703f0d24651028",
+    "metadata.json": "b6414013c10e3599363f6e145766a717d8f8cef1ec1ec527909ff0fed869815f",
+    "equivalence.json": "a04b125176670726fad69f658670cc3af5c219f61a3e0119cb2925b7bb7da71e",
+    "summary.json": "c9e54921842bdcd08d3a8416265b83730f1fa9d8eddf02fc8ea4daa184cc4a21"
+  }
+}

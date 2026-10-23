@@ -1,0 +1,72 @@
+[
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation/network10k_mpi2_after_0.log",
+    "original_sha256": "0ae589a720f9fc0514190174e0e1205a2523e98b802244a5d293c13cf71af25a",
+    "original_lines": 20044,
+    "excerpt_sha256": "08bcacb2483df2997f73fdff9f32557183d12deed53652cad17dba66b0fb147c",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation/network10k_mpi2_after_1.log",
+    "original_sha256": "19896f1fbd1661305fe2fb5569c653983d7d29ebc0ab787003e4f09fcb8fcbbe",
+    "original_lines": 20044,
+    "excerpt_sha256": "316f3567917beeb6992a11982da45a2bee63941e56033388155f4569ea623177",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation/network10k_mpi2_after_2.log",
+    "original_sha256": "4ef6e3a67edae3f6d97822ebb1c7ae95cd2894c3c7d6ca54f21d09fec9a30c8b",
+    "original_lines": 20044,
+    "excerpt_sha256": "051856d3e0205dbf39cff1be393a552eb8fe59a88dcc7f1bc8ae41a7491d1f6f",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation/network10k_mpi2_after_3.log",
+    "original_sha256": "09979aec3c33ed927549fa4e0a6a64f651b8ecc8a4a46c64210088d19005ed01",
+    "original_lines": 20044,
+    "excerpt_sha256": "211ac74145c66c3fc58df0580bc8d0741f4f5215c2c34052d88cb5ea4842a4fc",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation/network10k_mpi2_after_4.log",
+    "original_sha256": "eb6acc758a9ab34b6524c988105fc8349ef0cc60a79782111d803cb94e4da85f",
+    "original_lines": 20044,
+    "excerpt_sha256": "1f29760397c1c8ce42fbf25d9f8b2e002d8d0fd70310735f5cfe033509a3179f",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation/network10k_mpi2_before_0.log",
+    "original_sha256": "0fa93e145f6b3a18e50b7cc27bf044bb32accb0a2fb237e3fd693362ff7f17d4",
+    "original_lines": 20044,
+    "excerpt_sha256": "1c329c565685f4c9f08557940621ba3eadbd7ca2e3533cf8df8a8a83720409e5",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation/network10k_mpi2_before_1.log",
+    "original_sha256": "2e7b1c9abeed48d2062b6675586e8bba60be4e0e4d861210512f9e4cba96730e",
+    "original_lines": 20044,
+    "excerpt_sha256": "263dbc47d32ac7b8de9281b63b336b37d77e8013e3dd303e9f869dfe23ac55dd",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation/network10k_mpi2_before_2.log",
+    "original_sha256": "915cc8f7cef3b606849afbd490a40103752c60927105ab3ee1b78691f7e3dab7",
+    "original_lines": 20044,
+    "excerpt_sha256": "560ac3194fb6a3c2ade3b0080086fd581ff4a9853772843431518f29670a9aea",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation/network10k_mpi2_before_3.log",
+    "original_sha256": "2ac46c2d3d13783e29225fa4408415e0e4e9a2faf241d23f4de16f1e3070e171",
+    "original_lines": 20044,
+    "excerpt_sha256": "9638386d44b6687b47922c882a282f10c50f6ba2317251b5ead5167a0599a00a",
+    "excerpt_starts_at_line": 20015
+  },
+  {
+    "path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/results_network_mpi2_confirmation/network10k_mpi2_before_4.log",
+    "original_sha256": "a9c3a4302d929fa2fba58b5026644c853e3f3cad7c54a327030909eca5320b5e",
+    "original_lines": 20044,
+    "excerpt_sha256": "92eeed568bf937cb7afea7524f571b8c2741476445341d21c0712a525fca5aba",
+    "excerpt_starts_at_line": 20015
+  }
+]

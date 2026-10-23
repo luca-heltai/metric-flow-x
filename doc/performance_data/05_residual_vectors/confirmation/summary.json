@@ -1,0 +1,50 @@
+[
+  {
+    "case": "network10k_mpi2",
+    "metric": "residual",
+    "variant": "before",
+    "median_ms": 101.47198272,
+    "min_ms": 95.89750476,
+    "max_ms": 103.30341982
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "residual",
+    "variant": "after",
+    "median_ms": 96.73985566000002,
+    "min_ms": 89.77419616,
+    "max_ms": 98.43078628
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "jacobian",
+    "variant": "before",
+    "median_ms": 209.81065139999998,
+    "min_ms": 193.4162866,
+    "max_ms": 225.15136139999998
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "jacobian",
+    "variant": "after",
+    "median_ms": 215.073902,
+    "min_ms": 192.8085252,
+    "max_ms": 217.0794124
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "derivative",
+    "variant": "before",
+    "median_ms": 3.32e-06,
+    "min_ms": 2.84e-06,
+    "max_ms": 4.22e-06
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "derivative",
+    "variant": "after",
+    "median_ms": 3.2599999999999997e-06,
+    "min_ms": 3.08e-06,
+    "max_ms": 4.4e-06
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "input": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/inputs/adan56.prm",
+    "input_sha256": "ec6e1068dd1ccef33d085eb0ef610c095c34d731e7dc167baa5e93cc73cc8191",
+    "original": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/inputs/adan56.prm",
+    "original_sha256": "b631c2cfb244413d17902be61579279ef949feb4cda314a34ad0d4e7431521a6",
+    "only_change": "Output directory moved into lnx2_residual lane",
+    "mesh_file": "/data/home/lheltai/codes/metric-flow-x/notebooks/56_adnr_new.vtk",
+    "mesh_sha256": "61975d5e4219135c3f9a43210b03ce074a197d3d026c88f7581938c96425df3d",
+    "archived_input": "adan56.prm.gz"
+  },
+  {
+    "input": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx2_residual/inputs/network10k.prm",
+    "input_sha256": "b48e009f37aade7521ab14ea45acccaed9bb1b244be45ef1d49dc6eadb3555b4",
+    "original": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/inputs/network10k.prm",
+    "original_sha256": "8ea3eb4289c3a9e0aeb862e74052778f75b96459f9a098a952499b418c06584c",
+    "only_change": "Output directory moved into lnx2_residual lane",
+    "mesh_file": "/data/home/lheltai/codes/metric-flow-x/notebooks/networks_by_svv/trees/network_10000_adnr.vtk",
+    "mesh_sha256": "3d93dd9d3edb088d45bd719f4526f6137a97411fd0f51d39ab4db2b6279744be",
+    "archived_input": "network10k.prm.gz"
+  }
+]
