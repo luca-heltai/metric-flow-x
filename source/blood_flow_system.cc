@@ -1377,9 +1377,11 @@ namespace MetricFlowX
                       << range.second << ")\n";
             std::abort();
           }
-
-        y_fe_owned(i) = y(i);
       }
+    const auto indices = locally_owned_fe_dofs.get_index_vector();
+    std::vector<double> values(indices.size());
+    y.extract_subvector_to(indices, values);
+    y_fe_owned.set(indices, values);
     y_fe_owned.compress(VectorOperation::insert);
     y_fe_relevant = y_fe_owned;
   }
