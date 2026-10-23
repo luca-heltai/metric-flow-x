@@ -712,7 +712,6 @@ namespace MetricFlowX
     // Parameter entries refer to stable map values. These references avoid
     // string lookups and automatically observe subsequent parameter reloads.
     const double &density                = par["rho"];
-    const double &tube_law_exponent      = par["m"];
     const double &viscosity              = par["mu"];
     const double &friction_profile       = par["xi"];
     const double &reflection_coefficient = par["Rt"];
@@ -1249,8 +1248,8 @@ namespace MetricFlowX
                                   const double       a_d_local) const
     {
       const double A_safe = std::max(A, 1e-10);
-      return compute_wave_speed(A_safe, vid, a_d_local) * tube_law_exponent /
-             (2.0 * A_safe);
+      // The square-root tube law gives c(A) proportional to A^(1/4).
+      return compute_wave_speed(A_safe, vid, a_d_local) * 0.5 / (2.0 * A_safe);
     }
 
     // ---- Cell-iterator wrappers (compute a_d_local internally)
