@@ -64,6 +64,7 @@ containers
 math
 results
 performance
+performance_campaign
 tutorials
 reproducibility
 api

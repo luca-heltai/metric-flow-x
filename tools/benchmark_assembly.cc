@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 
@@ -14,9 +15,10 @@ int
 main(int argc, char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi(argc, argv, 1);
-  AssertThrow(argc == 3,
-              ExcMessage(
-                "Usage: benchmark_assembly parameters.prm repetitions"));
+  AssertThrow(
+    argc == 3 || argc == 4,
+    ExcMessage(
+      "Usage: benchmark_assembly parameters.prm repetitions [snapshot_prefix]"));
   const unsigned int repetitions = std::stoul(argv[2]);
   AssertThrow(repetitions > 0, ExcMessage("Repetitions must be positive."));
   const auto            start = std::chrono::steady_clock::now();
@@ -73,6 +75,9 @@ main(int argc, char **argv)
   const auto jac =
     measure([&]() { flow.assemble_state_jacobian(0.1, y, ydot); },
             std::max(1u, repetitions / 10));
+  const auto mass =
+    measure([&]() { flow.assemble_derivative_jacobian(0.1, y, ydot); },
+            repetitions);
   const double norm           = residual.l2_norm();
   double       checksum_local = 0.0;
   for (const auto i : flow.locally_owned_dofs())
@@ -94,5 +99,66 @@ main(int argc, char **argv)
               << ",\"jacobian_min_s\":" << jac[0]
               << ",\"jacobian_median_s\":" << jac[1]
               << ",\"jacobian_max_s\":" << jac[2] << ",\"residual_l2\":" << norm
-              << ",\"residual_checksum\":" << checksum << "}\n";
+              << ",\"residual_checksum\":" << checksum
+              << ",\"derivative_min_s\":" << mass[0]
+              << ",\"derivative_median_s\":" << mass[1]
+              << ",\"derivative_max_s\":" << mass[2] << "}\n";
+
+  // Snapshots are outside the measured region. Compare the same MPI layout
+  // between revisions: global numbering may differ with the number of ranks.
+  if (argc == 4)
+    {
+      const auto rank =
+        Utilities::MPI::this_mpi_process(flow.mpi_communicator());
+      for (unsigned int state = 0; state < 3; ++state)
+        {
+          for (const auto &cell : flow.dof_handler().active_cell_iterators())
+            if (cell->is_locally_owned())
+              {
+                cell->get_dof_indices(indices);
+                for (unsigned int i = 0; i < indices.size(); ++i)
+                  {
+                    const auto component =
+                      flow.finite_element().system_to_component_index(i).first;
+                    const double variation =
+                      1.0 + 0.001 * ((indices[i] + state) % 13);
+                    y(indices[i]) =
+                      component % 2 == 0 ?
+                        (1.01 + 0.02 * state) * variation *
+                          flow.vessel_properties(cell->material_id()).a_d :
+                        (state == 1 ? -0.1 : 0.1) * variation;
+                  }
+              }
+          y.compress(VectorOperation::insert);
+          for (const auto i : flow.locally_owned_dofs())
+            ydot(i) = 0.02 * (1 + (i + state) % 7);
+          ydot.compress(VectorOperation::insert);
+          const double t = 0.1 + 0.03 * state;
+          flow.assemble_residual(t, y, ydot, residual);
+          flow.assemble_state_jacobian(t, y, ydot);
+          flow.assemble_derivative_jacobian(t, y, ydot);
+          const std::string prefix = std::string(argv[3]) + ".state" +
+                                     std::to_string(state) + ".rank" +
+                                     std::to_string(rank);
+          std::ofstream vector(prefix + ".residual");
+          AssertThrow(vector, ExcMessage("Cannot write residual snapshot."));
+          vector << std::hexfloat;
+          for (const auto i : flow.locally_owned_dofs())
+            vector << i << ' ' << residual(i) << '\n';
+          const auto dump = [&](const MatrixType  &matrix,
+                                const std::string &name) {
+            std::ofstream output(prefix + name);
+            AssertThrow(output, ExcMessage("Cannot write matrix snapshot."));
+            output << std::hexfloat;
+            for (const auto row : flow.locally_owned_dofs())
+              for (auto entry = matrix.begin(row); entry != matrix.end(row);
+                   ++entry)
+                output << row << ' ' << entry->column() << ' ' << entry->value()
+                       << '\n';
+          };
+          dump(flow.state_jacobian_matrix(), ".state_jacobian");
+          dump(flow.derivative_jacobian_matrix(), ".derivative_jacobian");
+        }
+    }
+  flow.write_scaling_timings();
 }
