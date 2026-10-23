@@ -59,6 +59,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -696,6 +697,17 @@ namespace MetricFlowX
     // -----------------------------------------------------------------------
     std::map<FaceKey, FaceTraceDof> face_dof_map;
 
+    struct InteriorFace
+    {
+      typename DoFHandler<dim, spacedim>::active_cell_iterator cell, neighbor;
+      unsigned int face_no, neighbor_face_no;
+      FaceTraceDof trace;
+    };
+
+    // Rebuilt with face_dof_map after DoF distribution. Keep the first-owned-
+    // cell traversal and canonical trace-row ownership of uncached assembly.
+    std::vector<InteriorFace> interior_faces;
+
     // VertexKey
     // face_key(const typename DoFHandler<dim, spacedim>::active_cell_iterator
     // &cell,
@@ -1124,6 +1136,24 @@ namespace MetricFlowX
       const Tensor<1, spacedim> &normal) const
     {
       return compute_directional_vector(cell) * normal;
+    }
+
+    double
+    compute_interior_tangent_normal_product(
+      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+      const Tensor<1, spacedim> &normal) const
+    {
+      const auto direction = compute_directional_vector(cell);
+      if constexpr (spacedim == 3)
+        // Preserve the original contraction order: a normal's last-bit change
+        // can be amplified by cancellation in the trace Jacobian.
+        return std::fma(direction[2],
+                        normal[2],
+                        std::fma(direction[0],
+                                 normal[0],
+                                 direction[1] * normal[1]));
+      else
+        return direction * normal;
     }
 
     // -----------------------------------------------------------------------
