@@ -959,6 +959,7 @@ namespace MetricFlowX
         vp.r_d    = cell_r_d[vid];
         vp.r_in   = (cell_r_in.size() > vid) ? cell_r_in[vid] : 0.0;
         vp.r_out  = (cell_r_out.size() > vid) ? cell_r_out[vid] : 0.0;
+        vp.beta_p = compute_beta_p(vp.E, vp.h_wall);
 
         vessel_map[vid] = vp;
       }

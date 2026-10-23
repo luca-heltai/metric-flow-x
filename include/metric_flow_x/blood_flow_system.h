@@ -742,7 +742,11 @@ namespace MetricFlowX
     // arc-length bounds entering compute_a_d_local() are a property of the
     // vessel as a whole rather than of the locally stored part of it.
     // -----------------------------------------------------------------------
-    using VesselPhysicalProperties = VesselProperties;
+    struct VesselPhysicalProperties : VesselProperties
+    {
+      // E and wall thickness are fixed until network data is rebuilt.
+      double beta_p = 0.0;
+    };
     std::map<unsigned int, VesselPhysicalProperties> vessel_map;
 
     ExternalPressureProvider external_pressure_provider;
@@ -1248,7 +1252,7 @@ namespace MetricFlowX
       // The physical pressure used by assembly is this value plus the
       // prescribed external pressure, through compute_physical_pressure().
       const auto  &vpp  = vessel_map.at(vid);
-      const double beta = compute_beta_p(vpp.E, vpp.h_wall);
+      const double beta = vpp.beta_p;
       return vpp.p0 + beta / a_d_local * (std::sqrt(A) - std::sqrt(a_d_local)) +
              vpp.p_d;
     }
@@ -1259,7 +1263,7 @@ namespace MetricFlowX
                                 const double       a_d_local) const
     {
       const auto  &vpp    = vessel_map.at(vid);
-      const double beta_p = compute_beta_p(vpp.E, vpp.h_wall);
+      const double beta_p = vpp.beta_p;
       return beta_p / (2.0 * a_d_local * std::sqrt(std::max(A, 1e-30)));
     }
 

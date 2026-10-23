@@ -1,0 +1,540 @@
+{
+  "metadata": {
+    "host": "lnx4",
+    "runs": 5,
+    "repetitions": 20,
+    "map_by": "pe-list=8,9:ordered",
+    "bind_to": "core",
+    "baseline": "5797cfd18ec0e192e845ee3947317160e8a5d6e5",
+    "candidate": "3b2d463d9e439d604fb192caad3ad6a9fe43b2e3",
+    "ranks": [
+      1,
+      2
+    ],
+    "input_sha256": {
+      "adan56.prm": "5efe2f1952e1c91472ca7a5583c95cbd65a90a2b4915efdcb55372b7ad2221bb",
+      "network10k.prm": "1b1f7bd95590bf43d50963df4231604e7a541f9bdf78de59376a920e8f0b875d"
+    },
+    "numerical_validation": {
+      "status": "exact",
+      "snapshot_pairs": 54,
+      "rtol": 1.4210854715202004e-14,
+      "atol": 1.4210854715202004e-14,
+      "max_abs_error": 0.0,
+      "max_relative_error": 0.0,
+      "max_scaled_error": 0.0,
+      "changed_entries": 0
+    },
+    "validation": {
+      "release_golden_regressions": 28,
+      "cache_mpi_ranks": [
+        2,
+        4
+      ],
+      "assembly_snapshot_pairs": 54,
+      "assembly_exact": true,
+      "physical_csv_files": 32,
+      "physical_exact": false,
+      "physical_policy": "Actual global IDA component weights and dimensionally propagated derived-output bounds; strict normalized error<1",
+      "solver_atol": 1e-12,
+      "solver_rtol": 1e-07,
+      "physical_acceptance_bound": "Every normalized physical error strictly below 1",
+      "max_normalized_physical_errors": {
+        "area": 1.5241135283647072e-08,
+        "velocity": 0.005824003860829134,
+        "pressure": 2.2817313048924358e-06,
+        "flow": 0.21404059115002771,
+        "terminal_area": 2.2814597295748165e-06,
+        "terminal_velocity": 0.3646675975879655,
+        "reconstructed_Pc": 4.6508261180771187e-08,
+        "volume": 3.643413083667897e-09,
+        "dVdt": 2.4288485300488076e-09,
+        "net_flux": 0.0014865231515103282,
+        "imbalance": 2.3142272644024505e-08
+      },
+      "physical_tool_sha256": "91aa6d2eb3b84a76bba744c752961a5f75183c684d96a9709f1bb16382866f7b",
+      "policy_receipt_sha256": "3e341a6110882a7dbbc6726ee828d72bbd522c0e1dc8fe8276c33f87e329bbda",
+      "diagnostics": "Adaptive time grids, solver counters and relative mass imbalance are recorded separately, not treated as physical output errors",
+      "submitted_parent": "b881955b305614e5eb7a0899bb8061495c133c37",
+      "baseline_cpp_identical_to_submitted_parent": true,
+      "candidate_cpp_identical_to_measured_runtime": true,
+      "source_files_checked": {
+        "baseline": 178,
+        "candidate": 180
+      }
+    },
+    "raw_results_sha256": "826b69bbbf28e87b47892f2c77b39fa89b79290cb481f320179248e884688b5f",
+    "limitations": "ADAN56 pairs vary widely; no precise ADAN gain claimed. Network MPI2 unchanged ghost control improves 1.0434x, so environment contributes to full-kernel gain. Five complete alternating pairs retained; no confidence interval or end-to-end speedup claim.",
+    "predeclared_physical_policy": {
+      "declared_utc": "2026-10-23T18:20:11.823125+00:00",
+      "scope": "Actual post-accepted-new8-to9 trajectory gate; conditional old5baf precheck is not acceptance",
+      "tool_sha256": "91aa6d2eb3b84a76bba744c752961a5f75183c684d96a9709f1bb16382866f7b",
+      "exact_comparison_first": true,
+      "solver_inputs_unchanged": true,
+      "expected_scalar_ida_atol": 1e-12,
+      "expected_scalar_ida_rtol": 1e-07,
+      "assembly_atol": 1.4210854715202004e-14,
+      "assembly_rtol": 1.4210854715202004e-14,
+      "physical_acceptance": "Every physical-unit metric normalized by actual scalar IDA weights or the documented dimensional propagation must be strictly below1; no tolerance overrides",
+      "diagnostics": "Adaptive internal grids/counters and relative mass imbalance recorded separately, never treated as state-unit errors",
+      "fixtures": "All analytic/CSV inflow MPI1/MPI2 cases; unchanged physical parameters, VTK model and waveform contents; positive volume required",
+      "no_adjustment_policy": "Any failure is reported and investigated or rejected; no threshold/input changes or unbounded repetitions"
+    }
+  },
+  "rows": [
+    {
+      "case": "adan56_mpi1",
+      "workload": "adan56",
+      "ranks": 1,
+      "metric": "residual",
+      "before_median_ms": 12.351462050000002,
+      "before_min_ms": 11.8452884,
+      "before_max_ms": 12.57237055,
+      "after_median_ms": 12.31447335,
+      "after_min_ms": 11.688038500000001,
+      "after_max_ms": 12.949166100000001,
+      "median_paired_speedup": 1.002290084025061,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0,
+      "paired_speedups": [
+        1.0030036769700752,
+        1.0573099626596882,
+        0.9954554598081038,
+        1.002290084025061,
+        0.9147529893836174
+      ],
+      "paired_speedup_min": 0.9147529893836174,
+      "paired_speedup_max": 1.0573099626596882
+    },
+    {
+      "case": "adan56_mpi1",
+      "workload": "adan56",
+      "ranks": 1,
+      "metric": "jacobian",
+      "before_median_ms": 35.416501000000004,
+      "before_min_ms": 33.555618,
+      "before_max_ms": 37.390724,
+      "after_median_ms": 34.616527,
+      "after_min_ms": 32.190178,
+      "after_max_ms": 37.849954999999994,
+      "median_paired_speedup": 1.0398099842835777,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0,
+      "paired_speedups": [
+        1.0270261647336278,
+        1.0801408240636041,
+        1.0924727256866986,
+        1.0398099842835777,
+        0.8865431412005643
+      ],
+      "paired_speedup_min": 0.8865431412005643,
+      "paired_speedup_max": 1.0924727256866986
+    },
+    {
+      "case": "adan56_mpi1",
+      "workload": "adan56",
+      "ranks": 1,
+      "metric": "derivative",
+      "before_median_ms": 5.1e-06,
+      "before_min_ms": 4.000000000000001e-06,
+      "before_max_ms": 5.8e-06,
+      "after_median_ms": 4.6e-06,
+      "after_min_ms": 4.3e-06,
+      "after_max_ms": 5.15e-06,
+      "median_paired_speedup": 1.1744186046511629,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0,
+      "paired_speedups": [
+        1.1860465116279069,
+        0.7766990291262137,
+        1.141304347826087,
+        1.2340425531914896,
+        1.1744186046511629
+      ],
+      "paired_speedup_min": 0.7766990291262137,
+      "paired_speedup_max": 1.2340425531914896
+    },
+    {
+      "case": "adan56_mpi2",
+      "workload": "adan56",
+      "ranks": 2,
+      "metric": "residual",
+      "before_median_ms": 6.7115314,
+      "before_min_ms": 6.554386500000001,
+      "before_max_ms": 7.1916652,
+      "after_median_ms": 6.6712005,
+      "after_min_ms": 6.41814025,
+      "after_max_ms": 6.74589015,
+      "median_paired_speedup": 1.0186193997907935,
+      "before_strong_scaling_speedup": 1.8403343907472447,
+      "before_parallel_efficiency": 0.9201671953736223,
+      "after_strong_scaling_speedup": 1.8459156414201612,
+      "after_parallel_efficiency": 0.9229578207100806,
+      "paired_speedups": [
+        1.0021051335975282,
+        0.9824898082436587,
+        1.0315113790166863,
+        1.0186193997907935,
+        1.0744546903534995
+      ],
+      "paired_speedup_min": 0.9824898082436587,
+      "paired_speedup_max": 1.0744546903534995
+    },
+    {
+      "case": "adan56_mpi2",
+      "workload": "adan56",
+      "ranks": 2,
+      "metric": "jacobian",
+      "before_median_ms": 19.56653,
+      "before_min_ms": 18.3687265,
+      "before_max_ms": 20.562798,
+      "after_median_ms": 19.6313765,
+      "after_min_ms": 18.832824000000002,
+      "after_max_ms": 20.199789499999998,
+      "median_paired_speedup": 1.0031808499786594,
+      "before_strong_scaling_speedup": 1.8100552831800019,
+      "before_parallel_efficiency": 0.9050276415900009,
+      "after_strong_scaling_speedup": 1.7633265298538796,
+      "after_parallel_efficiency": 0.8816632649269398,
+      "paired_speedups": [
+        1.0031808499786594,
+        1.0305531714202818,
+        0.9356820445066601,
+        1.001941073829397,
+        1.0463946203908352
+      ],
+      "paired_speedup_min": 0.9356820445066601,
+      "paired_speedup_max": 1.0463946203908352
+    },
+    {
+      "case": "adan56_mpi2",
+      "workload": "adan56",
+      "ranks": 2,
+      "metric": "derivative",
+      "before_median_ms": 5.050000000000001e-06,
+      "before_min_ms": 4.9e-06,
+      "before_max_ms": 5.500000000000001e-06,
+      "after_median_ms": 5.500000000000001e-06,
+      "after_min_ms": 5.25e-06,
+      "after_max_ms": 6.55e-06,
+      "median_paired_speedup": 0.961904761904762,
+      "before_strong_scaling_speedup": 1.00990099009901,
+      "before_parallel_efficiency": 0.504950495049505,
+      "after_strong_scaling_speedup": 0.8363636363636363,
+      "after_parallel_efficiency": 0.41818181818181815,
+      "paired_speedups": [
+        0.961904761904762,
+        1.0185185185185186,
+        0.875,
+        1.0,
+        0.7557251908396946
+      ],
+      "paired_speedup_min": 0.7557251908396946,
+      "paired_speedup_max": 1.0185185185185186
+    },
+    {
+      "case": "network10k_mpi1",
+      "workload": "network10k",
+      "ranks": 1,
+      "metric": "residual",
+      "before_median_ms": 159.46689315,
+      "before_min_ms": 157.18593505,
+      "before_max_ms": 170.3993139,
+      "after_median_ms": 148.6550118,
+      "after_min_ms": 147.71608215,
+      "after_max_ms": 160.93966245,
+      "median_paired_speedup": 1.0706887694048133,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0,
+      "paired_speedups": [
+        1.064108475950396,
+        1.0734533650823814,
+        1.0706887694048133,
+        0.9921720206764358,
+        1.0763415485540189
+      ],
+      "paired_speedup_min": 0.9921720206764358,
+      "paired_speedup_max": 1.0763415485540189
+    },
+    {
+      "case": "network10k_mpi1",
+      "workload": "network10k",
+      "ranks": 1,
+      "metric": "jacobian",
+      "before_median_ms": 298.419084,
+      "before_min_ms": 291.0137315,
+      "before_max_ms": 305.1526405,
+      "after_median_ms": 278.3900915,
+      "after_min_ms": 277.568995,
+      "after_max_ms": 288.29843500000004,
+      "median_paired_speedup": 1.0573041161322987,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0,
+      "paired_speedups": [
+        1.0469118207887802,
+        1.052128383671299,
+        1.0694362386061056,
+        1.0573041161322987,
+        1.0993758164524103
+      ],
+      "paired_speedup_min": 1.0469118207887802,
+      "paired_speedup_max": 1.0993758164524103
+    },
+    {
+      "case": "network10k_mpi1",
+      "workload": "network10k",
+      "ranks": 1,
+      "metric": "derivative",
+      "before_median_ms": 5.4e-06,
+      "before_min_ms": 4.9e-06,
+      "before_max_ms": 5.999999999999999e-06,
+      "after_median_ms": 5.25e-06,
+      "after_min_ms": 4.35e-06,
+      "after_max_ms": 5.999999999999999e-06,
+      "median_paired_speedup": 1.0,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0,
+      "paired_speedups": [
+        1.379310344827586,
+        1.0,
+        0.9904761904761905,
+        0.8166666666666668,
+        1.1666666666666665
+      ],
+      "paired_speedup_min": 0.8166666666666668,
+      "paired_speedup_max": 1.379310344827586
+    },
+    {
+      "case": "network10k_mpi2",
+      "workload": "network10k",
+      "ranks": 2,
+      "metric": "residual",
+      "before_median_ms": 91.40131035,
+      "before_min_ms": 88.77549365000002,
+      "before_max_ms": 92.31281285000001,
+      "after_median_ms": 85.83921155,
+      "after_min_ms": 84.37054005,
+      "after_max_ms": 87.3480118,
+      "median_paired_speedup": 1.0647967135247993,
+      "before_strong_scaling_speedup": 1.7446893544453435,
+      "before_parallel_efficiency": 0.8723446772226717,
+      "after_strong_scaling_speedup": 1.7317844504362763,
+      "after_parallel_efficiency": 0.8658922252181381,
+      "paired_speedups": [
+        1.0414372820332471,
+        1.0647967135247993,
+        1.0665516740400276,
+        1.0348425419854181,
+        1.0923931225920842
+      ],
+      "paired_speedup_min": 1.0348425419854181,
+      "paired_speedup_max": 1.0923931225920842
+    },
+    {
+      "case": "network10k_mpi2",
+      "workload": "network10k",
+      "ranks": 2,
+      "metric": "jacobian",
+      "before_median_ms": 177.944175,
+      "before_min_ms": 170.76434749999999,
+      "before_max_ms": 181.6189235,
+      "after_median_ms": 166.9486285,
+      "after_min_ms": 164.127731,
+      "after_max_ms": 170.0152705,
+      "median_paired_speedup": 1.0673763785769328,
+      "before_strong_scaling_speedup": 1.6770376664479183,
+      "before_parallel_efficiency": 0.8385188332239591,
+      "after_strong_scaling_speedup": 1.6675194878884552,
+      "after_parallel_efficiency": 0.8337597439442276,
+      "paired_speedups": [
+        1.0673763785769328,
+        1.0658618558223136,
+        1.0682506516377892,
+        1.0255356099616224,
+        1.0721621503437466
+      ],
+      "paired_speedup_min": 1.0255356099616224,
+      "paired_speedup_max": 1.0721621503437466
+    },
+    {
+      "case": "network10k_mpi2",
+      "workload": "network10k",
+      "ranks": 2,
+      "metric": "derivative",
+      "before_median_ms": 5e-06,
+      "before_min_ms": 4.35e-06,
+      "before_max_ms": 5.7e-06,
+      "after_median_ms": 5.2e-06,
+      "after_min_ms": 4.65e-06,
+      "after_max_ms": 5.999999999999999e-06,
+      "median_paired_speedup": 0.9354838709677419,
+      "before_strong_scaling_speedup": 1.0799999999999998,
+      "before_parallel_efficiency": 0.5399999999999999,
+      "after_strong_scaling_speedup": 1.0096153846153846,
+      "after_parallel_efficiency": 0.5048076923076923,
+      "paired_speedups": [
+        0.8877551020408163,
+        1.0857142857142856,
+        1.0096153846153846,
+        0.9354838709677419,
+        0.8333333333333335
+      ],
+      "paired_speedup_min": 0.8333333333333335,
+      "paired_speedup_max": 1.0857142857142856
+    }
+  ],
+  "scope_timer_evidence": {
+    "adan56_mpi1": {
+      "assemble_cell_residuals": {
+        "median_paired_speedup": 1.0380116959064327,
+        "paired_speedups": [
+          1.0412087912087913,
+          1.0347826086956522,
+          1.0380116959064327,
+          1.047752808988764,
+          0.9489247311827956
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      },
+      "assemble_jacobian_cell_block": {
+        "median_paired_speedup": 1.0310077519379846,
+        "paired_speedups": [
+          1.048913043478261,
+          1.088709677419355,
+          1.0234375,
+          1.0310077519379846,
+          0.8639455782312926
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      },
+      "update_ghosted_vectors": {
+        "median_paired_speedup": 1.0324074074074074,
+        "paired_speedups": [
+          1.0324074074074074,
+          1.0540540540540542,
+          1.1160220994475136,
+          1.025,
+          0.9693877551020408
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      }
+    },
+    "adan56_mpi2": {
+      "assemble_cell_residuals": {
+        "median_paired_speedup": 1.0259067357512954,
+        "paired_speedups": [
+          1.0048309178743962,
+          1.0210526315789474,
+          1.0376344086021505,
+          1.0259067357512954,
+          1.0703517587939697
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      },
+      "assemble_jacobian_cell_block": {
+        "median_paired_speedup": 1.0128205128205128,
+        "paired_speedups": [
+          1.0480769230769231,
+          1.0128205128205128,
+          0.9787234042553193,
+          0.9902642559109874,
+          1.0327868852459017
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      },
+      "update_ghosted_vectors": {
+        "median_paired_speedup": 0.9823008849557523,
+        "paired_speedups": [
+          0.9568345323741008,
+          1.0,
+          0.9137931034482759,
+          0.9907407407407406,
+          0.9823008849557523
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      }
+    },
+    "network10k_mpi1": {
+      "assemble_cell_residuals": {
+        "median_paired_speedup": 1.108359133126935,
+        "paired_speedups": [
+          1.1359223300970873,
+          1.0855263157894737,
+          1.1143790849673203,
+          1.0340557275541795,
+          1.108359133126935
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      },
+      "assemble_jacobian_cell_block": {
+        "median_paired_speedup": 1.0971223021582734,
+        "paired_speedups": [
+          1.1166666666666667,
+          1.067065868263473,
+          1.0971223021582734,
+          1.076036866359447,
+          1.1201923076923077
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      },
+      "update_ghosted_vectors": {
+        "median_paired_speedup": 1.0070422535211268,
+        "paired_speedups": [
+          1.0127388535031847,
+          1.0214285714285714,
+          1.0070422535211268,
+          0.9602649006622516,
+          1.0
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      }
+    },
+    "network10k_mpi2": {
+      "assemble_cell_residuals": {
+        "median_paired_speedup": 1.0818713450292399,
+        "paired_speedups": [
+          1.0777777777777777,
+          1.125,
+          1.0818713450292399,
+          1.0584795321637428,
+          1.0946745562130178
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      },
+      "assemble_jacobian_cell_block": {
+        "median_paired_speedup": 1.0676229508196722,
+        "paired_speedups": [
+          1.0326975476839237,
+          1.0997920997920998,
+          1.0196463654223968,
+          1.0676229508196722,
+          1.1208333333333333
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      },
+      "update_ghosted_vectors": {
+        "median_paired_speedup": 1.0434298440979954,
+        "paired_speedups": [
+          1.0679611650485437,
+          1.0434298440979954,
+          1.0531803962460897,
+          1.0085015940488842,
+          1.0377358490566038
+        ],
+        "precision": "rounded TimerOutput totals, supporting evidence only"
+      }
+    }
+  }
+}

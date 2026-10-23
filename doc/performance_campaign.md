@@ -114,3 +114,36 @@ lnx3. [Final results](performance_data/08_fe_support_selector/results.json)
 retain all paired ratios, ranges, provenance and this residual limitation.
 
 ![Nonzero finite-element supports](performance_data/08_fe_support_selector/comparison.svg)
+
+## 9. Reuse vessel material stiffness
+
+Cache the material factor `(4 sqrt(pi) / 3) E h` while rebuilding vessel data;
+pressure and its derivative reuse it. The public constant property view stays
+unchanged, and a reload regression verifies updates to both material inputs.
+Five complete alternating Release/PETSc pairs on lnx4 cores 8/9 compare against
+step 8, with 20 repetitions at MPI1/MPI2 and source-matched archived libraries.
+
+Network residual speedups are **1.071/1.065x**, Jacobian **1.057/1.067x**.
+Target cell scopes improve **1.08–1.11x** (residual), **1.07–1.10x** (Jacobian).
+The unchanged MPI2 ghost control improves 1.043x, so environment contributes;
+ADAN56 varies widely and supports no precise gain claim. All paired ratios,
+ranges and controls remain in the [final results](performance_data/09_vessel_stiffness/results.json).
+
+All **54 assembly snapshots match exactly**; **28 Release regressions** and
+cache checks at MPI2/MPI4 pass. The 32 physical CSVs have small differences:
+all errors are strictly below actual IDA weights (`atol=1e-12`, `rtol=1e-7`),
+with maximum normalized error **0.365**. Bounds are propagated in physical
+units; adaptive grids and counters remain separate diagnostics.
+
+![Cached vessel stiffness](performance_data/09_vessel_stiffness/comparison.svg)
+
+For the scalar-IDA single-vessel inflow fixture, compare physical outputs with:
+
+```sh
+python3 tools/compare_inflow_trajectories.py --before BEFORE --after AFTER \
+  --policy PREDECLARED.json --output REPORT.json
+```
+
+Record the policy before measuring. The tool reads the actual solver weights,
+checks unchanged effective inputs and propagates bounds in SI units; it rejects
+unsupported componentwise tolerances or fixtures. It accepts no tolerance overrides.
