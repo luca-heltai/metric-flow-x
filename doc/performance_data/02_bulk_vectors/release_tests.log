@@ -1,0 +1,56 @@
+Internal ctest changing into directory: /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/candidate_build
+Test project /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/candidate_build
+      Start  1: tests/template.release
+ 1/25 Test  #1: tests/template.release ..............................   Passed    0.50 sec
+      Start  3: tests/test_constant.release
+ 2/25 Test  #3: tests/test_constant.release .........................   Passed    0.24 sec
+      Start 12: tests/test_jacobian_eta.release
+ 3/25 Test #12: tests/test_jacobian_eta.release .....................   Passed    0.23 sec
+      Start 20: tests/test_rcr_zero_capacitance.release
+ 4/25 Test #20: tests/test_rcr_zero_capacitance.release .............   Passed    0.24 sec
+      Start 17: tests/test_mass_ones.release
+ 5/25 Test #17: tests/test_mass_ones.release ........................   Passed    0.23 sec
+      Start 14: tests/test_jacobian_junction.release
+ 6/25 Test #14: tests/test_jacobian_junction.release ................   Passed    0.23 sec
+      Start 15: tests/test_mass_integration.release
+ 7/25 Test #15: tests/test_mass_integration.release .................   Passed    0.23 sec
+      Start 22: tests/test_terminal_exports.release
+ 8/25 Test #22: tests/test_terminal_exports.release .................   Passed    0.23 sec
+      Start  6: tests/test_dirichlet_boundary.release
+ 9/25 Test  #6: tests/test_dirichlet_boundary.release ...............   Passed    0.23 sec
+      Start  8: tests/test_inflow_series.release
+10/25 Test  #8: tests/test_inflow_series.release ....................   Passed    0.22 sec
+      Start  2: tests/test_component_tolerances.release
+11/25 Test  #2: tests/test_component_tolerances.release .............   Passed    0.23 sec
+      Start 16: tests/test_mass_integration_velocity.release
+12/25 Test #16: tests/test_mass_integration_velocity.release ........   Passed    0.22 sec
+      Start 10: tests/test_jacobian_boundary.release
+13/25 Test #10: tests/test_jacobian_boundary.release ................   Passed    0.23 sec
+      Start  5: tests/test_csv_output.release
+14/25 Test  #5: tests/test_csv_output.release .......................   Passed    0.22 sec
+      Start 25: tests/test_vtk.release
+15/25 Test #25: tests/test_vtk.release ..............................   Passed    0.22 sec
+      Start  9: tests/test_iterative_trace_initialization.release
+16/25 Test  #9: tests/test_iterative_trace_initialization.release ...   Passed    0.22 sec
+      Start 13: tests/test_jacobian_interior.release
+17/25 Test #13: tests/test_jacobian_interior.release ................   Passed    0.22 sec
+      Start 11: tests/test_jacobian_cell.release
+18/25 Test #11: tests/test_jacobian_cell.release ....................   Passed    0.22 sec
+      Start 18: tests/test_mesh_initializer.release
+19/25 Test #18: tests/test_mesh_initializer.release .................   Passed    0.21 sec
+      Start 24: tests/test_trace_residual.release
+20/25 Test #24: tests/test_trace_residual.release ...................   Passed    0.21 sec
+      Start 21: tests/test_tapered_vessel.release
+21/25 Test #21: tests/test_tapered_vessel.release ...................   Passed    0.21 sec
+      Start 19: tests/test_physical_constants_reload.release
+22/25 Test #19: tests/test_physical_constants_reload.release ........   Passed    0.22 sec
+      Start  7: tests/test_external_pressure.release
+23/25 Test  #7: tests/test_external_pressure.release ................   Passed    0.22 sec
+      Start 23: tests/test_terminal_parameters.release
+24/25 Test #23: tests/test_terminal_parameters.release ..............   Passed    0.22 sec
+      Start  4: tests/test_coupling_readiness.release
+25/25 Test  #4: tests/test_coupling_readiness.release ...............   Passed    0.22 sec
+
+100% tests passed, 0 tests failed out of 25
+
+Total Test time (real) =   6.00 sec

@@ -1,0 +1,6 @@
+{
+  "original_baseline": "-O3 -DNDEBUG -fPIC -pedantic -Wall -Wextra -Wmissing-braces -Woverloaded-virtual -Wpointer-arith -Wsign-compare -Wsuggest-override -Wswitch -Wsynth -Wwrite-strings -Wno-placement-new -Wno-literal-suffix -Wno-psabi -Wno-misleading-indentation -Wno-unused-local-typedefs -fopenmp-simd -march=broadwell -mtune=broadwell -O2 -funroll-loops -funroll-all-loops -Wno-unused-parameter -march=core-avx2 -mtune=core-avx2 -mrtm -frounding-math",
+  "final_candidate": "-O3 -DNDEBUG -fPIC -pedantic -Wall -Wextra -Wmissing-braces -Woverloaded-virtual -Wpointer-arith -Wsign-compare -Wsuggest-override -Wswitch -Wsynth -Wwrite-strings -Wno-placement-new -Wno-literal-suffix -Wno-psabi -Wno-misleading-indentation -Wno-unused-local-typedefs -fopenmp-simd -march=broadwell -mtune=broadwell -O2 -funroll-loops -funroll-all-loops -Wno-unused-parameter -march=core-avx2 -mtune=core-avx2 -mrtm -frounding-math",
+  "effective_optimization": "-O2 (deal.II appends it after the initial CMake -O3)",
+  "compiler": "g++ (Spack GCC) 13.2.0"
+}

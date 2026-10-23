@@ -1,0 +1,11 @@
+{
+  "measured_base": "965e7fdc97edac7024151ab05dad53e623b77d96",
+  "measured_patch_sha256": "c01259a3aa1f7f8e537a93045ca1c9cad74ca4710441ed41f92c233f723f7cea",
+  "final_runtime_revision": "2042e28",
+  "final_adjustment": "One empty line removed after the measured build. Final library is independently checked against every measured snapshot hash.",
+  "tests": "25/25 Release build/run/diff; CTest-j4 with lock; 32 physical trajectory CSVs exact.",
+  "final_library_sha256": "52bb67e477e059773024d5a9e673fe033d8e205cabfc5d7467f6ee78971c84d5",
+  "final_verification": "54/54 snapshot hashes and 32 physical trajectory CSVs match exactly with final recompiled library.",
+  "measured_patch_archive": "measured_source.patch.gz",
+  "process_log_excerpt": "BENCHMARK record through TimerOutput summary, trailing blank lines trimmed; setup vessel listing omitted. Full original logs retained in build/performance_campaign/step2_bulk."
+}

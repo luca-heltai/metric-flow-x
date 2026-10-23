@@ -68,7 +68,7 @@ The numerical source is commit `6c2e6f8`, compared with main `b5d1b62`; both
 archives use the same extended benchmark driver.
 
 The accepted experiment ran on lnx3 with GCC 13.2.0, deal.II 9.8.0, PETSc,
-Release (`-O3`, AVX2), and five alternating process pairs per case. Each process
+Release (effective `-O2`, AVX2), and five alternating process pairs per case. Each process
 uses three timed samples of 20 residual calls. The ADAN56 workload has degree 2,
 2464 cells and 24671 unknowns; the SI network has degree 1, 20001 cells and
 170009 unknowns. The preliminary lnx2 data are excluded.
@@ -132,3 +132,59 @@ The [exact mismatch receipt](performance_data/rejected_interior_cache/rejection.
 [binary metadata](performance_data/rejected_interior_cache/metadata.json)
 preserve the failed experiment. Its timing improvement is not an accepted
 performance intervention.
+
+## Intervention 2: transfer owned FE state in bulk
+
+`update_ghosted_vectors()` previously read and inserted one distributed vector
+entry at a time. It now uses the existing native subvector extraction and bulk
+insertion interfaces. The ownership validation, insertion compression and both
+ghost imports retain their original order. No floating-point formula changes.
+The measured source patch is archived against `965e7fd`; the final numerical
+source is `2042e28`, which also includes the separate CTest build-lock fix.
+
+The same lnx3 protocol as intervention 1 ran five alternating pairs for all
+four cases. Eighteen of twenty residual pairs improved. The state Jacobian also
+uses the changed ghost import, but its benefit is smaller and partly masked by
+process variability. The derivative Jacobian is unchanged and remains a
+variability control. No end-to-end speedup is claimed.
+
+| Case | Before residual (ms) | After residual (ms) | Median paired speedup |
+|---|---:|---:|---:|
+| adan56_mpi1 | 36.915 | 36.169 | 1.076 |
+| adan56_mpi2 | 18.408 | 16.913 | 1.068 |
+| network10k_mpi1 | 323.397 | 304.148 | 1.063 |
+| network10k_mpi2 | 165.504 | 152.524 | 1.068 |
+
+![Before and after bulk vector transfer](performance_data/02_bulk_vectors/comparison.svg)
+
+All 54 snapshot pairs matched exactly, covering 1,179,248,416 bytes per side.
+The [receipts](performance_data/02_bulk_vectors/equivalence.json),
+[raw timing records](performance_data/02_bulk_vectors/timings.jsonl),
+[build metadata](performance_data/02_bulk_vectors/metadata.json) and
+[input hashes](performance_data/02_bulk_vectors/inputs.json) accompany the plot.
+Rounded TimerOutput summaries show an approximately sixfold reduction in the
+ghost-update section; the [profile receipt](performance_data/02_bulk_vectors/ghost_profile.json)
+records these approximate section times separately from the assembly benchmark.
+
+All 25 Release tests passed, including build, execution and output comparison.
+CTest also passed with `-j4` after verifying the shared build lock on every
+discovered test. This additionally validates the supporting fix in PR #38.
+Both measured archives passed the analytic/CSV inflow check at MPI1 and MPI2;
+all 32 physical output CSVs (2372 rows) matched exactly after excluding only
+scaling timings and the wall-clock statistics field. The
+[test log](performance_data/02_bulk_vectors/release_tests.log) and
+[trajectory receipt](performance_data/02_bulk_vectors/trajectory_equivalence.json)
+record these checks.
+
+The [compiler flags](performance_data/02_bulk_vectors/toolchain.json) are the
+same before and after. Although CMake's Release flags begin with `-O3`, the
+configured deal.II flags subsequently append `-O2`; the effective optimization
+level is therefore `-O2`. This also corrects the earlier description of
+intervention 1, which used the same flags.
+
+After the whitespace cleanup for publication, the final source was recompiled
+and independently checked against all 54 recorded snapshot hashes. The final
+executable also reproduced all 32 trajectory CSVs exactly. Separate
+[final-revision receipts](performance_data/02_bulk_vectors/final_revision_equivalence.json)
+and [trajectory receipts](performance_data/02_bulk_vectors/final_trajectory_equivalence.json)
+identify the recompiled library; the original timed build remains archived.
