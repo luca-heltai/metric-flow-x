@@ -260,6 +260,7 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::initialize_params(const std::string &filename)
   {
     TimerOutput::Scope t(computing_timer, "initialize_params");
+    derivative_jacobian_is_current_ = false;
 
     ParameterAcceptor::initialize(filename,
                                   "last_used_parameters.prm",
@@ -1619,6 +1620,7 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer,
                              "build_extended_sparsity_pattern");
+    derivative_jacobian_is_current_ = false;
 
     DynamicSparsityPattern dsp(n_total_dofs,
                                n_total_dofs,
@@ -2075,6 +2077,7 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::build_per_cell_mass_inv()
   {
     TimerOutput::Scope timer(computing_timer, "build_per_cell_mass_inv");
+    derivative_jacobian_is_current_ = false;
 
     const unsigned int n_local_cells = triangulation_.n_active_cells();
     per_cell_mass.assign(n_local_cells, FullMatrix<double>());
@@ -3785,6 +3788,10 @@ namespace MetricFlowX
     (void)t;
     (void)y;
     (void)ydot;
+    // Only the mesh mass matrices and terminal capacitances enter this block.
+    // They change during setup or parameter reload, which invalidate the cache.
+    if (derivative_jacobian_is_current_)
+      return;
     derivative_jacobian_matrix_ = 0.0;
 
     const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
@@ -3806,6 +3813,7 @@ namespace MetricFlowX
         derivative_jacobian_matrix_.add(pc_dof, pc_dof, rcr_map.at(bid).C);
 
     derivative_jacobian_matrix_.compress(VectorOperation::add);
+    derivative_jacobian_is_current_ = true;
   }
 
   template <int dim, int spacedim>
