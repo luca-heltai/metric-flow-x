@@ -330,7 +330,14 @@ namespace MetricFlowX
   void
   BloodFlowSystem<dim, spacedim>::setup()
   {
-    create_triangulation();
+    setup(MeshInitializer{});
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::setup(const MeshInitializer &initialize_mesh)
+  {
+    create_triangulation(initialize_mesh);
     setup_system();
     initialize_terminal_capacitors();
     build_per_cell_mass_inv();
@@ -527,6 +534,13 @@ namespace MetricFlowX
   {
     reinit_state(state_dot);
     state_dot = 0.0;
+  }
+
+  template <int dim, int spacedim>
+  parallel::fullydistributed::Triangulation<dim, spacedim> &
+  BloodFlowSystem<dim, spacedim>::triangulation()
+  {
+    return triangulation_;
   }
 
   template <int dim, int spacedim>
@@ -729,6 +743,17 @@ namespace MetricFlowX
   void
   BloodFlowSystem<dim, spacedim>::create_triangulation()
   {
+    create_triangulation(MeshInitializer{});
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::create_triangulation(
+    const MeshInitializer &initialize_mesh)
+  {
+    AssertThrow(triangulation_.n_global_active_cells() == 0,
+                ExcMessage(
+                  "Cannot initialize an already populated flow mesh."));
     TimerOutput::Scope timer(computing_timer, "create_triangulation");
 
     Triangulation<dim, spacedim> serial_triangulation;
@@ -854,19 +879,29 @@ namespace MetricFlowX
               vessel_terminals[cell->material_id()].insert(id);
           }
 
-    serial_triangulation.refine_global(n_global_refinements);
+    if (initialize_mesh)
+      {
+        initialize_mesh(serial_triangulation, n_global_refinements);
+        AssertThrow(triangulation_.n_global_active_cells() > 0,
+                    ExcMessage(
+                      "The mesh initializer must populate the flow mesh."));
+      }
+    else
+      {
+        serial_triangulation.refine_global(n_global_refinements);
 
-    // Partition and hand the description to the fully distributed mesh.  The
-    // z-order partitioner keeps a vessel's cells together, which keeps the
-    // number of junctions straddling a subdomain boundary small.
-    GridTools::partition_triangulation_zorder(n_mpi_processes,
-                                              serial_triangulation);
+        // Partition and hand the description to the fully distributed mesh. The
+        // z-order partitioner keeps a vessel's cells together, which keeps the
+        // number of junctions straddling a subdomain boundary small.
+        GridTools::partition_triangulation_zorder(n_mpi_processes,
+                                                  serial_triangulation);
 
-    const auto description = TriangulationDescription::Utilities::
-      create_description_from_triangulation(serial_triangulation,
-                                            mpi_communicator_);
+        const auto description = TriangulationDescription::Utilities::
+          create_description_from_triangulation(serial_triangulation,
+                                                mpi_communicator_);
 
-    triangulation_.create_triangulation(description);
+        triangulation_.create_triangulation(description);
+      }
     if (verbosity > 0)
       pcout << "Global active cells = "
             << triangulation_.n_global_active_cells() << std::endl;
