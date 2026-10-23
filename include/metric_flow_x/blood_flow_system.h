@@ -945,6 +945,7 @@ namespace MetricFlowX
     MatrixType jacobian_matrix;
     MatrixType state_jacobian_matrix_;
     MatrixType derivative_jacobian_matrix_;
+    bool       derivative_jacobian_is_current_ = false;
     MatrixType linear_system_matrix;
 
     // The direct solver is the one object with no common alias in the LA

@@ -260,6 +260,7 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::initialize_params(const std::string &filename)
   {
     TimerOutput::Scope t(computing_timer, "initialize_params");
+    derivative_jacobian_is_current_ = false;
 
     ParameterAcceptor::initialize(filename,
                                   "last_used_parameters.prm",
@@ -1377,9 +1378,11 @@ namespace MetricFlowX
                       << range.second << ")\n";
             std::abort();
           }
-
-        y_fe_owned(i) = y(i);
       }
+    const auto          indices = locally_owned_fe_dofs.get_index_vector();
+    std::vector<double> values(indices.size());
+    y.extract_subvector_to(indices, values);
+    y_fe_owned.set(indices, values);
     y_fe_owned.compress(VectorOperation::insert);
     y_fe_relevant = y_fe_owned;
   }
@@ -1617,6 +1620,7 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer,
                              "build_extended_sparsity_pattern");
+    derivative_jacobian_is_current_ = false;
 
     DynamicSparsityPattern dsp(n_total_dofs,
                                n_total_dofs,
@@ -2073,6 +2077,7 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::build_per_cell_mass_inv()
   {
     TimerOutput::Scope timer(computing_timer, "build_per_cell_mass_inv");
+    derivative_jacobian_is_current_ = false;
 
     const unsigned int n_local_cells = triangulation_.n_active_cells();
     per_cell_mass.assign(n_local_cells, FullMatrix<double>());
@@ -2761,6 +2766,7 @@ namespace MetricFlowX
     std::vector<double> Uhat_q(fef.n_quadrature_points);
 
     const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
+    std::vector<double>                  local_values(n_dofs);
     Vector<double>                       cell_rhs(n_dofs);
     std::vector<types::global_dof_index> ldofs(n_dofs);
 
@@ -2778,11 +2784,14 @@ namespace MetricFlowX
         fev.reinit(cell);
 
         cell->get_dof_indices(ldofs);
+        y_cell.extract_subvector_to(ldofs, local_values);
 
         const auto &JxW = fev.get_JxW_values();
 
-        fev[area_extractor].get_function_values(y_cell, A_h);
-        fev[velocity_extractor].get_function_values(y_cell, U_h);
+        fev[area_extractor].get_function_values_from_local_dof_values(
+          local_values, A_h);
+        fev[velocity_extractor].get_function_values_from_local_dof_values(
+          local_values, U_h);
 
         cell_rhs = 0;
 
@@ -2854,8 +2863,10 @@ namespace MetricFlowX
             const auto  &JxW     = fef.get_JxW_values();
 
             // Interior cell values at the face quadrature point
-            fef[area_extractor].get_function_values(y_cell, Ah_q);
-            fef[velocity_extractor].get_function_values(y_cell, Uh_q);
+            fef[area_extractor].get_function_values_from_local_dof_values(
+              local_values, Ah_q);
+            fef[velocity_extractor].get_function_values_from_local_dof_values(
+              local_values, Uh_q);
 
             // Face-trace values: this cell's OWN (A_hat, U_hat) on
             // face f, read with the same extractor idiom as the
@@ -2864,8 +2875,10 @@ namespace MetricFlowX
             // on an ordinary interior (or 2-way) face it is tied to
             // the canonical side by the continuity rows, so the
             // converged value is identical to the canonical one.
-            fef[a_hat_extractor].get_function_values(y_cell, Ahat_q);
-            fef[u_hat_extractor].get_function_values(y_cell, Uhat_q);
+            fef[a_hat_extractor].get_function_values_from_local_dof_values(
+              local_values, Ahat_q);
+            fef[u_hat_extractor].get_function_values_from_local_dof_values(
+              local_values, Uhat_q);
 
             for (unsigned int q = 0; q < fef.n_quadrature_points; ++q)
               {
@@ -2927,8 +2940,7 @@ namespace MetricFlowX
         // Every DoF of this FESystem is discontinuous, so all of `ldofs`
         // belongs to this cell alone and is owned by this rank: no other rank
         // contributes to these rows.
-        for (unsigned int i = 0; i < n_dofs; ++i)
-          F(ldofs[i]) += cell_rhs(i);
+        F.add(ldofs, cell_rhs);
       }
   }
 
@@ -3606,16 +3618,18 @@ namespace MetricFlowX
 
         cell->get_dof_indices(ldofs);
 
-        for (unsigned int i = 0; i < n_dofs; ++i)
-          {
-            local_F(i)     = residual_F(ldofs[i]);
-            local_Mydot(i) = ydot(ldofs[i]);
-          }
+        residual_F.extract_subvector_to(ldofs.begin(),
+                                        ldofs.end(),
+                                        local_F.begin());
+        ydot.extract_subvector_to(ldofs.begin(),
+                                  ldofs.end(),
+                                  local_Mydot.begin());
 
         per_cell_mass[cell->active_cell_index()].vmult(local_res, local_Mydot);
 
         for (unsigned int i = 0; i < n_dofs; ++i)
-          residual(ldofs[i]) += local_res(i) - local_F(i);
+          local_res(i) -= local_F(i);
+        residual.add(ldofs, local_res);
       }
 
     // RCR capacitor rows: differential, written directly in M*ydot - R form.
@@ -3775,6 +3789,10 @@ namespace MetricFlowX
     (void)t;
     (void)y;
     (void)ydot;
+    // Only the mesh mass matrices and terminal capacitances enter this block.
+    // They change during setup or parameter reload, which invalidate the cache.
+    if (derivative_jacobian_is_current_)
+      return;
     derivative_jacobian_matrix_ = 0.0;
 
     const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
@@ -3796,6 +3814,7 @@ namespace MetricFlowX
         derivative_jacobian_matrix_.add(pc_dof, pc_dof, rcr_map.at(bid).C);
 
     derivative_jacobian_matrix_.compress(VectorOperation::add);
+    derivative_jacobian_is_current_ = true;
   }
 
   template <int dim, int spacedim>
@@ -3847,6 +3866,7 @@ namespace MetricFlowX
     const double eta =
       2.0 * (friction_profile + 2.0) * numbers::PI * viscosity / rho;
     (void)t;
+    std::vector<double> local_values(fe_->n_dofs_per_cell());
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
@@ -3861,11 +3881,14 @@ namespace MetricFlowX
         const auto                          &JxW = fev.get_JxW_values();
         std::vector<types::global_dof_index> ldofs(n_dofs);
         cell->get_dof_indices(ldofs);
+        y_cell.extract_subvector_to(ldofs, local_values);
 
         std::vector<double> A_h(fev.n_quadrature_points);
         std::vector<double> U_h(fev.n_quadrature_points);
-        fev[area_extractor].get_function_values(y_cell, A_h);
-        fev[velocity_extractor].get_function_values(y_cell, U_h);
+        fev[area_extractor].get_function_values_from_local_dof_values(
+          local_values, A_h);
+        fev[velocity_extractor].get_function_values_from_local_dof_values(
+          local_values, U_h);
 
         FullMatrix<double> cell_matrix(n_dofs, n_dofs);
 
@@ -3919,8 +3942,10 @@ namespace MetricFlowX
             const double        ad_face = compute_a_d_at_face(cell, f);
             std::vector<double> Ah_q(fef.n_quadrature_points);
             std::vector<double> Uh_q(fef.n_quadrature_points);
-            fef[area_extractor].get_function_values(y_cell, Ah_q);
-            fef[velocity_extractor].get_function_values(y_cell, Uh_q);
+            fef[area_extractor].get_function_values_from_local_dof_values(
+              local_values, Ah_q);
+            fef[velocity_extractor].get_function_values_from_local_dof_values(
+              local_values, Uh_q);
 
             // This cell's OWN trace values / DOFs on face f — must
             // match the extractor read in assemble_cell_residuals,
@@ -3928,8 +3953,10 @@ namespace MetricFlowX
             // the wrong column.
             std::vector<double> Ahat_q(fef.n_quadrature_points);
             std::vector<double> Uhat_q(fef.n_quadrature_points);
-            fef[a_hat_extractor].get_function_values(y_cell, Ahat_q);
-            fef[u_hat_extractor].get_function_values(y_cell, Uhat_q);
+            fef[a_hat_extractor].get_function_values_from_local_dof_values(
+              local_values, Ahat_q);
+            fef[u_hat_extractor].get_function_values_from_local_dof_values(
+              local_values, Uhat_q);
             const double A_hat = std::max(Ahat_q[0], 1e-10);
             const double U_hat = Uhat_q[0];
 
@@ -4017,9 +4044,7 @@ namespace MetricFlowX
         // Single scatter: volume + face cell-cell ->
         // jacobian_matrix
 
-        for (unsigned int i = 0; i < n_dofs; ++i)
-          for (unsigned int j = 0; j < n_dofs; ++j)
-            jacobian_matrix.add(ldofs[i], ldofs[j], cell_matrix(i, j));
+        jacobian_matrix.add(ldofs, cell_matrix);
       }
   }
 
