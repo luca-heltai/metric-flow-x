@@ -1,5 +1,8 @@
 # Assembly profiling
 
+The follow-up [measured performance campaign](performance_campaign.md) records
+the comparison protocol and new interventions tracked in issue #36.
+
 This is the first measured step for issue #9. Constant parameters now use live
 references to their registered map values, removing string lookup from flux and
 wave-speed calls while observing parameter reloads. The reload regression checks

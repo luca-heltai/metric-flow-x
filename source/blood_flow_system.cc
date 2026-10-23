@@ -2761,6 +2761,7 @@ namespace MetricFlowX
     std::vector<double> Uhat_q(fef.n_quadrature_points);
 
     const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
+    std::vector<double>                  local_values(n_dofs);
     Vector<double>                       cell_rhs(n_dofs);
     std::vector<types::global_dof_index> ldofs(n_dofs);
 
@@ -2778,11 +2779,14 @@ namespace MetricFlowX
         fev.reinit(cell);
 
         cell->get_dof_indices(ldofs);
+        y_cell.extract_subvector_to(ldofs, local_values);
 
         const auto &JxW = fev.get_JxW_values();
 
-        fev[area_extractor].get_function_values(y_cell, A_h);
-        fev[velocity_extractor].get_function_values(y_cell, U_h);
+        fev[area_extractor].get_function_values_from_local_dof_values(
+          local_values, A_h);
+        fev[velocity_extractor].get_function_values_from_local_dof_values(
+          local_values, U_h);
 
         cell_rhs = 0;
 
@@ -2854,8 +2858,10 @@ namespace MetricFlowX
             const auto  &JxW     = fef.get_JxW_values();
 
             // Interior cell values at the face quadrature point
-            fef[area_extractor].get_function_values(y_cell, Ah_q);
-            fef[velocity_extractor].get_function_values(y_cell, Uh_q);
+            fef[area_extractor].get_function_values_from_local_dof_values(
+              local_values, Ah_q);
+            fef[velocity_extractor].get_function_values_from_local_dof_values(
+              local_values, Uh_q);
 
             // Face-trace values: this cell's OWN (A_hat, U_hat) on
             // face f, read with the same extractor idiom as the
@@ -2864,8 +2870,10 @@ namespace MetricFlowX
             // on an ordinary interior (or 2-way) face it is tied to
             // the canonical side by the continuity rows, so the
             // converged value is identical to the canonical one.
-            fef[a_hat_extractor].get_function_values(y_cell, Ahat_q);
-            fef[u_hat_extractor].get_function_values(y_cell, Uhat_q);
+            fef[a_hat_extractor].get_function_values_from_local_dof_values(
+              local_values, Ahat_q);
+            fef[u_hat_extractor].get_function_values_from_local_dof_values(
+              local_values, Uhat_q);
 
             for (unsigned int q = 0; q < fef.n_quadrature_points; ++q)
               {
@@ -3847,6 +3855,7 @@ namespace MetricFlowX
     const double eta =
       2.0 * (friction_profile + 2.0) * numbers::PI * viscosity / rho;
     (void)t;
+    std::vector<double> local_values(fe_->n_dofs_per_cell());
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
@@ -3861,11 +3870,14 @@ namespace MetricFlowX
         const auto                          &JxW = fev.get_JxW_values();
         std::vector<types::global_dof_index> ldofs(n_dofs);
         cell->get_dof_indices(ldofs);
+        y_cell.extract_subvector_to(ldofs, local_values);
 
         std::vector<double> A_h(fev.n_quadrature_points);
         std::vector<double> U_h(fev.n_quadrature_points);
-        fev[area_extractor].get_function_values(y_cell, A_h);
-        fev[velocity_extractor].get_function_values(y_cell, U_h);
+        fev[area_extractor].get_function_values_from_local_dof_values(
+          local_values, A_h);
+        fev[velocity_extractor].get_function_values_from_local_dof_values(
+          local_values, U_h);
 
         FullMatrix<double> cell_matrix(n_dofs, n_dofs);
 
@@ -3919,8 +3931,10 @@ namespace MetricFlowX
             const double        ad_face = compute_a_d_at_face(cell, f);
             std::vector<double> Ah_q(fef.n_quadrature_points);
             std::vector<double> Uh_q(fef.n_quadrature_points);
-            fef[area_extractor].get_function_values(y_cell, Ah_q);
-            fef[velocity_extractor].get_function_values(y_cell, Uh_q);
+            fef[area_extractor].get_function_values_from_local_dof_values(
+              local_values, Ah_q);
+            fef[velocity_extractor].get_function_values_from_local_dof_values(
+              local_values, Uh_q);
 
             // This cell's OWN trace values / DOFs on face f — must
             // match the extractor read in assemble_cell_residuals,
@@ -3928,8 +3942,10 @@ namespace MetricFlowX
             // the wrong column.
             std::vector<double> Ahat_q(fef.n_quadrature_points);
             std::vector<double> Uhat_q(fef.n_quadrature_points);
-            fef[a_hat_extractor].get_function_values(y_cell, Ahat_q);
-            fef[u_hat_extractor].get_function_values(y_cell, Uhat_q);
+            fef[a_hat_extractor].get_function_values_from_local_dof_values(
+              local_values, Ahat_q);
+            fef[u_hat_extractor].get_function_values_from_local_dof_values(
+              local_values, Uhat_q);
             const double A_hat = std::max(Ahat_q[0], 1e-10);
             const double U_hat = Uhat_q[0];
 

@@ -45,6 +45,7 @@ def main():
         text = text.replace("subsection BloodFlowSystem<", "subsection MetricFlowSystem<")
         text = text.replace("subsection Blood Flow Parameters", "subsection Metric Flow Parameters")
         text = assign(text, "Vtk file path for mesh input", mesh)
+        text = assign(text, "Output directory", destination / f"{name}_output")
         if name == "network10k":
             text = assign(text, "Finite element degree", 1)
             text = assign(text, "Number of global refinement", 0)
