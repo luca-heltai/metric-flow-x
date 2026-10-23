@@ -2940,8 +2940,7 @@ namespace MetricFlowX
         // Every DoF of this FESystem is discontinuous, so all of `ldofs`
         // belongs to this cell alone and is owned by this rank: no other rank
         // contributes to these rows.
-        for (unsigned int i = 0; i < n_dofs; ++i)
-          F(ldofs[i]) += cell_rhs(i);
+        F.add(ldofs, cell_rhs);
       }
   }
 
@@ -3619,16 +3618,18 @@ namespace MetricFlowX
 
         cell->get_dof_indices(ldofs);
 
-        for (unsigned int i = 0; i < n_dofs; ++i)
-          {
-            local_F(i)     = residual_F(ldofs[i]);
-            local_Mydot(i) = ydot(ldofs[i]);
-          }
+        residual_F.extract_subvector_to(ldofs.begin(),
+                                        ldofs.end(),
+                                        local_F.begin());
+        ydot.extract_subvector_to(ldofs.begin(),
+                                  ldofs.end(),
+                                  local_Mydot.begin());
 
         per_cell_mass[cell->active_cell_index()].vmult(local_res, local_Mydot);
 
         for (unsigned int i = 0; i < n_dofs; ++i)
-          residual(ldofs[i]) += local_res(i) - local_F(i);
+          local_res(i) -= local_F(i);
+        residual.add(ldofs, local_res);
       }
 
     // RCR capacitor rows: differential, written directly in M*ydot - R form.
