@@ -1,0 +1,44 @@
+[
+  {
+    "metric": "residual",
+    "variant": "before",
+    "median_ms": 34.8892015,
+    "min_ms": 34.3665197,
+    "max_ms": 35.1525386
+  },
+  {
+    "metric": "residual",
+    "variant": "after",
+    "median_ms": 29.5219385,
+    "min_ms": 26.6468902,
+    "max_ms": 30.624761099999997
+  },
+  {
+    "metric": "jacobian",
+    "variant": "before",
+    "median_ms": 94.1916,
+    "min_ms": 89.786112,
+    "max_ms": 102.732032
+  },
+  {
+    "metric": "jacobian",
+    "variant": "after",
+    "median_ms": 88.244011,
+    "min_ms": 79.546138,
+    "max_ms": 90.2504
+  },
+  {
+    "metric": "derivative",
+    "variant": "before",
+    "median_ms": 8.272628399999999,
+    "min_ms": 8.1668898,
+    "max_ms": 8.8056163
+  },
+  {
+    "metric": "derivative",
+    "variant": "after",
+    "median_ms": 9.5120124,
+    "min_ms": 8.224406700000001,
+    "max_ms": 10.5376445
+  }
+]

@@ -1,0 +1,78 @@
+Rejected interior traversal candidate: numerical diagnosis
+========================================================
+
+Status: candidate6b52f26 remains REJECTED. No shared source files changed.
+
+Confirmed mechanism
+-------------------
+The compiler changes FMA contraction in the directional-vector dot normal
+expression used in the refactored interior routines. These are DIFFERENT
+rounding sequences despite expressing the same real arithmetic:
+
+Accepted: fma(d2,n2,fma(d0,n0,round(d1*n1)))
+Rejected: fma(d2,n2,fma(d1,n1,round(d0*n0)))
+
+Archived candidate1 libmetric_flow_x.so residual:
+11d1b1 vmulsd 0x8(%r14),%xmm5,%xmm8   [initial component1 product]
+11d1c6 vfmadd231sd (%r14),%xmm6,%xmm8 [component0 fused]
+11d1df vfmadd231sd 0x10(%r14),%xmm7,%xmm8 [component2 fused]
+
+Archived candidate2 libmetric_flow_x.so residual LEFT normal:
+11e111 normal0 ->xmm3;11e117 normal1 ->xmm5;11e122 normal2 ->xmm7
+11e129 direction0 ->xmm2;11e141 direction1 ->xmm4;
+11e149 direction2 ->xmm6
+11e151 normal0 ->stack-838;11e159 direction0 ->stack-830
+11e161 direction1 ->stack-850;11e169 normal1 ->stack-858
+11e171 direction2 ->stack-840;11e179 normal2 ->stack-848
+11e5bb vmovsd stack-830,%xmm15
+11e5c3 vmulsd stack-838,%xmm15,%xmm6 [initial component0 product]
+11e5cb vmovsd stack-850,%xmm0
+11e5da vmovsd stack-840,%xmm1
+11e5ea vfmadd132sd stack-858,%xmm6,%xmm0 [component1 fused]
+11e5f3 vfmadd132sd stack-848,%xmm0,%xmm1 [component2 fused]
+
+The accepted Jacobian invokes compute_tangent_normal_product out of line twice
+(at1203b3 and12050c). Its helper has exactly the accepted component1-first
+rounding sequence. Rejected Jacobian instead inlines the dot products (four
+FMA instructions in its body versus zero in the accepted body). This is
+specific evidence of the suspected inlining/context effect, rather than a
+speculative statement that floating point can change.
+
+Full disassemblies: candidate1.asm and candidate2.asm in this directory.
+An independent arithmetic example using libc fma demonstrates a one-ulp
+difference between these exact contraction choices: see fma-reproducer.txt.
+
+Traversal audit
+---------------
+Source comparison finds no traversal-order discrepancy for dim1: both the
+old assembly loops and cache builder iterate active cells in their existing
+order, locally owned cells only, then faces0,1; discard boundary/junction
+faces; insert the canonical key into a processed set before ownership checks;
+and retain only the owner of the canonical trace. The new DoFHandler ownership
+check equals the prior FE portion of locally_owned_dofs_ (RCR unknowns append
+after FE indices). Cached neighbors and trace indices are direct copies.
+get_face_trace is only a canonical-map lookup and two vector reads, so the
+replacement does not change the data read. This audit is source-level;
+no instrumented per-face traversal trace was executed.
+
+Snapshot evidence
+-----------------
+Only row residues7 and9 modulo10 differ in all three states, consistent with
+trace transmission rows. State0 residual655 entries, Jacobian1403; state1
+residual639, Jacobian1343; state2 residual646, Jacobian1371. Derivative matrices
+are identical in every state. This fits an interior normal evaluation change.
+
+Experimental correction proposal
+--------------------------------
+candidate-fma-correction.patch applies to rejected6b52f26 only. It explicitly
+uses the ACCEPTED nested std::fma sequence for normal products in the two
+refactored interior routines. Other call sites keep their existing expression.
+For spacedim values other than3 the proposal retains the original expression.
+This patch is experimental, NOT COMPILED, NOT benchmarked, and NOT accepted.
+It should only be considered if reviving this optimization later, followed by
+full exact snapshot and trajectory gates and fresh performance measurements.
+Its purpose is to pin the accepted arithmetic locally rather than disable FMA
+globally, which would also change accepted baseline results elsewhere.
+
+No claim is made that this is the only remaining difference until the complete
+numerical gate passes. The accepted source is the correct production fallback.

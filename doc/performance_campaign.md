@@ -109,3 +109,26 @@ the archives matched all 32 output CSVs (2372 rows) exactly after removing only
 were retained. The [trajectory receipt](performance_data/01_local_state/trajectory_equivalence.json)
 records the compared files and row hashes. This is a short numerical regression,
 not a full cardiac-cycle validation or an end-to-end timing claim.
+
+## Rejected candidate: cache interior-face traversal
+
+Candidate `6b52f26` cached the interior-face traversal and trace indices. Its
+26 Release tests passed, including mesh reconstruction and empty MPI ranks,
+but the exact ADAN56/MPI1 gate failed in all three nonuniform states. The
+residual differed by at most 5.33e-15 and the state Jacobian by 3.73e-9.
+The derivative matrices remained identical. No tolerance was substituted.
+
+Inspection of the archived machine code confirmed that GCC changed the FMA
+contraction order in tangent-normal products after the refactoring. The
+[diagnosis](performance_data/rejected_interior_cache/diagnosis.txt) records
+the instructions and the limits of the source-level traversal audit.
+The candidate remains excluded from the accepted stack. Only ADAN56/MPI1
+completed the five timing pairs; the other cases were not run after rejection.
+
+![Rejected interior cache](performance_data/rejected_interior_cache/comparison.svg)
+
+The [exact mismatch receipt](performance_data/rejected_interior_cache/rejection.json),
+[partial timings](performance_data/rejected_interior_cache/timings.jsonl), and
+[binary metadata](performance_data/rejected_interior_cache/metadata.json)
+preserve the failed experiment. Its timing improvement is not an accepted
+performance intervention.

@@ -1,0 +1,79 @@
+{
+  "status": "REJECTED: numerical output differs; no tolerance allowed",
+  "before": "965e7fd",
+  "candidate": "6b52f26",
+  "checks": [
+    {
+      "file": "adan56_mpi1_before.state0.rank0.derivative_jacobian",
+      "entries": 737924,
+      "differing_entries": 0,
+      "max_absolute_difference": 0,
+      "before_sha256": "53465b91cd926745b4ee4470023b0e796491712a828cc7dd7f9442e882f6bb53",
+      "after_sha256": "53465b91cd926745b4ee4470023b0e796491712a828cc7dd7f9442e882f6bb53"
+    },
+    {
+      "file": "adan56_mpi1_before.state0.rank0.residual",
+      "entries": 24671,
+      "differing_entries": 655,
+      "max_absolute_difference": 5.329070518200751e-15,
+      "before_sha256": "3814b481d59bcc3317db4f3fb9d90b22375d1fb600d07610ca525bd483edee38",
+      "after_sha256": "34c1195ea87400cecfb44c8804aff1015fb0886eda6a1226b6ea327e4660605a"
+    },
+    {
+      "file": "adan56_mpi1_before.state0.rank0.state_jacobian",
+      "entries": 737924,
+      "differing_entries": 1403,
+      "max_absolute_difference": 1.862645149230957e-09,
+      "before_sha256": "1011a393ad684e0cb6d10d69c833e1a4929200960c9a4bff761ec884c74d9a41",
+      "after_sha256": "743776e9169dda971578a37d7e20ba97381dd70df9ca12886c1fe30288fea66e"
+    },
+    {
+      "file": "adan56_mpi1_before.state1.rank0.derivative_jacobian",
+      "entries": 737924,
+      "differing_entries": 0,
+      "max_absolute_difference": 0,
+      "before_sha256": "53465b91cd926745b4ee4470023b0e796491712a828cc7dd7f9442e882f6bb53",
+      "after_sha256": "53465b91cd926745b4ee4470023b0e796491712a828cc7dd7f9442e882f6bb53"
+    },
+    {
+      "file": "adan56_mpi1_before.state1.rank0.residual",
+      "entries": 24671,
+      "differing_entries": 639,
+      "max_absolute_difference": 5.329070518200751e-15,
+      "before_sha256": "b265b9357e94cf3a51f736f368374a045c800ed2ef44cbfe8b1f2ec5d426c6a8",
+      "after_sha256": "33262da96ff3cd9730b0ecf05a6223bcb3027c3e5d01b0f682353fe895a394d9"
+    },
+    {
+      "file": "adan56_mpi1_before.state1.rank0.state_jacobian",
+      "entries": 737924,
+      "differing_entries": 1343,
+      "max_absolute_difference": 1.862645149230957e-09,
+      "before_sha256": "2d4a2bcb1035cbfb089cba90a5e20e780bd6163522a2374520bc30d3351afc32",
+      "after_sha256": "b4cea19dc28ab8cf6f4699a3ea014d395c732e1b92ba81c1cc13f4b2976c4999"
+    },
+    {
+      "file": "adan56_mpi1_before.state2.rank0.derivative_jacobian",
+      "entries": 737924,
+      "differing_entries": 0,
+      "max_absolute_difference": 0,
+      "before_sha256": "53465b91cd926745b4ee4470023b0e796491712a828cc7dd7f9442e882f6bb53",
+      "after_sha256": "53465b91cd926745b4ee4470023b0e796491712a828cc7dd7f9442e882f6bb53"
+    },
+    {
+      "file": "adan56_mpi1_before.state2.rank0.residual",
+      "entries": 24671,
+      "differing_entries": 646,
+      "max_absolute_difference": 5.329070518200751e-15,
+      "before_sha256": "be1d65c477402b10181843c7fa91221c703b5eeae10757cb37716755ac18d17c",
+      "after_sha256": "467d4377e02a2db62627278f850cd9235a444b033fc6e84efabba0124a2f5edc"
+    },
+    {
+      "file": "adan56_mpi1_before.state2.rank0.state_jacobian",
+      "entries": 737924,
+      "differing_entries": 1371,
+      "max_absolute_difference": 3.725290298461914e-09,
+      "before_sha256": "2bd3f1d7c5c0add7fdc7c5df7f2e7ac4532ba4f99504c67be8c6fb57560ac022",
+      "after_sha256": "96a89694ca48e756ae3ae76ef40f79b106467eb5cc7bb368da0af6203717e6b2"
+    }
+  ]
+}
