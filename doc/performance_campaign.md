@@ -6,6 +6,14 @@ assembly investigation in issue #9. Each accepted intervention has a separate
 pull request based on the preceding intervention. Candidates must demonstrate
 an improvement and preserve the measured numerical results.
 
+```{toctree}
+:hidden:
+:glob:
+:maxdepth: 1
+
+performance_data/*/README
+```
+
 ## Measurement and numerical comparison
 
 `benchmark_assembly` measures setup, residual assembly, the state Jacobian, and
