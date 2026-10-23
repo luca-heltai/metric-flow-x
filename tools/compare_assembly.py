@@ -121,6 +121,8 @@ def main():
         ax.legend()
     fig.tight_layout()
     fig.savefig(args.output / "comparison.svg")
+    svg = args.output / "comparison.svg"
+    svg.write_text("\n".join(line.rstrip() for line in svg.read_text().splitlines()) + "\n")
     fig.savefig(args.output / "comparison.png", dpi=150)
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
 

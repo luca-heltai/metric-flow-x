@@ -57,3 +57,55 @@ oracles, taper tests and MPI tests complement these synthetic snapshots. Exact
 agreement on finite workloads does not establish all possible configurations
 or physiological validity. Assembly speedups and end-to-end speedups must be
 reported separately.
+
+## Intervention 1: reuse local cell state
+
+The cell residual and cell Jacobian previously extracted distributed DoF values
+separately for each component, volume and face. They now extract once per cell
+and use deal.II's existing `get_function_values_from_local_dof_values()` path.
+No interpolation formula, quadrature, flux, or accumulation order is changed.
+The numerical source is commit `6c2e6f8`, compared with main `b5d1b62`; both
+archives use the same extended benchmark driver.
+
+The accepted experiment ran on lnx3 with GCC 13.2.0, deal.II 9.8.0, PETSc,
+Release (`-O3`, AVX2), and five alternating process pairs per case. Each process
+uses three timed samples of 20 residual calls. The ADAN56 workload has degree 2,
+2464 cells and 24671 unknowns; the SI network has degree 1, 20001 cells and
+170009 unknowns. The preliminary lnx2 data are excluded.
+
+| Case | Before residual (ms) | After residual (ms) | Median paired speedup |
+|---|---:|---:|---:|
+| adan56_mpi1 | 43.962 | 35.506 | 1.124 |
+| adan56_mpi2 | 19.806 | 17.974 | 1.111 |
+| network10k_mpi1 | 318.719 | 288.133 | 1.107 |
+| network10k_mpi2 | 179.748 | 148.003 | 1.224 |
+
+Times are medians of process medians. The paired speedup is the median of the
+five before/after ratios, which differs from the ratio of independently taken
+medians. Every residual pair improved. The state-Jacobian paired medians improved
+by 1.141x/1.047x for ADAN56 MPI1/MPI2 and 1.053x/1.074x for the SI network.
+The derivative Jacobian is unchanged code and serves as a variability control:
+its ADAN56 MPI1 samples drifted appreciably, while the other three paired
+medians are approximately 1.0. No derivative-Jacobian speedup is claimed.
+
+![Before and after local-state reuse](performance_data/01_local_state/comparison.svg)
+
+The [raw records](performance_data/01_local_state/timings.jsonl),
+[environment and binary hashes](performance_data/01_local_state/metadata.json),
+[input manifest](performance_data/01_local_state/inputs.json), and
+[exact comparison receipts](performance_data/01_local_state/equivalence.json)
+are committed alongside the figure. All 54 snapshot pairs matched exactly,
+covering 1,179,248,416 bytes of residual and matrix data on each side.
+The seven focused Release tests passed: coupling readiness, external pressure,
+cell Jacobian, taper, terminal parameters, mesh initializer and constant reload.
+These tests include independent analytical and finite-difference oracles.
+The [test log](performance_data/01_local_state/release_tests.log) records the
+actual selection and result.
+
+Both archives also passed the existing analytic/CSV inflow integration check
+at MPI1 and MPI2 through 0.01 s with nonzero flow. Direct comparison between
+the archives matched all 32 output CSVs (2372 rows) exactly after removing only
+`scaling_timings.csv` and the `wall_time` statistics field. Physical time columns
+were retained. The [trajectory receipt](performance_data/01_local_state/trajectory_equivalence.json)
+records the compared files and row hashes. This is a short numerical regression,
+not a full cardiac-cycle validation or an end-to-end timing claim.
