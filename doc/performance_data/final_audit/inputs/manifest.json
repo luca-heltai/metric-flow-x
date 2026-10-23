@@ -1,0 +1,20 @@
+[
+  {
+    "input": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/final_audit/inputs/adan56.prm",
+    "sha256": "72eb08280d1fa8ae712f69fc1dab5ae3c860cacf744d7cf393dbe064e95c9d5b",
+    "original": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/inputs/adan56.prm",
+    "original_sha256": "b631c2cfb244413d17902be61579279ef949feb4cda314a34ad0d4e7431521a6",
+    "change": "Output directory only",
+    "mesh": "/data/home/lheltai/codes/metric-flow-x/notebooks/56_adnr_new.vtk",
+    "mesh_sha256": "61975d5e4219135c3f9a43210b03ce074a197d3d026c88f7581938c96425df3d"
+  },
+  {
+    "input": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/final_audit/inputs/network10k.prm",
+    "sha256": "50646ce401850abea32ec45ac66a800636acadeeebe64ba1f614c23f5804b0a7",
+    "original": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/inputs/network10k.prm",
+    "original_sha256": "8ea3eb4289c3a9e0aeb862e74052778f75b96459f9a098a952499b418c06584c",
+    "change": "Output directory only",
+    "mesh": "/data/home/lheltai/codes/metric-flow-x/notebooks/networks_by_svv/trees/network_10000_adnr.vtk",
+    "mesh_sha256": "3d93dd9d3edb088d45bd719f4526f6137a97411fd0f51d39ab4db2b6279744be"
+  }
+]

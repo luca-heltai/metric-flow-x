@@ -349,3 +349,48 @@ preserved those paths; both tree-equivalence receipts accompany the report.
 Inputs are retained as deterministic `.prm.gz` files with verified decompression
 hashes. Original timing records remain byte-identical, and committed log
 excerpts retain BENCHMARK and TimerOutput with hashes of the full originals.
+
+## Cumulative audit and stop after five interventions
+
+The accepted stack now contains five performance changes: local cell-state
+reuse ([#37](https://github.com/luca-heltai/metric-flow-x/pull/37)), bulk ghost
+vector transfers ([#40](https://github.com/luca-heltai/metric-flow-x/pull/40)),
+derivative-Jacobian reuse
+([#41](https://github.com/luca-heltai/metric-flow-x/pull/41)), bulk cell-matrix
+insertion ([#42](https://github.com/luca-heltai/metric-flow-x/pull/42)), and
+bulk residual gather/scatter (intervention 5 above). The supporting CTest build
+race fix ([#38](https://github.com/luca-heltai/metric-flow-x/pull/38)) is included
+in the stack. An interior-face cache candidate was rejected for numerical
+changes and is excluded; its measurements remain in the rejection report.
+
+A separate baseline-to-final audit on **lnx3** compares the initial solver
+`b5d1b62` against all five changes, using the same enhanced benchmark driver
+on both sides. Three alternating pairs cover ADAN56 and the 10k network with
+**MPI1/MPI2/MPI4/MPI8**. Across these eight cases, median paired residual
+speedups are **1.20–1.34x** and state-Jacobian speedups **1.13–1.26x**.
+All **270 complete snapshot pairs** match exactly (2,361,309,361 bytes per
+side), and all **32 physical trajectory CSVs / 2372 rows** match exactly after
+the declared timing exclusions.
+
+![Initial baseline and five-intervention assembly latency](performance_data/final_audit/latency.svg)
+
+![Strong scaling through eight MPI ranks](performance_data/final_audit/strong_scaling.svg)
+
+At MPI8 the final residual/Jacobian efficiencies are **91.9%/93.4%** on ADAN56
+and **85.7%/78.2%** on the 10k network, normalized by each variant's own MPI1
+median. Absolute assembly latency improves at every measured rank count;
+relative parallel efficiency does not improve uniformly. This is one-node
+assembly evidence, without a full-solver or multi-node speedup guarantee.
+Valid-cache derivative timings exclude first assembly and invalidation.
+
+The [cumulative report](performance_data/final_audit/README.md) retains raw
+timings, exact inputs, reproducible figures and numerical receipts. The
+[remaining-cost analysis](performance_data/final_audit/remaining_costs.md)
+connects measured interior-face, cell, junction, boundary, setup and output
+costs to issues #9, #25 and #26, and distinguishes measured costs from remaining
+hypotheses. Full-cycle integration, isolated communication, memory, solver
+factorization counters and multi-node performance remain unmeasured.
+
+The campaign stops at **five accepted performance interventions**. Further
+optimization requires the user's next instruction; no sixth candidate is
+introduced here.

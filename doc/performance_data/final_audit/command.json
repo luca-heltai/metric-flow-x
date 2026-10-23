@@ -1,0 +1,22 @@
+[
+  "python3",
+  "/data/home/lheltai/codes/metric-flow-x/tools/compare_assembly.py",
+  "--before",
+  "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/baseline",
+  "--after",
+  "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/final_audit/final",
+  "--inputs",
+  "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/final_audit/inputs/adan56.prm",
+  "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/final_audit/inputs/network10k.prm",
+  "--ranks",
+  "1",
+  "2",
+  "4",
+  "8",
+  "--runs",
+  "3",
+  "--repetitions",
+  "20",
+  "--output",
+  "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/final_audit/results"
+]
