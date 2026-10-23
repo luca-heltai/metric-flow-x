@@ -1,0 +1,296 @@
+Single Ninja graph: 26 test targets
+[0/2] Re-checking globbed directories...
+[1/131] Building CXX object tests/CMakeFiles/tests.template.release.dir/template.cc.o
+[2/131] Building CXX object tests/CMakeFiles/tests.test_coupling_readiness.release.dir/test_coupling_readiness.cc.o
+[3/131] Building CXX object tests/CMakeFiles/tests.test_component_tolerances.release.dir/test_component_tolerances.cc.o
+[4/131] Building CXX object tests/CMakeFiles/tests.test_constant.release.dir/test_constant.cc.o
+[5/131] Building CXX object tests/CMakeFiles/tests.test_csv_output.release.dir/test_csv_output.cc.o
+[6/131] Building CXX object tests/CMakeFiles/tests.test_dirichlet_boundary.release.dir/test_dirichlet_boundary.cc.o
+[7/131] Building CXX object tests/CMakeFiles/tests.test_external_pressure.release.dir/test_external_pressure.cc.o
+[8/131] Building CXX object tests/CMakeFiles/tests.test_derivative_jacobian_cache.release.dir/test_derivative_jacobian_cache.cc.o
+[9/131] Building CXX object tests/CMakeFiles/tests.test_inflow_series.release.dir/test_inflow_series.cc.o
+[10/131] Building CXX object tests/CMakeFiles/tests.test_iterative_trace_initialization.release.dir/test_iterative_trace_initialization.cc.o
+[11/131] Building CXX object tests/CMakeFiles/tests.test_jacobian_boundary.release.dir/test_jacobian_boundary.cc.o
+[12/131] Building CXX object tests/CMakeFiles/tests.test_jacobian_cell.release.dir/test_jacobian_cell.cc.o
+[13/131] Building CXX object tests/CMakeFiles/tests.test_jacobian_eta.release.dir/test_jacobian_eta.cc.o
+[14/131] Building CXX object tests/CMakeFiles/tests.test_jacobian_interior.release.dir/test_jacobian_interior.cc.o
+[15/131] Building CXX object tests/CMakeFiles/tests.test_jacobian_junction.release.dir/test_jacobian_junction.cc.o
+[16/131] Building CXX object tests/CMakeFiles/tests.test_mass_integration.release.dir/test_mass_integration.cc.o
+[17/131] Building CXX object tests/CMakeFiles/tests.test_mass_integration_velocity.release.dir/test_mass_integration_velocity.cc.o
+[18/131] Building CXX object tests/CMakeFiles/tests.test_mass_ones.release.dir/test_mass_ones.cc.o
+[19/131] Building CXX object tests/CMakeFiles/tests.test_physical_constants_reload.release.dir/test_physical_constants_reload.cc.o
+[20/131] Building CXX object tests/CMakeFiles/tests.test_rcr_zero_capacitance.release.dir/test_rcr_zero_capacitance.cc.o
+[21/131] Building CXX object tests/CMakeFiles/tests.test_mesh_initializer.release.dir/test_mesh_initializer.cc.o
+[22/131] Building CXX object tests/CMakeFiles/tests.test_tapered_vessel.release.dir/test_tapered_vessel.cc.o
+[23/131] Building CXX object tests/CMakeFiles/tests.test_terminal_exports.release.dir/test_terminal_exports.cc.o
+[24/131] Building CXX object tests/CMakeFiles/tests.test_trace_residual.release.dir/test_trace_residual.cc.o
+[25/131] Linking CXX executable tests/template.release/template.release
+[26/131] Linking CXX executable tests/test_constant.release/test_constant.release
+[27/131] Linking CXX executable tests/test_component_tolerances.release/test_component_tolerances.release
+[28/131] Linking CXX executable tests/test_coupling_readiness.release/test_coupling_readiness.release
+[29/131] Building CXX object tests/CMakeFiles/tests.test_terminal_parameters.release.dir/test_terminal_parameters.cc.o
+[30/131] Linking CXX executable tests/test_csv_output.release/test_csv_output.release
+[31/131] Linking CXX executable tests/test_derivative_jacobian_cache.release/test_derivative_jacobian_cache.release
+[32/131] Linking CXX executable tests/test_external_pressure.release/test_external_pressure.release
+[33/131] Linking CXX executable tests/test_dirichlet_boundary.release/test_dirichlet_boundary.release
+[34/131] Linking CXX executable tests/test_inflow_series.release/test_inflow_series.release
+[35/131] Linking CXX executable tests/test_iterative_trace_initialization.release/test_iterative_trace_initialization.release
+[36/131] Linking CXX executable tests/test_jacobian_boundary.release/test_jacobian_boundary.release
+[37/131] Linking CXX executable tests/test_jacobian_cell.release/test_jacobian_cell.release
+[38/131] Linking CXX executable tests/test_jacobian_eta.release/test_jacobian_eta.release
+[39/131] Linking CXX executable tests/test_jacobian_interior.release/test_jacobian_interior.release
+[40/131] Linking CXX executable tests/test_mass_integration.release/test_mass_integration.release
+[41/131] Linking CXX executable tests/test_jacobian_junction.release/test_jacobian_junction.release
+[42/131] Linking CXX executable tests/test_mass_integration_velocity.release/test_mass_integration_velocity.release
+[43/131] Linking CXX executable tests/test_mesh_initializer.release/test_mesh_initializer.release
+[44/131] Linking CXX executable tests/test_mass_ones.release/test_mass_ones.release
+[45/131] Linking CXX executable tests/test_physical_constants_reload.release/test_physical_constants_reload.release
+[46/131] Linking CXX executable tests/test_rcr_zero_capacitance.release/test_rcr_zero_capacitance.release
+[47/131] Linking CXX executable tests/test_tapered_vessel.release/test_tapered_vessel.release
+[48/131] Linking CXX executable tests/test_terminal_exports.release/test_terminal_exports.release
+[49/131] Linking CXX executable tests/test_terminal_parameters.release/test_terminal_parameters.release
+[50/131] Linking CXX executable tests/test_trace_residual.release/test_trace_residual.release
+[51/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/template.release/serial/output
+[52/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_constant.release/serial/output
+[53/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_component_tolerances.release/serial/output
+[54/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_coupling_readiness.release/serial/output
+[55/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_derivative_jacobian_cache.release/serial/output
+[56/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_csv_output.release/serial/output
+[57/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_dirichlet_boundary.release/serial/output
+[58/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_external_pressure.release/serial/output
+[59/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_iterative_trace_initialization.release/serial/output
+[60/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_jacobian_boundary.release/serial/output
+[61/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_inflow_series.release/serial/output
+[62/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_jacobian_cell.release/serial/output
+[63/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_jacobian_eta.release/serial/output
+[64/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_jacobian_interior.release/serial/output
+[65/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_jacobian_junction.release/serial/output
+[66/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_mass_integration.release/serial/output
+[67/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_mass_integration_velocity.release/serial/output
+[68/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_mass_ones.release/serial/output
+[69/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_mesh_initializer.release/serial/output
+[70/131] Building CXX object tests/CMakeFiles/tests.test_vtk.release.dir/test_vtk.cc.o
+[71/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_physical_constants_reload.release/serial/output
+[72/131] Linking CXX executable tests/test_vtk.release/test_vtk.release
+[73/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_rcr_zero_capacitance.release/serial/output
+[74/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_tapered_vessel.release/serial/output
+[75/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_terminal_exports.release/serial/output
+[76/131] Generating template.release/serial/diff
+[77/131] Generating test_component_tolerances.release/serial/diff
+[78/131] Generating test_constant.release/serial/diff
+[79/131] Generating test_coupling_readiness.release/serial/diff
+[80/131] Generating test_csv_output.release/serial/diff
+[81/131] Generating test_derivative_jacobian_cache.release/serial/diff
+[82/131] Generating test_dirichlet_boundary.release/serial/diff
+[83/131] Generating test_external_pressure.release/serial/diff
+[84/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_trace_residual.release/serial/output
+[85/131] Generating test_inflow_series.release/serial/diff
+[86/131] Generating test_iterative_trace_initialization.release/serial/diff
+[87/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_terminal_parameters.release/serial/output
+[88/131] Generating test_jacobian_boundary.release/serial/diff
+[89/131] Generating test_jacobian_cell.release/serial/diff
+[90/131] Generating test_jacobian_eta.release/serial/diff
+[91/131] Generating test_jacobian_junction.release/serial/diff
+[92/131] Generating test_jacobian_interior.release/serial/diff
+[93/131] Generating test_mass_integration.release/serial/diff
+[94/131] Generating test_mass_integration_velocity.release/serial/diff
+[95/131] Generating test_mass_ones.release/serial/diff
+[96/131] Normalizing test output file /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests/test_vtk.release/serial/output
+[97/131] Generating test_mesh_initializer.release/serial/diff
+[98/131] Generating test_physical_constants_reload.release/serial/diff
+[99/131] Generating test_rcr_zero_capacitance.release/serial/diff
+[100/131] Generating test_tapered_vessel.release/serial/diff
+[101/131] Generating test_terminal_exports.release/serial/diff
+[102/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/template.release:\ BUILD\ successful. && echo tests/template.release:\ RUN\ successful. && echo tests/template.release:\ DIFF\ successful. && echo tests/template.release:\ PASSED.
+tests/template.release: BUILD successful.
+tests/template.release: RUN successful.
+tests/template.release: DIFF successful.
+tests/template.release: PASSED.
+[103/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_component_tolerances.release:\ BUILD\ successful. && echo tests/test_component_tolerances.release:\ RUN\ successful. && echo tests/test_component_tolerances.release:\ DIFF\ successful. && echo tests/test_component_tolerances.release:\ PASSED.
+tests/test_component_tolerances.release: BUILD successful.
+tests/test_component_tolerances.release: RUN successful.
+tests/test_component_tolerances.release: DIFF successful.
+tests/test_component_tolerances.release: PASSED.
+[104/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_constant.release:\ BUILD\ successful. && echo tests/test_constant.release:\ RUN\ successful. && echo tests/test_constant.release:\ DIFF\ successful. && echo tests/test_constant.release:\ PASSED.
+tests/test_constant.release: BUILD successful.
+tests/test_constant.release: RUN successful.
+tests/test_constant.release: DIFF successful.
+tests/test_constant.release: PASSED.
+[105/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_coupling_readiness.release:\ BUILD\ successful. && echo tests/test_coupling_readiness.release:\ RUN\ successful. && echo tests/test_coupling_readiness.release:\ DIFF\ successful. && echo tests/test_coupling_readiness.release:\ PASSED.
+tests/test_coupling_readiness.release: BUILD successful.
+tests/test_coupling_readiness.release: RUN successful.
+tests/test_coupling_readiness.release: DIFF successful.
+tests/test_coupling_readiness.release: PASSED.
+[106/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_csv_output.release:\ BUILD\ successful. && echo tests/test_csv_output.release:\ RUN\ successful. && echo tests/test_csv_output.release:\ DIFF\ successful. && echo tests/test_csv_output.release:\ PASSED.
+tests/test_csv_output.release: BUILD successful.
+tests/test_csv_output.release: RUN successful.
+tests/test_csv_output.release: DIFF successful.
+tests/test_csv_output.release: PASSED.
+[107/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_derivative_jacobian_cache.release:\ BUILD\ successful. && echo tests/test_derivative_jacobian_cache.release:\ RUN\ successful. && echo tests/test_derivative_jacobian_cache.release:\ DIFF\ successful. && echo tests/test_derivative_jacobian_cache.release:\ PASSED.
+tests/test_derivative_jacobian_cache.release: BUILD successful.
+tests/test_derivative_jacobian_cache.release: RUN successful.
+tests/test_derivative_jacobian_cache.release: DIFF successful.
+tests/test_derivative_jacobian_cache.release: PASSED.
+[108/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_dirichlet_boundary.release:\ BUILD\ successful. && echo tests/test_dirichlet_boundary.release:\ RUN\ successful. && echo tests/test_dirichlet_boundary.release:\ DIFF\ successful. && echo tests/test_dirichlet_boundary.release:\ PASSED.
+tests/test_dirichlet_boundary.release: BUILD successful.
+tests/test_dirichlet_boundary.release: RUN successful.
+tests/test_dirichlet_boundary.release: DIFF successful.
+tests/test_dirichlet_boundary.release: PASSED.
+[109/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_external_pressure.release:\ BUILD\ successful. && echo tests/test_external_pressure.release:\ RUN\ successful. && echo tests/test_external_pressure.release:\ DIFF\ successful. && echo tests/test_external_pressure.release:\ PASSED.
+tests/test_external_pressure.release: BUILD successful.
+tests/test_external_pressure.release: RUN successful.
+tests/test_external_pressure.release: DIFF successful.
+tests/test_external_pressure.release: PASSED.
+[110/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_inflow_series.release:\ BUILD\ successful. && echo tests/test_inflow_series.release:\ RUN\ successful. && echo tests/test_inflow_series.release:\ DIFF\ successful. && echo tests/test_inflow_series.release:\ PASSED.
+tests/test_inflow_series.release: BUILD successful.
+tests/test_inflow_series.release: RUN successful.
+tests/test_inflow_series.release: DIFF successful.
+tests/test_inflow_series.release: PASSED.
+[111/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_iterative_trace_initialization.release:\ BUILD\ successful. && echo tests/test_iterative_trace_initialization.release:\ RUN\ successful. && echo tests/test_iterative_trace_initialization.release:\ DIFF\ successful. && echo tests/test_iterative_trace_initialization.release:\ PASSED.
+tests/test_iterative_trace_initialization.release: BUILD successful.
+tests/test_iterative_trace_initialization.release: RUN successful.
+tests/test_iterative_trace_initialization.release: DIFF successful.
+tests/test_iterative_trace_initialization.release: PASSED.
+[112/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_jacobian_boundary.release:\ BUILD\ successful. && echo tests/test_jacobian_boundary.release:\ RUN\ successful. && echo tests/test_jacobian_boundary.release:\ DIFF\ successful. && echo tests/test_jacobian_boundary.release:\ PASSED.
+tests/test_jacobian_boundary.release: BUILD successful.
+tests/test_jacobian_boundary.release: RUN successful.
+tests/test_jacobian_boundary.release: DIFF successful.
+tests/test_jacobian_boundary.release: PASSED.
+[113/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_jacobian_cell.release:\ BUILD\ successful. && echo tests/test_jacobian_cell.release:\ RUN\ successful. && echo tests/test_jacobian_cell.release:\ DIFF\ successful. && echo tests/test_jacobian_cell.release:\ PASSED.
+tests/test_jacobian_cell.release: BUILD successful.
+tests/test_jacobian_cell.release: RUN successful.
+tests/test_jacobian_cell.release: DIFF successful.
+tests/test_jacobian_cell.release: PASSED.
+[114/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_jacobian_eta.release:\ BUILD\ successful. && echo tests/test_jacobian_eta.release:\ RUN\ successful. && echo tests/test_jacobian_eta.release:\ DIFF\ successful. && echo tests/test_jacobian_eta.release:\ PASSED.
+tests/test_jacobian_eta.release: BUILD successful.
+tests/test_jacobian_eta.release: RUN successful.
+tests/test_jacobian_eta.release: DIFF successful.
+tests/test_jacobian_eta.release: PASSED.
+[115/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_jacobian_interior.release:\ BUILD\ successful. && echo tests/test_jacobian_interior.release:\ RUN\ successful. && echo tests/test_jacobian_interior.release:\ DIFF\ successful. && echo tests/test_jacobian_interior.release:\ PASSED.
+tests/test_jacobian_interior.release: BUILD successful.
+tests/test_jacobian_interior.release: RUN successful.
+tests/test_jacobian_interior.release: DIFF successful.
+tests/test_jacobian_interior.release: PASSED.
+[116/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_jacobian_junction.release:\ BUILD\ successful. && echo tests/test_jacobian_junction.release:\ RUN\ successful. && echo tests/test_jacobian_junction.release:\ DIFF\ successful. && echo tests/test_jacobian_junction.release:\ PASSED.
+tests/test_jacobian_junction.release: BUILD successful.
+tests/test_jacobian_junction.release: RUN successful.
+tests/test_jacobian_junction.release: DIFF successful.
+tests/test_jacobian_junction.release: PASSED.
+[117/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_mass_integration.release:\ BUILD\ successful. && echo tests/test_mass_integration.release:\ RUN\ successful. && echo tests/test_mass_integration.release:\ DIFF\ successful. && echo tests/test_mass_integration.release:\ PASSED.
+tests/test_mass_integration.release: BUILD successful.
+tests/test_mass_integration.release: RUN successful.
+tests/test_mass_integration.release: DIFF successful.
+tests/test_mass_integration.release: PASSED.
+[118/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_mass_integration_velocity.release:\ BUILD\ successful. && echo tests/test_mass_integration_velocity.release:\ RUN\ successful. && echo tests/test_mass_integration_velocity.release:\ DIFF\ successful. && echo tests/test_mass_integration_velocity.release:\ PASSED.
+tests/test_mass_integration_velocity.release: BUILD successful.
+tests/test_mass_integration_velocity.release: RUN successful.
+tests/test_mass_integration_velocity.release: DIFF successful.
+tests/test_mass_integration_velocity.release: PASSED.
+[119/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_mass_ones.release:\ BUILD\ successful. && echo tests/test_mass_ones.release:\ RUN\ successful. && echo tests/test_mass_ones.release:\ DIFF\ successful. && echo tests/test_mass_ones.release:\ PASSED.
+tests/test_mass_ones.release: BUILD successful.
+tests/test_mass_ones.release: RUN successful.
+tests/test_mass_ones.release: DIFF successful.
+tests/test_mass_ones.release: PASSED.
+[120/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_mesh_initializer.release:\ BUILD\ successful. && echo tests/test_mesh_initializer.release:\ RUN\ successful. && echo tests/test_mesh_initializer.release:\ DIFF\ successful. && echo tests/test_mesh_initializer.release:\ PASSED.
+tests/test_mesh_initializer.release: BUILD successful.
+tests/test_mesh_initializer.release: RUN successful.
+tests/test_mesh_initializer.release: DIFF successful.
+tests/test_mesh_initializer.release: PASSED.
+[121/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_physical_constants_reload.release:\ BUILD\ successful. && echo tests/test_physical_constants_reload.release:\ RUN\ successful. && echo tests/test_physical_constants_reload.release:\ DIFF\ successful. && echo tests/test_physical_constants_reload.release:\ PASSED.
+tests/test_physical_constants_reload.release: BUILD successful.
+tests/test_physical_constants_reload.release: RUN successful.
+tests/test_physical_constants_reload.release: DIFF successful.
+tests/test_physical_constants_reload.release: PASSED.
+[122/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_rcr_zero_capacitance.release:\ BUILD\ successful. && echo tests/test_rcr_zero_capacitance.release:\ RUN\ successful. && echo tests/test_rcr_zero_capacitance.release:\ DIFF\ successful. && echo tests/test_rcr_zero_capacitance.release:\ PASSED.
+tests/test_rcr_zero_capacitance.release: BUILD successful.
+tests/test_rcr_zero_capacitance.release: RUN successful.
+tests/test_rcr_zero_capacitance.release: DIFF successful.
+tests/test_rcr_zero_capacitance.release: PASSED.
+[123/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_tapered_vessel.release:\ BUILD\ successful. && echo tests/test_tapered_vessel.release:\ RUN\ successful. && echo tests/test_tapered_vessel.release:\ DIFF\ successful. && echo tests/test_tapered_vessel.release:\ PASSED.
+tests/test_tapered_vessel.release: BUILD successful.
+tests/test_tapered_vessel.release: RUN successful.
+tests/test_tapered_vessel.release: DIFF successful.
+tests/test_tapered_vessel.release: PASSED.
+[124/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_terminal_exports.release:\ BUILD\ successful. && echo tests/test_terminal_exports.release:\ RUN\ successful. && echo tests/test_terminal_exports.release:\ DIFF\ successful. && echo tests/test_terminal_exports.release:\ PASSED.
+tests/test_terminal_exports.release: BUILD successful.
+tests/test_terminal_exports.release: RUN successful.
+tests/test_terminal_exports.release: DIFF successful.
+tests/test_terminal_exports.release: PASSED.
+[125/131] Generating test_terminal_parameters.release/serial/diff
+[126/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_terminal_parameters.release:\ BUILD\ successful. && echo tests/test_terminal_parameters.release:\ RUN\ successful. && echo tests/test_terminal_parameters.release:\ DIFF\ successful. && echo tests/test_terminal_parameters.release:\ PASSED.
+tests/test_terminal_parameters.release: BUILD successful.
+tests/test_terminal_parameters.release: RUN successful.
+tests/test_terminal_parameters.release: DIFF successful.
+tests/test_terminal_parameters.release: PASSED.
+[127/131] Generating test_trace_residual.release/serial/diff
+[128/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_trace_residual.release:\ BUILD\ successful. && echo tests/test_trace_residual.release:\ RUN\ successful. && echo tests/test_trace_residual.release:\ DIFF\ successful. && echo tests/test_trace_residual.release:\ PASSED.
+tests/test_trace_residual.release: BUILD successful.
+tests/test_trace_residual.release: RUN successful.
+tests/test_trace_residual.release: DIFF successful.
+tests/test_trace_residual.release: PASSED.
+[129/131] Generating test_vtk.release/serial/diff
+[130/131] cd /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build/tests && echo tests/test_vtk.release:\ BUILD\ successful. && echo tests/test_vtk.release:\ RUN\ successful. && echo tests/test_vtk.release:\ DIFF\ successful. && echo tests/test_vtk.release:\ PASSED.
+tests/test_vtk.release: BUILD successful.
+tests/test_vtk.release: RUN successful.
+tests/test_vtk.release: DIFF successful.
+tests/test_vtk.release: PASSED.
+
+CTest follow-up -j1
+Internal ctest changing into directory: /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build
+Test project /data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build
+      Start  1: tests/template.release
+ 1/26 Test  #1: tests/template.release ..............................   Passed    0.33 sec
+      Start  2: tests/test_component_tolerances.release
+ 2/26 Test  #2: tests/test_component_tolerances.release .............   Passed    0.26 sec
+      Start  3: tests/test_constant.release
+ 3/26 Test  #3: tests/test_constant.release .........................   Passed    0.27 sec
+      Start  4: tests/test_coupling_readiness.release
+ 4/26 Test  #4: tests/test_coupling_readiness.release ...............   Passed    0.26 sec
+      Start  5: tests/test_csv_output.release
+ 5/26 Test  #5: tests/test_csv_output.release .......................   Passed    0.26 sec
+      Start  6: tests/test_derivative_jacobian_cache.release
+ 6/26 Test  #6: tests/test_derivative_jacobian_cache.release ........   Passed    0.28 sec
+      Start  7: tests/test_dirichlet_boundary.release
+ 7/26 Test  #7: tests/test_dirichlet_boundary.release ...............   Passed    0.26 sec
+      Start  8: tests/test_external_pressure.release
+ 8/26 Test  #8: tests/test_external_pressure.release ................   Passed    0.26 sec
+      Start  9: tests/test_inflow_series.release
+ 9/26 Test  #9: tests/test_inflow_series.release ....................   Passed    0.26 sec
+      Start 10: tests/test_iterative_trace_initialization.release
+10/26 Test #10: tests/test_iterative_trace_initialization.release ...   Passed    0.26 sec
+      Start 11: tests/test_jacobian_boundary.release
+11/26 Test #11: tests/test_jacobian_boundary.release ................   Passed    0.28 sec
+      Start 12: tests/test_jacobian_cell.release
+12/26 Test #12: tests/test_jacobian_cell.release ....................   Passed    0.26 sec
+      Start 13: tests/test_jacobian_eta.release
+13/26 Test #13: tests/test_jacobian_eta.release .....................   Passed    0.26 sec
+      Start 14: tests/test_jacobian_interior.release
+14/26 Test #14: tests/test_jacobian_interior.release ................   Passed    0.27 sec
+      Start 15: tests/test_jacobian_junction.release
+15/26 Test #15: tests/test_jacobian_junction.release ................   Passed    0.26 sec
+      Start 16: tests/test_mass_integration.release
+16/26 Test #16: tests/test_mass_integration.release .................   Passed    0.26 sec
+      Start 17: tests/test_mass_integration_velocity.release
+17/26 Test #17: tests/test_mass_integration_velocity.release ........   Passed    0.26 sec
+      Start 18: tests/test_mass_ones.release
+18/26 Test #18: tests/test_mass_ones.release ........................   Passed    0.28 sec
+      Start 19: tests/test_mesh_initializer.release
+19/26 Test #19: tests/test_mesh_initializer.release .................   Passed    0.28 sec
+      Start 20: tests/test_physical_constants_reload.release
+20/26 Test #20: tests/test_physical_constants_reload.release ........   Passed    0.27 sec
+      Start 21: tests/test_rcr_zero_capacitance.release
+21/26 Test #21: tests/test_rcr_zero_capacitance.release .............   Passed    0.27 sec
+      Start 22: tests/test_tapered_vessel.release
+22/26 Test #22: tests/test_tapered_vessel.release ...................   Passed    0.27 sec
+      Start 23: tests/test_terminal_exports.release
+23/26 Test #23: tests/test_terminal_exports.release .................   Passed    0.25 sec
+      Start 24: tests/test_terminal_parameters.release
+24/26 Test #24: tests/test_terminal_parameters.release ..............   Passed    0.25 sec
+      Start 25: tests/test_trace_residual.release
+25/26 Test #25: tests/test_trace_residual.release ...................   Passed    0.26 sec
+      Start 26: tests/test_vtk.release
+26/26 Test #26: tests/test_vtk.release ..............................   Passed    0.25 sec
+
+100% tests passed, 0 tests failed out of 26
+
+Total Test time (real) =   7.13 sec

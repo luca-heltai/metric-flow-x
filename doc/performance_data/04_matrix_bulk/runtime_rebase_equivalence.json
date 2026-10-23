@@ -1,0 +1,52 @@
+{
+  "measured_candidate": "7bfd570ab83ebc786c50647070ec92a55041c478",
+  "submission_runtime_commit": "6a4a3b718ca40070aedcda5ec7f4848c02998888",
+  "submission_base": "bcdc829ec5eff0c9cbde691e35bb78b34f746314",
+  "compared_paths": [
+    "source",
+    "include",
+    "apps",
+    "tools",
+    "parameters",
+    "cmake",
+    "tests",
+    "CMakeLists.txt"
+  ],
+  "git_diff_empty": false,
+  "git_diff_ignoring_whitespace_empty": true,
+  "formatting_difference": "Inherited const-auto declaration alignment only; same tokens and line count",
+  "trees": {
+    "source": {
+      "measured": "51bb2645a1d29a93c30552f32a4837b851b21df9",
+      "rebased": "f777e20eeb48aa8bc61643980716e4fea6674d0d"
+    },
+    "include": {
+      "measured": "c322c8ed1097852ead6d38396eac38f9ded74713",
+      "rebased": "c322c8ed1097852ead6d38396eac38f9ded74713"
+    },
+    "apps": {
+      "measured": "b2dd0672fc97ca77afe71db53983ad1278d2ce3f",
+      "rebased": "b2dd0672fc97ca77afe71db53983ad1278d2ce3f"
+    },
+    "tools": {
+      "measured": "c095a9da17ef3e04e149d309bc4f8e1df2064f8b",
+      "rebased": "c095a9da17ef3e04e149d309bc4f8e1df2064f8b"
+    },
+    "parameters": {
+      "measured": "eeba1827f72b591cde99579f50b1d025921e8047",
+      "rebased": "eeba1827f72b591cde99579f50b1d025921e8047"
+    },
+    "cmake": {
+      "measured": "84002a2fd88879fd89ff116c1286b5195ed8ddda",
+      "rebased": "84002a2fd88879fd89ff116c1286b5195ed8ddda"
+    },
+    "tests": {
+      "measured": "80018be415c4c1759736c0eaadca432771b1e18f",
+      "rebased": "80018be415c4c1759736c0eaadca432771b1e18f"
+    },
+    "CMakeLists.txt": {
+      "measured": "fa15673f00db7c79b114f34d879e0c31e96934ef",
+      "rebased": "fa15673f00db7c79b114f34d879e0c31e96934ef"
+    }
+  }
+}

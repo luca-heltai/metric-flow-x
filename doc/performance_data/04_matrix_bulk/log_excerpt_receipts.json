@@ -1,0 +1,346 @@
+[
+  {
+    "file": "adan56_mpi1_after_0.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi1_after_0.log",
+    "original_sha256": "a61cc831ce177745790a30ab3ac3fd3797bbaeaa972dec6b80c0b3269f5cacb2",
+    "excerpt_sha256": "77dbb8772b495598ade7b5b0be6897800ccea48e98e1ca94cc52bed7d9b09268",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi1_after_1.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi1_after_1.log",
+    "original_sha256": "5e0755dba1b4af866a1a188aaf5b6ed348b636cda3ad2c4c3a490a62be6397e3",
+    "excerpt_sha256": "e91936c609e758b5f583b7f9461e1b11c85cda214366b87de97db4391d0a81e4",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi1_after_2.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi1_after_2.log",
+    "original_sha256": "bc498df468c38d9e15607b87073a391c5a2e2310fd7ba2f630dc6eafe39a3ee3",
+    "excerpt_sha256": "1021da10b5e9b10e81d1136e26dd5f72f969e275333d3562b15fa68bc483bbb8",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi1_after_3.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi1_after_3.log",
+    "original_sha256": "1e8a1091996eeed95fb1ae3d71e1bc4fd6758dd8f33759cb4e145e899e4fcc01",
+    "excerpt_sha256": "85d4415b9672291a59ce8f179cd3eedd6a41218cc9dd339d0721905e261eda5e",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi1_after_4.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi1_after_4.log",
+    "original_sha256": "adf1751d4bea59a4559cfc00a23836709f2784a394e51e9eaf9cf0091e068f0e",
+    "excerpt_sha256": "45a81807632eb2e03309537f41a573ec4d49a1f192495ab7001ce45bcb5dfb1b",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi1_before_0.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi1_before_0.log",
+    "original_sha256": "1768b40125abca623c6caceb6ca35175f38812dd6194e2f6aea14394f6802cb6",
+    "excerpt_sha256": "1e348d9aebdc4ac67ef06053b58f5c2ff6de6e674e209cace2e315edd40c9b19",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi1_before_1.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi1_before_1.log",
+    "original_sha256": "6fc22ddce50324220e2233d6284fea1ca5724ccb2f6b6fbe02df867d745cb3d0",
+    "excerpt_sha256": "1af5d12f21d6fbf8c74df86cdacb05397d863decefa634f06285b7a00bc29220",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi1_before_2.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi1_before_2.log",
+    "original_sha256": "9054f42adee2ee7205da1e2cc14eb5f9ae95d1fecdf25b80dc74f36426357093",
+    "excerpt_sha256": "e7e6a64328762825803ac632a6e2ff3fd5cc625fa3d7ebad4ba547223b44be04",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi1_before_3.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi1_before_3.log",
+    "original_sha256": "e213c6949b8ae58bfbb302e6a5be5aacd717d59f9c83ecbb9858ba4ad9249b8b",
+    "excerpt_sha256": "c97424171771bcdb2aa512ea45c0abc868ac8ef7b4199ca5a3c49b255fd10d6e",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi1_before_4.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi1_before_4.log",
+    "original_sha256": "051932f3584d42f2137d4f87bc9083809be7dcf38dc3e3b73c4001cb4348da2a",
+    "excerpt_sha256": "a99b3d5bceb296ee7f4edbb7704472f0daff237158b54be64dd6723b9a9ad345",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi2_after_0.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi2_after_0.log",
+    "original_sha256": "d6fb97c61504bcaedf3985404a4fcbb7e550e1e77820a5d908d2899baeaec821",
+    "excerpt_sha256": "c82dc0ef14821da71c766b12e48325bb3f19ffa30287cd221c505234280b5ea9",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi2_after_1.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi2_after_1.log",
+    "original_sha256": "e6c7a4ae5b96fcfd434b0ce46652287e1c39f53a7153400757c70d405d1edd46",
+    "excerpt_sha256": "2539d8f89762187d7149b39377e51625aaa77228e1633ee3bb2ad63fde796f32",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi2_after_2.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi2_after_2.log",
+    "original_sha256": "61e216a2ece5e6970830d9ea29282f15ffce27990f36dac0dedc164ee7c2f90b",
+    "excerpt_sha256": "10d02f0ef8a3bca4c46c1c3a6af53e104585ffd88f57977c1adc94127ff4ff04",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi2_after_3.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi2_after_3.log",
+    "original_sha256": "98629bdf3b67a31f024b5cf0d3d1a92e0bd98fbbc30c6243cb14bd4610a65b12",
+    "excerpt_sha256": "52270c7c6440ea5bdcc3e56780c1bc1869544c32601b4d42584a26482c2d5037",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi2_after_4.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi2_after_4.log",
+    "original_sha256": "18f1e60282bfa93e85d7e837e13c374f2457f5d2f0290f2d7f2e9a3abe57644f",
+    "excerpt_sha256": "df2c20874cd611f4f7349f60c55f4b22da25b30ee61bf1d0973913791b5596d3",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi2_before_0.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi2_before_0.log",
+    "original_sha256": "234aa455db0243f9fe41620c06e44b64278b49c2c95a94b8d83f8f8fca723064",
+    "excerpt_sha256": "d2abf90195745f6212f21d3a860731d794089147d4a2434a600737cac25e25ea",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi2_before_1.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi2_before_1.log",
+    "original_sha256": "ebcc24ba90f0a394e841c2c0b61e907a236159356d29303c0372e1e912c50037",
+    "excerpt_sha256": "ddf136da1b8a42351df9ef22c98c80c04c938342705208555f70968e47caa1db",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi2_before_2.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi2_before_2.log",
+    "original_sha256": "5cf18a5844e325d38ae4aa7c2f0a703c7cc429ef2b51fd111b2f24c486c33b4e",
+    "excerpt_sha256": "01362493041175ab01c1926c54ef2e3b4801a0e5ea3100f44b895c88173342fb",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi2_before_3.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi2_before_3.log",
+    "original_sha256": "8bfcb52646b2d5e73f92f280f3b6c661c2aedc601ea9e1246e7fd7a400d0d49a",
+    "excerpt_sha256": "45f6323e2368dfc3bf28f10e1fd453353cdd044dc63f9f393a5c882553c7c5d8",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "adan56_mpi2_before_4.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/adan56_mpi2_before_4.log",
+    "original_sha256": "0ba5dfc2a62fa6cbd7d949e9806520d744dff641f5dca8fcd302122c7104c97b",
+    "excerpt_sha256": "ce1360b4ce068158b0c412fdb185d7f359c931be4d5b66da699522eb484028d9",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi1_after_0.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi1_after_0.log",
+    "original_sha256": "753d42310697eef4d1713c9f32e879f78e264ce2215017c0b0fd41083b293e06",
+    "excerpt_sha256": "ba8921de2d3d82c1865a86714d55d4031dbf21eec9bf2b24b28bfc16c0fd8e2c",
+    "first_original_line": 20014,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi1_after_1.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi1_after_1.log",
+    "original_sha256": "ec36a5007a02173144202a74a59abfada31d104cabcfc8b59ec48f8a6a077f6f",
+    "excerpt_sha256": "511d03bd612292624e7967f2bd3f781266e9e263c946f82caa92bbea70ae9e14",
+    "first_original_line": 20014,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi1_after_2.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi1_after_2.log",
+    "original_sha256": "795aad75c50f816bd76141f83362828f526952f226c2204ae78ab18204a40c52",
+    "excerpt_sha256": "d31d703628dbcd08f25695823a24b9ebbfd2c2eeb73f4f4212ae5dac8956654c",
+    "first_original_line": 20014,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi1_after_3.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi1_after_3.log",
+    "original_sha256": "3cbf26efc4c387e9904d52847009817d2ad94597fd09148ec8682ccf4da60a05",
+    "excerpt_sha256": "9c2b5507944e7ebecca7cf1c89f074d79d14d0866810742e35feabe77a10f0a0",
+    "first_original_line": 20014,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi1_after_4.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi1_after_4.log",
+    "original_sha256": "368c750b331169f3cdd3a92769fcbf519c2a5a3e4232f63cbe1cccf4a48c7299",
+    "excerpt_sha256": "cef5f68ba942a67ee6e2e4ab6cdb2eb68e69ce9e1759e12f8fa49e1acbfab5a0",
+    "first_original_line": 20014,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi1_before_0.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi1_before_0.log",
+    "original_sha256": "499c3313d97ddd26ac5ac9b53ab8377063d170ff15cafb6051d025c7777b6a5d",
+    "excerpt_sha256": "7cccaf969e1e01fbf6f76364c78c4f84853f74cdfa52ab077fa8a0835b39bce0",
+    "first_original_line": 20014,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi1_before_1.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi1_before_1.log",
+    "original_sha256": "e936d0d74ee055f702c009fe926ce8f22d64dccdf5bfbcc95a877c53e2a17c6b",
+    "excerpt_sha256": "04c5383701ebde54163250cfd8874fb9b5adba04dac9d6b92f554f79e3e2facd",
+    "first_original_line": 20014,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi1_before_2.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi1_before_2.log",
+    "original_sha256": "e1605dfcdaf3f03a03ebccb17b06ddaf138346bb22a073286400ce0dfc0700f1",
+    "excerpt_sha256": "7873e99f7c04a6bdd2461c5a759c2a44caf72b9d8cfb61bcefea4d23b74b47c0",
+    "first_original_line": 20014,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi1_before_3.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi1_before_3.log",
+    "original_sha256": "9be116891e988804f9f8d7a1792b7cd50dba28aa059be8d2511ff665dcc7fa6a",
+    "excerpt_sha256": "de52d7ca5e377b176b6f2c10a95e3fb8df43f3d625d262b9b2f4b862286cb1c2",
+    "first_original_line": 20014,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi1_before_4.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi1_before_4.log",
+    "original_sha256": "d5df77fd6ae92052223487e4488fdb738e9bf06521d5decb6877f2ecb4ff48b7",
+    "excerpt_sha256": "d7e1873841e0038d1cbe325207441abf4ac116010351901690bc3a5999ea65d6",
+    "first_original_line": 20014,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi2_after_0.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi2_after_0.log",
+    "original_sha256": "f204777697ab0a14c6e33f889358251756a415cffa279f49a53db40d82d39ecc",
+    "excerpt_sha256": "3eebf25ea9dba79ed97cbfbbd4fdb65e206649839f88d70c6cfd4c94a609cdd5",
+    "first_original_line": 20015,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi2_after_1.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi2_after_1.log",
+    "original_sha256": "7422164ce7c2add5cbcc97e5cc5bdb785344d5e1dc419354b56231d2939be3cc",
+    "excerpt_sha256": "750c3428e11017d59dbd87f5ea8e1481506622a8e4c4f29821d76f97a70f7e98",
+    "first_original_line": 20015,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi2_after_2.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi2_after_2.log",
+    "original_sha256": "27d2b6203d3b291e5fce748806a6c21fe2e067376bdab85e8a5b1696d4c28b06",
+    "excerpt_sha256": "64173f8e1aa8f85409e3762b898a380643e603b1916ea1f28074e2cc6f9018c3",
+    "first_original_line": 20015,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi2_after_3.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi2_after_3.log",
+    "original_sha256": "729a97adc8320be4f53175de36dc4531ee2e49acf335823b64933b1b3a944857",
+    "excerpt_sha256": "cd06efcb49692bfb8e1e6520c6dfe99bb364c912dd9ec7eb88358f9c0c33d587",
+    "first_original_line": 20015,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi2_after_4.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi2_after_4.log",
+    "original_sha256": "676f680f6f184bf6b1504676ac129613af58ea8d313403d52f52e2a0f25dcba0",
+    "excerpt_sha256": "6594297951c1b75595f96c26374069076d41b0c459221d5eaaf520b72b307b7c",
+    "first_original_line": 20015,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi2_before_0.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi2_before_0.log",
+    "original_sha256": "77b9ab370b8210d18bee74c0f88540c0d88a60defa7d9d6d3b9b72b22d0933ea",
+    "excerpt_sha256": "eff2f6cc4dba50399519cf524650c58c7d125decd175942484dd8b1061fb69dd",
+    "first_original_line": 20015,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi2_before_1.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi2_before_1.log",
+    "original_sha256": "41190b4456ec27eeeeb29420f436227e4380bcc7107325b4dfe467aa1a22d14f",
+    "excerpt_sha256": "1d2c83160f2f7eb9accaa8bddad3c4689ae7b50a8f824c45d5a156abe5d3e3d8",
+    "first_original_line": 20015,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi2_before_2.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi2_before_2.log",
+    "original_sha256": "b4b00c568a918239d68633842705e68908c0d0403238caafe75b4529122a048d",
+    "excerpt_sha256": "336e29f95db24c14cdaa38080c5c7aaf8b6f03746cb5602c09475f8060b5a72d",
+    "first_original_line": 20015,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi2_before_3.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi2_before_3.log",
+    "original_sha256": "dfd0cc8559da4d2bda74f7b81030d3d66fe34765fd6c965378356eff9d55a531",
+    "excerpt_sha256": "cd816f74dfbc965d41aa233f001a34e36c6da38c2497e0bb276396a9f8180b55",
+    "first_original_line": 20015,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "network10k_mpi2_before_4.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/step4/network10k_mpi2_before_4.log",
+    "original_sha256": "9cb0a2744190232bd1cc9babdf4bdbbf0335ae21f080ca44a107986cafd91b9b",
+    "excerpt_sha256": "f0c60ae1b68d62f5f15f830c0f9c1ad80519cf771234423e06db8dc997e2764c",
+    "first_original_line": 20015,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "release_tests.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/release_tests.log",
+    "original_sha256": "47c0453d1e70bb520f26916e8728ab8e1f503ce0097d420d02ff412a71bd7983",
+    "excerpt_sha256": "47c0453d1e70bb520f26916e8728ab8e1f503ce0097d420d02ff412a71bd7983",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "trajectory_before.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/trajectory_before.log",
+    "original_sha256": "40adcc3bb0e5f1a275a0b59a1fd52dc9f6c0b4480d01fcbfece1cf2c53ac425c",
+    "excerpt_sha256": "40adcc3bb0e5f1a275a0b59a1fd52dc9f6c0b4480d01fcbfece1cf2c53ac425c",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  },
+  {
+    "file": "trajectory_after.log",
+    "original_path": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/trajectory_after.log",
+    "original_sha256": "40adcc3bb0e5f1a275a0b59a1fd52dc9f6c0b4480d01fcbfece1cf2c53ac425c",
+    "excerpt_sha256": "40adcc3bb0e5f1a275a0b59a1fd52dc9f6c0b4480d01fcbfece1cf2c53ac425c",
+    "first_original_line": 1,
+    "normalization": "Trailing line whitespace and empty EOF lines stripped from committed excerpt only"
+  }
+]

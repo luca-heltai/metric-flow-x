@@ -1,0 +1,194 @@
+[
+  {
+    "case": "adan56_mpi1",
+    "metric": "residual",
+    "variant": "before",
+    "median_ms": 36.68969875,
+    "min_ms": 33.2921648,
+    "max_ms": 36.9771933
+  },
+  {
+    "case": "adan56_mpi2",
+    "metric": "residual",
+    "variant": "before",
+    "median_ms": 18.186683000000002,
+    "min_ms": 17.7095175,
+    "max_ms": 18.3891635
+  },
+  {
+    "case": "network10k_mpi1",
+    "metric": "residual",
+    "variant": "before",
+    "median_ms": 291.00224744999997,
+    "min_ms": 280.21773495,
+    "max_ms": 310.1666766
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "residual",
+    "variant": "before",
+    "median_ms": 159.51510485,
+    "min_ms": 157.3295297,
+    "max_ms": 163.95027495
+  },
+  {
+    "case": "adan56_mpi1",
+    "metric": "residual",
+    "variant": "after",
+    "median_ms": 35.1758989,
+    "min_ms": 33.87265195,
+    "max_ms": 36.9622188
+  },
+  {
+    "case": "adan56_mpi2",
+    "metric": "residual",
+    "variant": "after",
+    "median_ms": 18.258930149999998,
+    "min_ms": 18.047045599999997,
+    "max_ms": 18.5244689
+  },
+  {
+    "case": "network10k_mpi1",
+    "metric": "residual",
+    "variant": "after",
+    "median_ms": 289.2597331,
+    "min_ms": 280.08603645,
+    "max_ms": 295.55745435
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "residual",
+    "variant": "after",
+    "median_ms": 152.8092303,
+    "min_ms": 145.73664675,
+    "max_ms": 160.47934815
+  },
+  {
+    "case": "adan56_mpi1",
+    "metric": "jacobian",
+    "variant": "before",
+    "median_ms": 98.03783200000001,
+    "min_ms": 90.438669,
+    "max_ms": 99.8466775
+  },
+  {
+    "case": "adan56_mpi2",
+    "metric": "jacobian",
+    "variant": "before",
+    "median_ms": 51.8209455,
+    "min_ms": 48.907498000000004,
+    "max_ms": 52.814595499999996
+  },
+  {
+    "case": "network10k_mpi1",
+    "metric": "jacobian",
+    "variant": "before",
+    "median_ms": 587.857303,
+    "min_ms": 568.1074895,
+    "max_ms": 672.9172295
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "jacobian",
+    "variant": "before",
+    "median_ms": 352.05859499999997,
+    "min_ms": 345.5517335,
+    "max_ms": 364.0160835
+  },
+  {
+    "case": "adan56_mpi1",
+    "metric": "jacobian",
+    "variant": "after",
+    "median_ms": 85.955045,
+    "min_ms": 81.5272065,
+    "max_ms": 89.16073200000001
+  },
+  {
+    "case": "adan56_mpi2",
+    "metric": "jacobian",
+    "variant": "after",
+    "median_ms": 46.876827500000005,
+    "min_ms": 43.140822,
+    "max_ms": 47.148648
+  },
+  {
+    "case": "network10k_mpi1",
+    "metric": "jacobian",
+    "variant": "after",
+    "median_ms": 561.946425,
+    "min_ms": 551.683347,
+    "max_ms": 578.1612305
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "jacobian",
+    "variant": "after",
+    "median_ms": 310.20113599999996,
+    "min_ms": 297.231894,
+    "max_ms": 328.600737
+  },
+  {
+    "case": "adan56_mpi1",
+    "metric": "derivative",
+    "variant": "before",
+    "median_ms": 9.3e-06,
+    "min_ms": 8.65e-06,
+    "max_ms": 9.85e-06
+  },
+  {
+    "case": "adan56_mpi2",
+    "metric": "derivative",
+    "variant": "before",
+    "median_ms": 7.95e-06,
+    "min_ms": 7.350000000000001e-06,
+    "max_ms": 8.95e-06
+  },
+  {
+    "case": "network10k_mpi1",
+    "metric": "derivative",
+    "variant": "before",
+    "median_ms": 8.1e-06,
+    "min_ms": 7.499999999999999e-06,
+    "max_ms": 8.4e-06
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "derivative",
+    "variant": "before",
+    "median_ms": 9.2e-06,
+    "min_ms": 7.8e-06,
+    "max_ms": 1.02e-05
+  },
+  {
+    "case": "adan56_mpi1",
+    "metric": "derivative",
+    "variant": "after",
+    "median_ms": 7.85e-06,
+    "min_ms": 6.799999999999999e-06,
+    "max_ms": 8.95e-06
+  },
+  {
+    "case": "adan56_mpi2",
+    "metric": "derivative",
+    "variant": "after",
+    "median_ms": 8.65e-06,
+    "min_ms": 8.000000000000001e-06,
+    "max_ms": 1.0599999999999998e-05
+  },
+  {
+    "case": "network10k_mpi1",
+    "metric": "derivative",
+    "variant": "after",
+    "median_ms": 9.15e-06,
+    "min_ms": 8.3e-06,
+    "max_ms": 9.750000000000002e-06
+  },
+  {
+    "case": "network10k_mpi2",
+    "metric": "derivative",
+    "variant": "after",
+    "median_ms": 9.65e-06,
+    "min_ms": 8.05e-06,
+    "max_ms": 1.075e-05
+  }
+]

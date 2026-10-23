@@ -251,3 +251,44 @@ benchmark and driver were byte-identical to the measured candidate. The
 [ELF equivalence receipt](performance_data/03_derivative_cache/formatting_binary_equivalence.json)
 and [format check](performance_data/03_derivative_cache/formatting_check.json)
 record this follow-up without changing numeric data.
+
+## Intervention 4: insert cell Jacobians in bulk
+
+The final cell Jacobian scatter now uses the existing native matrix block
+insertion interface. The PETSc wrapper submits one local row per call while
+retaining the original row/column order and zero filtering. Cell volume and
+face arithmetic, trace insertion and compression retain their original order.
+
+Both cumulative builds, `7908e4f` before and `7bfd570` after, were compiled and
+measured on **lnx3** with five alternating pairs for ADAN56 and the 10k network
+at MPI1/MPI2. Nineteen of twenty state-Jacobian pairs improved. Residual and
+derivative timings remain controls; no end-to-end speedup is claimed.
+
+| Case | Before state Jacobian (ms) | After state Jacobian (ms) | Median paired speedup |
+|---|---:|---:|---:|
+| adan56_mpi1 | 98.038 | 85.955 | 1.135 |
+| adan56_mpi2 | 51.821 | 46.877 | 1.119 |
+| network10k_mpi1 | 587.857 | 561.946 | 1.054 |
+| network10k_mpi2 | 352.059 | 310.201 | 1.140 |
+
+![State Jacobian before and after bulk matrix insertion](performance_data/04_matrix_bulk/comparison.svg)
+
+All **54 snapshot pairs matched exactly**, covering 1,179,248,416 bytes per
+side. Both archives passed analytic/CSV inflow checks at MPI1/MPI2, with all
+**32 trajectory CSVs (2372 rows)** identical after the same wall-clock
+exclusions as earlier interventions. All **26 Release tests passed
+BUILD/RUN/DIFF and CTest**. The
+[full report](performance_data/04_matrix_bulk/README.md),
+[exact snapshot receipt](performance_data/04_matrix_bulk/equivalence.json),
+[trajectory receipt](performance_data/04_matrix_bulk/trajectory_equivalence.json),
+[raw timings](performance_data/04_matrix_bulk/timings.jsonl) and
+[test log](performance_data/04_matrix_bulk/release_tests.log) retain the evidence.
+
+The runtime patch was rebased onto published intervention 3, inheriting only
+declaration alignment in executable source. The entire changed source passed
+clang-format 16; recompilation produced three ELF files byte-identical to the
+measured candidate. The
+[binary identity receipt](performance_data/04_matrix_bulk/formatting_binary_equivalence.json)
+and [tree audit](performance_data/04_matrix_bulk/runtime_rebase_equivalence.json)
+connect the measured build to the submitted runtime. Exact measured inputs are
+archived as deterministic `.prm.gz` files with their decompression hashes.

@@ -1,0 +1,36 @@
+{
+  "before": {
+    "compiler": {
+      "CMAKE_CXX_COMPILER": "/software/spack-v2/var/spack/views/dealii/bin/mpicxx",
+      "CMAKE_CXX_COMPILER_ID": "GNU",
+      "CMAKE_CXX_COMPILER_VERSION": "13.2.0"
+    },
+    "cache": {
+      "CMAKE_BUILD_TYPE:STRING": "Release",
+      "CMAKE_CXX_COMPILER:STRING": "/software/spack-v2/var/spack/views/dealii/bin/mpicxx",
+      "CMAKE_CXX_FLAGS:STRING": "",
+      "CMAKE_CXX_FLAGS_RELEASE:STRING": "-O3 -DNDEBUG",
+      "DEAL_II_DIR:UNINITIALIZED": "/software/spack-v2/var/spack/views/dealii/lib/cmake/deal.II",
+      "METRIC_FLOW_X_BACKEND:STRING": "PETSc"
+    },
+    "translation_unit_flags": "-O3 -DNDEBUG -fPIC -pedantic -Wall -Wextra -Wmissing-braces -Woverloaded-virtual -Wpointer-arith -Wsign-compare -Wsuggest-override -Wswitch -Wsynth -Wwrite-strings -Wno-placement-new -Wno-literal-suffix -Wno-psabi -Wno-misleading-indentation -Wno-unused-local-typedefs -fopenmp-simd -march=broadwell -mtune=broadwell -O2 -funroll-loops -funroll-all-loops -Wno-unused-parameter -march=core-avx2 -mtune=core-avx2 -mrtm -frounding-math"
+  },
+  "after": {
+    "compiler": {
+      "CMAKE_CXX_COMPILER": "/software/spack-v2/var/spack/views/dealii/bin/mpicxx",
+      "CMAKE_CXX_COMPILER_ID": "GNU",
+      "CMAKE_CXX_COMPILER_VERSION": "13.2.0"
+    },
+    "cache": {
+      "CMAKE_BUILD_TYPE:STRING": "Release",
+      "CMAKE_CXX_COMPILER:STRING": "/software/spack-v2/var/spack/views/dealii/bin/mpicxx",
+      "CMAKE_CXX_FLAGS:STRING": "",
+      "CMAKE_CXX_FLAGS_RELEASE:STRING": "-O3 -DNDEBUG",
+      "DEAL_II_DIR:UNINITIALIZED": "/software/spack-v2/var/spack/views/dealii/lib/cmake/deal.II",
+      "METRIC_FLOW_X_BACKEND:STRING": "PETSc"
+    },
+    "translation_unit_flags": "-O3 -DNDEBUG -fPIC -pedantic -Wall -Wextra -Wmissing-braces -Woverloaded-virtual -Wpointer-arith -Wsign-compare -Wsuggest-override -Wswitch -Wsynth -Wwrite-strings -Wno-placement-new -Wno-literal-suffix -Wno-psabi -Wno-misleading-indentation -Wno-unused-local-typedefs -fopenmp-simd -march=broadwell -mtune=broadwell -O2 -funroll-loops -funroll-all-loops -Wno-unused-parameter -march=core-avx2 -mtune=core-avx2 -mrtm -frounding-math"
+  },
+  "archived_cmake_cache_byte_identical": true,
+  "effective_optimization": "-O2 follows initial -O3"
+}

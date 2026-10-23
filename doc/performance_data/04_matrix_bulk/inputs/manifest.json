@@ -1,0 +1,31 @@
+{
+  "baseline_revision": "7908e4f954714aa26157ad58dfb3676166525dd4",
+  "host_prepared": "lnx3",
+  "changes": "Only Output directory differs from source parameters",
+  "inputs": {
+    "adan56": {
+      "parameter_file": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/inputs/adan56.prm",
+      "parameter_sha256": "0ec5fd414a30824762b429d73e9df1b1b4cfc3f88f3b8c65c845f8a49004ca9f",
+      "source_parameter_file": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/inputs/adan56.prm",
+      "source_parameter_sha256": "b631c2cfb244413d17902be61579279ef949feb4cda314a34ad0d4e7431521a6",
+      "mesh_file": "/data/home/lheltai/codes/metric-flow-x/notebooks/56_adnr_new.vtk",
+      "mesh_sha256": "61975d5e4219135c3f9a43210b03ce074a197d3d026c88f7581938c96425df3d",
+      "output_directory": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/adan56_output",
+      "input_sha256": "0ec5fd414a30824762b429d73e9df1b1b4cfc3f88f3b8c65c845f8a49004ca9f",
+      "archive_file": "adan56.prm.gz",
+      "archive_sha256": "026740d692ba15f8143a33cc85e1d10607a2fdc5fb298024520d165cd49ebd7c"
+    },
+    "network10k": {
+      "parameter_file": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/inputs/network10k.prm",
+      "parameter_sha256": "3866aea63e2b7b7b87d61e29c793e4651cb67a8592f85c0b624761861c5dc178",
+      "source_parameter_file": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/inputs/network10k.prm",
+      "source_parameter_sha256": "8ea3eb4289c3a9e0aeb862e74052778f75b96459f9a098a952499b418c06584c",
+      "mesh_file": "/data/home/lheltai/codes/metric-flow-x/notebooks/networks_by_svv/trees/network_10000_adnr.vtk",
+      "mesh_sha256": "3d93dd9d3edb088d45bd719f4526f6137a97411fd0f51d39ab4db2b6279744be",
+      "output_directory": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/lnx3_matrix/network10k_output",
+      "input_sha256": "3866aea63e2b7b7b87d61e29c793e4651cb67a8592f85c0b624761861c5dc178",
+      "archive_file": "network10k.prm.gz",
+      "archive_sha256": "379217194c273a0a6bcb5ce93bf54817d94b47bf0eab23b4ad0da4ca298a16ae"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "measured_candidate": "7bfd570ab83ebc786c50647070ec92a55041c478",
+  "submission_runtime_commit": "6a4a3b718ca40070aedcda5ec7f4848c02998888",
+  "same_build_directory": "/data/home/lheltai/codes/metric-flow-x/build/performance_campaign/matrix_stack_build",
+  "host": "lnx3",
+  "formatting_check": "clang-format16 --dry-run --Werror on complete changed source passed",
+  "files": {
+    "benchmark_assembly": {
+      "measured_sha256": "9f8a3e1cc0245ee585fd3696cf00cb94ced00bdf31bc4d8ae8a606062882d4b5",
+      "rebuilt_sha256": "9f8a3e1cc0245ee585fd3696cf00cb94ced00bdf31bc4d8ae8a606062882d4b5",
+      "byte_identical": true
+    },
+    "blood_flow": {
+      "measured_sha256": "6567c9ab43ad124d7630577e34f5ed21980c0d7a28951b4f61b7645e5c283e01",
+      "rebuilt_sha256": "6567c9ab43ad124d7630577e34f5ed21980c0d7a28951b4f61b7645e5c283e01",
+      "byte_identical": true
+    },
+    "libmetric_flow_x.so": {
+      "measured_sha256": "862c0eeab427909102d78f50c6ff8572598c6b5f798f707541093c1c766e6049",
+      "rebuilt_sha256": "862c0eeab427909102d78f50c6ff8572598c6b5f798f707541093c1c766e6049",
+      "byte_identical": true
+    }
+  }
+}
