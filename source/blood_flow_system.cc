@@ -4043,9 +4043,7 @@ namespace MetricFlowX
         // Single scatter: volume + face cell-cell ->
         // jacobian_matrix
 
-        for (unsigned int i = 0; i < n_dofs; ++i)
-          for (unsigned int j = 0; j < n_dofs; ++j)
-            jacobian_matrix.add(ldofs[i], ldofs[j], cell_matrix(i, j));
+        jacobian_matrix.add(ldofs, cell_matrix);
       }
   }
 
