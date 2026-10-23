@@ -1,0 +1,284 @@
+{
+  "metadata": {
+    "host": "lnx3",
+    "runs": 5,
+    "repetitions": 20,
+    "map_by": "pe-list=8,9:ordered",
+    "bind_to": "core",
+    "baseline": "7cd16b3a418499962b1cf9ef95b1cca4fb6d6211; executable source and benchmark identical to compiled27e1ef4db19fa61094b402aea133c5becee228bb",
+    "candidate": "4a2f4364405dedc0321b7895c66b3806ee5e933a",
+    "ranks": [
+      1,
+      2
+    ],
+    "input_sha256": {
+      "adan56.prm": "ca93c493073d60ca7746e23894e931e6f6634e99590799d7b193706f718f362d",
+      "network10k.prm": "f5ace55ff17e86f7298220b47d2bef717f936cac88d3b8b66bddf7b26a97b41f"
+    },
+    "numerical_validation": {
+      "status": "exact",
+      "snapshot_pairs": 54,
+      "rtol": 1.4210854715202004e-14,
+      "atol": 1.4210854715202004e-14,
+      "max_abs_error": 0.0,
+      "max_relative_error": 0.0,
+      "max_scaled_error": 0.0,
+      "changed_entries": 0
+    },
+    "toolchain": {
+      "compiler": "GCC 13.2.0",
+      "deal_ii": "9.8.0",
+      "backend": "PETSc, real double",
+      "build_type": "Release",
+      "effective_optimization": "-O2",
+      "instruction_set": "AVX2",
+      "cpu_model": "Intel(R) Xeon(R) CPU E5-2650 v4 @ 2.20GHz"
+    },
+    "source_cpp_sha256": {
+      "source/blood_flow_system.cc": "645d993ccf1b0842dc220e523f87e4db452cd678e72b3cb3b34b5b28717c7874",
+      "include/metric_flow_x/blood_flow_system.h": "a5c99b4f0ad02ffb5b18e805325509175a95d065d302be4008d45c3e9567a990",
+      "tools/benchmark_assembly.cc": "52952ffdc4e80d401823c7b785ff70f8f1d877ebd2ee396156807a53cc3b51d7",
+      "tests/test_interior_face_cache.cc": "616e7db6950ca538452ff1722fe39cee52cbba0ad30b3a47a4be54f49d2e3f4c"
+    },
+    "validation": {
+      "release_golden_regressions_passed": 27,
+      "cache_rebuild_mpi_ranks": [
+        2,
+        4
+      ],
+      "empty_ranks_exercised": true,
+      "physical_csv_comparison": "exact",
+      "physical_csv_files": 32,
+      "physical_csv_rows": 2372,
+      "physical_csv_exclusions": [
+        "scaling_timings.csv",
+        "ida_statistics.csv:wall_time"
+      ],
+      "clang_format_version": "16.0.6"
+    },
+    "placement": {
+      "physical_cores": [
+        8,
+        9
+      ],
+      "logical_affinities": {
+        "rank0": [
+          8,
+          32
+        ],
+        "rank1": [
+          9,
+          33
+        ]
+      },
+      "confirmation": "All four cases repeated once with five alternating pairs after verified contention on the original core; complete earlier data retained locally",
+      "helper_sha256": "a7f2945c14f7c1a5e7de1996c478602b6fa1e5df0ea3397bb750346846f36ba6"
+    }
+  },
+  "rows": [
+    {
+      "case": "adan56_mpi1",
+      "workload": "adan56",
+      "ranks": 1,
+      "metric": "residual",
+      "before_median_ms": 19.56317305,
+      "before_min_ms": 18.7780242,
+      "before_max_ms": 21.11367745,
+      "after_median_ms": 13.913885249999998,
+      "after_min_ms": 12.8997004,
+      "after_max_ms": 14.13327075,
+      "median_paired_speedup": 1.455694598922623,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0
+    },
+    {
+      "case": "adan56_mpi1",
+      "workload": "adan56",
+      "ranks": 1,
+      "metric": "jacobian",
+      "before_median_ms": 54.086154,
+      "before_min_ms": 51.197254,
+      "before_max_ms": 57.379348500000006,
+      "after_median_ms": 47.135619,
+      "after_min_ms": 44.877347,
+      "after_max_ms": 49.178116,
+      "median_paired_speedup": 1.1520906082081903,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0
+    },
+    {
+      "case": "adan56_mpi1",
+      "workload": "adan56",
+      "ranks": 1,
+      "metric": "derivative",
+      "before_median_ms": 5.45e-06,
+      "before_min_ms": 4.55e-06,
+      "before_max_ms": 6.2e-06,
+      "after_median_ms": 4.6e-06,
+      "after_min_ms": 3.55e-06,
+      "after_max_ms": 5.45e-06,
+      "median_paired_speedup": 1.184782608695652,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0
+    },
+    {
+      "case": "adan56_mpi2",
+      "workload": "adan56",
+      "ranks": 2,
+      "metric": "residual",
+      "before_median_ms": 9.9913674,
+      "before_min_ms": 9.926816,
+      "before_max_ms": 10.083903549999999,
+      "after_median_ms": 7.026671149999999,
+      "after_min_ms": 7.002846849999999,
+      "after_max_ms": 7.22723035,
+      "median_paired_speedup": 1.420859123417307,
+      "before_strong_scaling_speedup": 1.9580075746188654,
+      "before_parallel_efficiency": 0.9790037873094327,
+      "after_strong_scaling_speedup": 1.9801531839155444,
+      "after_parallel_efficiency": 0.9900765919577722
+    },
+    {
+      "case": "adan56_mpi2",
+      "workload": "adan56",
+      "ranks": 2,
+      "metric": "jacobian",
+      "before_median_ms": 28.447940000000003,
+      "before_min_ms": 28.241263999999997,
+      "before_max_ms": 29.6448,
+      "after_median_ms": 24.397797999999998,
+      "after_min_ms": 24.013291,
+      "after_max_ms": 25.147863,
+      "median_paired_speedup": 1.1685363129648183,
+      "before_strong_scaling_speedup": 1.9012327078867572,
+      "before_parallel_efficiency": 0.9506163539433786,
+      "after_strong_scaling_speedup": 1.931962015588456,
+      "after_parallel_efficiency": 0.965981007794228
+    },
+    {
+      "case": "adan56_mpi2",
+      "workload": "adan56",
+      "ranks": 2,
+      "metric": "derivative",
+      "before_median_ms": 6.2499999999999995e-06,
+      "before_min_ms": 4.5e-06,
+      "before_max_ms": 6.9499999999999995e-06,
+      "after_median_ms": 5.4e-06,
+      "after_min_ms": 4.25e-06,
+      "after_max_ms": 6.5000000000000004e-06,
+      "median_paired_speedup": 1.146788990825688,
+      "before_strong_scaling_speedup": 0.8720000000000001,
+      "before_parallel_efficiency": 0.43600000000000005,
+      "after_strong_scaling_speedup": 0.8518518518518519,
+      "after_parallel_efficiency": 0.42592592592592593
+    },
+    {
+      "case": "network10k_mpi1",
+      "workload": "network10k",
+      "ranks": 1,
+      "metric": "residual",
+      "before_median_ms": 182.17651444999998,
+      "before_min_ms": 178.2529684,
+      "before_max_ms": 187.45114425,
+      "after_median_ms": 182.3816241,
+      "after_min_ms": 172.650774,
+      "after_max_ms": 193.98950965,
+      "median_paired_speedup": 1.0184114264064172,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0
+    },
+    {
+      "case": "network10k_mpi1",
+      "workload": "network10k",
+      "ranks": 1,
+      "metric": "jacobian",
+      "before_median_ms": 375.3281975,
+      "before_min_ms": 371.316196,
+      "before_max_ms": 391.2976025,
+      "after_median_ms": 370.60222250000004,
+      "after_min_ms": 365.5171765,
+      "after_max_ms": 386.1121305,
+      "median_paired_speedup": 1.0134299639674234,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0
+    },
+    {
+      "case": "network10k_mpi1",
+      "workload": "network10k",
+      "ranks": 1,
+      "metric": "derivative",
+      "before_median_ms": 5.6e-06,
+      "before_min_ms": 5.25e-06,
+      "before_max_ms": 6.1e-06,
+      "after_median_ms": 5.25e-06,
+      "after_min_ms": 4.65e-06,
+      "after_max_ms": 5.95e-06,
+      "median_paired_speedup": 1.0701754385964912,
+      "before_strong_scaling_speedup": 1.0,
+      "before_parallel_efficiency": 1.0,
+      "after_strong_scaling_speedup": 1.0,
+      "after_parallel_efficiency": 1.0
+    },
+    {
+      "case": "network10k_mpi2",
+      "workload": "network10k",
+      "ranks": 2,
+      "metric": "residual",
+      "before_median_ms": 102.12266005,
+      "before_min_ms": 99.59043199999999,
+      "before_max_ms": 103.47402935000001,
+      "after_median_ms": 99.16112245,
+      "after_min_ms": 96.39616869999999,
+      "after_max_ms": 101.56793834999999,
+      "median_paired_speedup": 1.0331368283934712,
+      "before_strong_scaling_speedup": 1.783899032406765,
+      "before_parallel_efficiency": 0.8919495162033825,
+      "after_strong_scaling_speedup": 1.8392452565466095,
+      "after_parallel_efficiency": 0.9196226282733048
+    },
+    {
+      "case": "network10k_mpi2",
+      "workload": "network10k",
+      "ranks": 2,
+      "metric": "jacobian",
+      "before_median_ms": 211.4199175,
+      "before_min_ms": 206.66131800000002,
+      "before_max_ms": 216.7227695,
+      "after_median_ms": 208.8983435,
+      "after_min_ms": 204.653083,
+      "after_max_ms": 218.8349945,
+      "median_paired_speedup": 1.0101063075604875,
+      "before_strong_scaling_speedup": 1.775273597389423,
+      "before_parallel_efficiency": 0.8876367986947115,
+      "after_strong_scaling_speedup": 1.7740792784218513,
+      "after_parallel_efficiency": 0.8870396392109257
+    },
+    {
+      "case": "network10k_mpi2",
+      "workload": "network10k",
+      "ranks": 2,
+      "metric": "derivative",
+      "before_median_ms": 6.2e-06,
+      "before_min_ms": 5.2e-06,
+      "before_max_ms": 6.45e-06,
+      "after_median_ms": 5.65e-06,
+      "after_min_ms": 4.000000000000001e-06,
+      "after_max_ms": 7.6e-06,
+      "median_paired_speedup": 1.0973451327433628,
+      "before_strong_scaling_speedup": 0.9032258064516129,
+      "before_parallel_efficiency": 0.45161290322580644,
+      "after_strong_scaling_speedup": 0.9292035398230087,
+      "after_parallel_efficiency": 0.46460176991150437
+    }
+  ]
+}

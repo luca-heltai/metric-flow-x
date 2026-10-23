@@ -1,6 +1,6 @@
 # Assembly performance
 
-Five changes reduce repeated assembly work: reuse each cell's local state;
+The first five changes reduce repeated assembly work: reuse each cell's local state;
 transfer FE vectors in bulk; reuse the derivative Jacobian until setup, mass
 or capacitance changes; insert cell matrices in bulk; gather/scatter residual
 cell vectors in bulk. A CTest resource lock also prevents concurrent nested
@@ -41,6 +41,9 @@ python3 tools/plot_assembly_results.py \
   /tmp/assembly-comparison/results.json --output /tmp/assembly.svg
 ```
 
+Plotting requires Matplotlib. Use `--map-by POLICY` to keep placement on
+verified idle cores identical before and after.
+
 Raw logs stay in the local output directory. Commit only the final summary
 and figure. Exact snapshot comparison is the default; explicit `--rtol` and
 `--atol` permit small floating-point errors in later experiments. Set the
@@ -53,3 +56,24 @@ bootstrap, output and solver factorization reuse need separate full-solver
 measurements; see issues [#9](https://github.com/luca-heltai/metric-flow-x/issues/9),
 [#25](https://github.com/luca-heltai/metric-flow-x/issues/25) and
 [#26](https://github.com/luca-heltai/metric-flow-x/issues/26).
+
+## 6. Cache interior-face topology
+
+Cache interior-face traversal and trace indices after DoF distribution,
+preserving row ownership; mesh/DoF rebuilds replace the cache. Pinning the
+normal's FMA order avoids amplified roundoff in the trace Jacobian.
+
+Five alternating Release/PETSc pairs on lnx3 compare MPI1/2 on free cores 8/9.
+A predeclared full confirmation repeated all four cases after finding physical
+core contention; both complete datasets remain local. ADAN56 paired speedups
+are **1.42–1.46x residual** and **1.15–1.17x state Jacobian**. Network gains
+are small/noisy (**1.01–1.03x**); no precise statistical bound is claimed.
+
+All **54 snapshots** and **32 physical CSVs / 2372 rows** match exactly.
+All **27 Release regressions**, cache-rebuild tests at MPI2/MPI4 with empty
+ranks, and clang-format 16 pass. With declared 64-epsilon local bounds,
+every measured numerical error is zero.
+[Final results](performance_data/06_face_topology/results.json) retain the
+configuration, ranges, paired improvements and validation summary.
+
+![Interior-face topology cache](performance_data/06_face_topology/comparison.svg)
