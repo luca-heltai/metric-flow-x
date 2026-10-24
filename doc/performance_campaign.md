@@ -86,3 +86,21 @@ unsupported componentwise tolerances and fixtures; no tolerance overrides exist.
 Remaining assembly costs are cells/interior faces on ADAN56 and cells,
 junctions/boundaries on the network. Full-solver startup, factorization and
 output require separate measurements; see #9, #25 and #26.
+
+## 11. Remove unused face-Jacobian evaluations
+
+Remove unused interior-velocity extraction and wave-speed vectors from boundary
+and junction Jacobians. Five alternating Release/PETSc pairs on lnx4 use
+20 repetitions, three samples and verified idle cores 8/9 at MPI1/MPI2.
+The 10k network Jacobian improves **1.053/1.067x**, with all **10 pairs** faster;
+target junction scopes improve **1.117/1.108x**. ADAN56 Jacobians measure
+**0.982/1.011x**: the MPI1 decrease tracks unchanged cell/interior controls
+(**0.970/0.972x**). Tiny ADAN boundary scopes measure **0.953/0.975x**.
+No uniform full-Jacobian or residual improvement is claimed.
+
+All **54 snapshots** and **32 trajectory CSVs / 2372 rows** match exactly;
+**29 Release regressions** and cache MPI2/MPI4 checks pass.
+[Results](performance_data/11_unused_face_jacobian/results.json) retain all pairs,
+ranges, controls and provenance.
+
+![Unused face-Jacobian evaluations](performance_data/11_unused_face_jacobian/comparison.svg)

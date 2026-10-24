@@ -4282,7 +4282,7 @@ namespace MetricFlowX
 
     std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
     std::vector<double>                  local_values(fe_->n_dofs_per_cell());
-    std::vector<double>                  A_int_v(1), U_int_v(1);
+    std::vector<double>                  A_int_v(1);
 
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
@@ -4310,14 +4310,9 @@ namespace MetricFlowX
             y_cell.extract_subvector_to(ldofs, local_values);
             fef[area_extractor].get_function_values_from_local_dof_values(
               local_values, A_int_v);
-            fef[velocity_extractor].get_function_values_from_local_dof_values(
-              local_values, U_int_v);
 
             const double A_int     = std::max(A_int_v[0], 1e-10);
             const double a_d_local = compute_a_d_at_face(cell, f);
-            // const double U_int  = U_int_v[0];
-            // const double c0     = compute_wave_speed(vpp.a_d,
-            // vid);
             const double dc_int =
               compute_wave_speed_derivative(A_int, vid, a_d_local);
 
@@ -4527,15 +4522,15 @@ namespace MetricFlowX
     const double A_min = 1e-10;
 
     std::vector<double> local_values(fe_->n_dofs_per_cell());
-    std::vector<double> Av(1), Uv(1);
+    std::vector<double> Av(1);
 
     for (const auto &J : junctions)
       {
         const unsigned int K = J.n_vessels();
 
-        std::vector<double>                  A_int(K), U_int(K), c0(K);
+        std::vector<double>                  A_int(K);
         std::vector<double>                  A_hat(K), U_hat(K);
-        std::vector<double>                  c_hat_v(K), dP_hat(K), dc_hat_v(K);
+        std::vector<double>                  dP_hat(K), dc_hat_v(K);
         std::vector<double>                  dc_int_v(K);
         std::vector<int>                     orient(K);
         std::vector<types::global_dof_index> a_row(K), u_row(K);
@@ -4552,15 +4547,11 @@ namespace MetricFlowX
             fef.reinit(hf.cell, hf.face_no);
             fef[area_extractor].get_function_values_from_local_dof_values(
               local_values, Av);
-            fef[velocity_extractor].get_function_values_from_local_dof_values(
-              local_values, Uv);
 
             A_int[i]  = std::max(Av[0], A_min);
-            U_int[i]  = Uv[0];
             orient[i] = hf.orientation;
 
             const double a_d_face = compute_a_d_at_face(hf.cell, hf.face_no);
-            c0[i]                 = compute_wave_speed(a_d_face, vid, a_d_face);
             dc_int_v[i] =
               compute_wave_speed_derivative(A_int[i], vid, a_d_face);
 
@@ -4587,7 +4578,6 @@ namespace MetricFlowX
             A_hat[i] = std::max(y(a_row[i]), A_min);
             U_hat[i] = y(u_row[i]);
 
-            c_hat_v[i] = compute_wave_speed(A_hat[i], vid, a_d_face);
             dc_hat_v[i] =
               compute_wave_speed_derivative(A_hat[i], vid, a_d_face);
             dP_hat[i] = compute_pressure_derivative(A_hat[i], vid, a_d_face);
