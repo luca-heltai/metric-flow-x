@@ -1,0 +1,5070 @@
+{
+  "schema_version": 1,
+  "description": "Complete formal whole-process initialization comparison and one-vessel tolerance-ramp equivalence.",
+  "sources": {
+    "native_revision": "a19a5e899e65e57d843d5f154bf9d690b0cd800d",
+    "legacy_revision": "15d55a7a090b331b923073cc46a4884b81e99771",
+    "legacy_reference_branch": "origin/codex/initialization-reference",
+    "common_linear_solver_fix": "Both references use the same serial UMFPACK fallback and MPI ILU1/right-preconditioned GMRES/ASM policy",
+    "default_initial_state": "rest"
+  },
+  "provenance": {
+    "host4_normalized_compile_flags_digest": "50111d726f13a9ae3bf6a53348e21241096c1d225c0c37b913d93ed987d417e2",
+    "host4_archive_hashes": {
+      "native": {
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow": "358c0e1e989691b323afadf97ad3e507c769dc048c37bba693b10ab8062c9d0a",
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/libmetric_flow_x.so": "7e00d96b801e5b137280e98c8d429c459ec8ccaff1d9deb6196695edc716daf3",
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/ramp_petsc_build4/CMakeCache.txt": "5cc78a6af0706178b847112a3d2842a89c04ea1311cb16e1156d15e355e60edd",
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/ramp_petsc_build4/build.ninja": "c31b86117dcb26270103847da78e96eb5a514313341e4816d5dd5194cf724669",
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/ramp_petsc_build4/compile_commands.json": "d76a4093761af7c9dfb1e0152c49204d5c38bcc3b15e5f457b4b2881dc583c0e"
+      },
+      "legacy": {
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/legacy_final_archive4/blood_flow": "a3a167074d3aeb67a1f0503474f28d1644aa405f7425103d6ade4996608a9897",
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/legacy_final_archive4/libmetric_flow_x.so": "de6c890eeefdeb38e5d1a167e68164c668ae3c9300d76848a17d6f590e391f96",
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/baseline_public_build4/CMakeCache.txt": "e301aba90f009c49f8f435c74ba919c046b6a92856db1ca6984181808c2612f8",
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/baseline_public_build4/build.ninja": "53bc8a40ec9ff614d24d87c5fe7209ed34df054f00967e9ed3673eda316fd64f",
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/baseline_public_build4/compile_commands.json": "23d158f1f5d74b7b77d830812e6d430772023f93c604e129deb11aedf22dad75"
+      }
+    },
+    "host3_provenance": {
+      "host": "lnx3",
+      "native": {
+        "revision": "a19a5e899e65e57d843d5f154bf9d690b0cd800d",
+        "archive_sha256": {
+          "blood_flow": "2008a88965e22478996cf2b9b7de834ad5334a5b259d479ed90cd74e62941512",
+          "libmetric_flow_x.so": "7cc047dab2c82bbbc4091492dd6f7847d8839d8bb2746e7a26ffe68bfee4e750"
+        }
+      },
+      "legacy": {
+        "revision": "15d55a7a090b331b923073cc46a4884b81e99771",
+        "archive_sha256": {
+          "blood_flow": "33132a1498bd7a706d378d13213718b9dff57b9d407a8081f0ea07af4713bb04",
+          "libmetric_flow_x.so": "b912f3618cd9d8f1fb4fbc25b1a50db1da023691f0f26c1966ab65511cceb82d"
+        }
+      },
+      "same_normalized_app_compiler_flags": true,
+      "normalized_compile_command_sha256": "fa539315ec31817206a911c5cec7aa80253c24319846c1c4a4421f6444a2bd2d",
+      "shared_direct_header_sha256": "cff322eb8bea7d30ece9d57a13b7ce927554b70a00c87a54386b32249ee58e36",
+      "native_cpp_fingerprint": "b35611f009730cd98c8d51928c260b3cef025d34d30617087f49482a6dc5ccef",
+      "legacy_cpp_fingerprint": "e7b3a0f1454ada9e1734b0cfe83c40c7422e5cc98268ab5627607a9011ff3dc3",
+      "cache_controls": [
+        "CMAKE_BUILD_TYPE:STRING=Release",
+        "CMAKE_CXX_COMPILER:STRING=/software/spack-v2/var/spack/views/dealii/bin/mpicxx",
+        "CMAKE_CXX_FLAGS:STRING=",
+        "CMAKE_CXX_FLAGS_DEBUG:STRING=-g",
+        "CMAKE_CXX_FLAGS_MINSIZEREL:STRING=-Os -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG",
+        "DEAL_II_DIR:UNINITIALIZED=/software/spack-v2/var/spack/views/dealii/lib/cmake/deal.II",
+        "METRIC_FLOW_X_BACKEND:STRING=PETSc",
+        "CMAKE_CXX_FLAGS-ADVANCED:INTERNAL=1",
+        "CMAKE_CXX_FLAGS_DEBUG-ADVANCED:INTERNAL=1",
+        "CMAKE_CXX_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1",
+        "CMAKE_CXX_FLAGS_RELEASE-ADVANCED:INTERNAL=1",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1"
+      ],
+      "policy_sha256": "66dddc5334fc4bb4dc3fbbf609a6cd5fcbc4370f3cc5c386acbd78260f702314"
+    },
+    "receipt_sha256": {
+      "summary.json": "b61282c7a4bacb51da6dd4a9a9cde4fd3c56878798c18f7698f857e141561b3b",
+      "protocol.json": "1b04bdad04b1eb6cdccead8f8900c4e8e62a4b4dd01bdf306ed623039646fc39",
+      "provenance.json": "07f0e40580d4664666fa304ebd6e53693350eab8ae9ae6071ad2feb491c71c31"
+    },
+    "all_pilot_timings_excluded": true
+  },
+  "initialization": {
+    "complete": true,
+    "sample_count": 27,
+    "triplets_per_scope": 3,
+    "all_samples_retained": true,
+    "samples": [
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "run": 0,
+        "policy": "legacy",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.02,
+        "input_sha256": "afd017a024045f9418b77e2f463d7549a06c3705e0a79bb2ea767411fc1de051",
+        "whole_process_wall_s": 20.36965413764119,
+        "initialization_statistics": {
+          "initial_condition_policy": "legacy",
+          "preparation_wall_s": 0.334492276,
+          "ida_setup_and_ic_wall_s": 1.190500208,
+          "first_ida_output_interval_wall_s": 5.084250519,
+          "ic_residual_calls": 5,
+          "ic_jacobian_setups": 2,
+          "ic_linear_solves": 5
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 17.868549024,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 496.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0442105263157895,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 248.0
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi1_t0.02_pair0_legacy",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "run": 0,
+        "policy": "native_rest",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.02,
+        "input_sha256": "48f611c07fe87dc77cadafbbd5c132ff5a26dfc5d54f62d53f6781cc8f816237",
+        "whole_process_wall_s": 19.36688420921564,
+        "initialization_statistics": {
+          "initial_state_source": "rest",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.352043449,
+          "ida_setup_and_ic_wall_s": 0.001981208,
+          "first_ida_output_interval_wall_s": 5.063444246,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 2,
+          "largest_trace_block": 6,
+          "algebraic_defect": 8.727062201609341e-05,
+          "differential_defect": 3.9229989611806785e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 16.891006058,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 493.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0378947368421052,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 246.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi1_t0.02_pair0_native_rest",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "run": 0,
+        "policy": "native_0d",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.02,
+        "input_sha256": "cbb44377d6080179218911e5c96bd11ac9468b7acf944c23d2c37621cfc6d58a",
+        "whole_process_wall_s": 16.559436328709126,
+        "initialization_statistics": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.245474695,
+          "ida_setup_and_ic_wall_s": 0.001975064,
+          "first_ida_output_interval_wall_s": 5.496489443,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 1,
+          "largest_trace_block": 6,
+          "algebraic_defect": 4.6664889393921425e-05,
+          "differential_defect": 2.149635825227992e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 14.205497516,
+          "n_steps": 288.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 311.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 288.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0798611111111112,
+          "steps_per_output": 144.0,
+          "nonlin_iters_per_output": 155.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi1_t0.02_pair0_native_0d",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 3921,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "run": 1,
+        "policy": "native_rest",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.02,
+        "input_sha256": "7b802da5dde930802624a7570b291ecfbcdc7c71a66971984ce42de6880ff1e2",
+        "whole_process_wall_s": 19.11653595417738,
+        "initialization_statistics": {
+          "initial_state_source": "rest",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.344800645,
+          "ida_setup_and_ic_wall_s": 0.001945948,
+          "first_ida_output_interval_wall_s": 5.086363211,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 2,
+          "largest_trace_block": 6,
+          "algebraic_defect": 8.727062201609341e-05,
+          "differential_defect": 3.9229989611806785e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 16.622855377,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 493.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0378947368421052,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 246.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi1_t0.02_pair1_native_rest",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "run": 1,
+        "policy": "native_0d",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.02,
+        "input_sha256": "788413d12753776cca54a980c66a9dc2304f63586dfb09aa4d4bd6e973611a93",
+        "whole_process_wall_s": 16.709625463932753,
+        "initialization_statistics": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.24220825,
+          "ida_setup_and_ic_wall_s": 0.00196528,
+          "first_ida_output_interval_wall_s": 5.452014757,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 1,
+          "largest_trace_block": 6,
+          "algebraic_defect": 4.6664889393921425e-05,
+          "differential_defect": 2.149635825227992e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 14.317514111,
+          "n_steps": 288.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 311.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 288.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0798611111111112,
+          "steps_per_output": 144.0,
+          "nonlin_iters_per_output": 155.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi1_t0.02_pair1_native_0d",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 3921,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "run": 1,
+        "policy": "legacy",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.02,
+        "input_sha256": "e646fb297afef0fda893b26ec05c03a59cba94db5407016336ef5bac30bd268e",
+        "whole_process_wall_s": 20.51976026594639,
+        "initialization_statistics": {
+          "initial_condition_policy": "legacy",
+          "preparation_wall_s": 0.334916483,
+          "ida_setup_and_ic_wall_s": 1.210808598,
+          "first_ida_output_interval_wall_s": 5.071598208,
+          "ic_residual_calls": 5,
+          "ic_jacobian_setups": 2,
+          "ic_linear_solves": 5
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 18.084850628,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 496.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0442105263157895,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 248.0
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi1_t0.02_pair1_legacy",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "run": 2,
+        "policy": "native_0d",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.02,
+        "input_sha256": "51cf668a393a0c4e4dd023cf7bfaa6cb7e0084419e9ca7c1ad066ca5b24768ad",
+        "whole_process_wall_s": 16.5587758384645,
+        "initialization_statistics": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.239885693,
+          "ida_setup_and_ic_wall_s": 0.001965153,
+          "first_ida_output_interval_wall_s": 5.450459821,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 1,
+          "largest_trace_block": 6,
+          "algebraic_defect": 4.6664889393921425e-05,
+          "differential_defect": 2.149635825227992e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 14.144896177,
+          "n_steps": 288.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 311.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 288.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0798611111111112,
+          "steps_per_output": 144.0,
+          "nonlin_iters_per_output": 155.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi1_t0.02_pair2_native_0d",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 3921,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "run": 2,
+        "policy": "legacy",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.02,
+        "input_sha256": "4dd6a60f83a80caa0247bb08c65214ef0d34139ea283e52ac7b2213ffe3ff0aa",
+        "whole_process_wall_s": 20.51968263462186,
+        "initialization_statistics": {
+          "initial_condition_policy": "legacy",
+          "preparation_wall_s": 0.371331162,
+          "ida_setup_and_ic_wall_s": 1.309024365,
+          "first_ida_output_interval_wall_s": 5.161470434,
+          "ic_residual_calls": 5,
+          "ic_jacobian_setups": 2,
+          "ic_linear_solves": 5
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 17.999211447,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 496.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0442105263157895,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 248.0
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi1_t0.02_pair2_legacy",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "run": 2,
+        "policy": "native_rest",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.02,
+        "input_sha256": "391099c3b3ef7f9f835de23bbee9357c92194db0bc0d128521dbeb83d562ccb5",
+        "whole_process_wall_s": 19.165365055203438,
+        "initialization_statistics": {
+          "initial_state_source": "rest",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.338853502,
+          "ida_setup_and_ic_wall_s": 0.001952994,
+          "first_ida_output_interval_wall_s": 5.079056111,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 2,
+          "largest_trace_block": 6,
+          "algebraic_defect": 8.727062201609341e-05,
+          "differential_defect": 3.9229989611806785e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 16.778138248,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 493.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0378947368421052,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 246.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi1_t0.02_pair2_native_rest",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "run": 0,
+        "policy": "legacy",
+        "solver_policy": "iterative",
+        "use_direct_solver": false,
+        "file_output_interval": 0.02,
+        "input_sha256": "a87aa454f3d87843ef01fbad43b1c667ca67a3944bc75d82a5be2f92efd2647f",
+        "whole_process_wall_s": 10.79319953173399,
+        "initialization_statistics": {
+          "initial_condition_policy": "legacy",
+          "preparation_wall_s": 0.290164299,
+          "ida_setup_and_ic_wall_s": 0.216534006,
+          "first_ida_output_interval_wall_s": 1.472415411,
+          "ic_residual_calls": 5,
+          "ic_jacobian_setups": 2,
+          "ic_linear_solves": 5
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 8.445922285,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 496.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0442105263157895,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 248.0
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi2_t0.02_pair0_legacy",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "run": 0,
+        "policy": "native_rest",
+        "solver_policy": "iterative",
+        "use_direct_solver": false,
+        "file_output_interval": 0.02,
+        "input_sha256": "a7e2d026f4a18d0f96d48882776f0b6a7ce5aaa74ccff3f36267fa14968ed44c",
+        "whole_process_wall_s": 10.342513982206583,
+        "initialization_statistics": {
+          "initial_state_source": "rest",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.285336677,
+          "ida_setup_and_ic_wall_s": 0.001248077,
+          "first_ida_output_interval_wall_s": 1.42899245,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 2,
+          "largest_trace_block": 6,
+          "algebraic_defect": 8.727062201609341e-05,
+          "differential_defect": 3.9229989611806785e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 8.099515047,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 493.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0378947368421052,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 246.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi2_t0.02_pair0_native_rest",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "run": 0,
+        "policy": "native_0d",
+        "solver_policy": "iterative",
+        "use_direct_solver": false,
+        "file_output_interval": 0.02,
+        "input_sha256": "2e564ee174e8d8847e8c966bfdb95c40de0bd91fbf191d4cae1f617c2741b0da",
+        "whole_process_wall_s": 6.832689065486193,
+        "initialization_statistics": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.197726509,
+          "ida_setup_and_ic_wall_s": 0.001302687,
+          "first_ida_output_interval_wall_s": 1.500311125,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 1,
+          "largest_trace_block": 6,
+          "algebraic_defect": 4.6664889393921425e-05,
+          "differential_defect": 2.149635825227992e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 4.619499123,
+          "n_steps": 288.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 311.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 288.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0798611111111112,
+          "steps_per_output": 144.0,
+          "nonlin_iters_per_output": 155.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi2_t0.02_pair0_native_0d",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 3921,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "run": 1,
+        "policy": "native_rest",
+        "solver_policy": "iterative",
+        "use_direct_solver": false,
+        "file_output_interval": 0.02,
+        "input_sha256": "005dfbf2f7b92f53aceec17487fe6d3356e727201eda795a9a5a162295ca6080",
+        "whole_process_wall_s": 10.442307934165001,
+        "initialization_statistics": {
+          "initial_state_source": "rest",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.282741886,
+          "ida_setup_and_ic_wall_s": 0.001243161,
+          "first_ida_output_interval_wall_s": 1.423521201,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 2,
+          "largest_trace_block": 6,
+          "algebraic_defect": 8.727062201609341e-05,
+          "differential_defect": 3.9229989611806785e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 8.089188841,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 493.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0378947368421052,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 246.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi2_t0.02_pair1_native_rest",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "run": 1,
+        "policy": "native_0d",
+        "solver_policy": "iterative",
+        "use_direct_solver": false,
+        "file_output_interval": 0.02,
+        "input_sha256": "56d9af3d02ef2a4bba512bb369d61c70fa09f2f3d4b2084a31023ddbbbe28378",
+        "whole_process_wall_s": 6.782302435487509,
+        "initialization_statistics": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.199798038,
+          "ida_setup_and_ic_wall_s": 0.001285837,
+          "first_ida_output_interval_wall_s": 1.479335689,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 1,
+          "largest_trace_block": 6,
+          "algebraic_defect": 4.6664889393921425e-05,
+          "differential_defect": 2.149635825227992e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 4.592261138,
+          "n_steps": 288.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 311.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 288.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0798611111111112,
+          "steps_per_output": 144.0,
+          "nonlin_iters_per_output": 155.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi2_t0.02_pair1_native_0d",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 3921,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "run": 1,
+        "policy": "legacy",
+        "solver_policy": "iterative",
+        "use_direct_solver": false,
+        "file_output_interval": 0.02,
+        "input_sha256": "769bdbe4c696bcaa8ee437da2f7e4de0627f81fb562348801fbc8abb5ff7086d",
+        "whole_process_wall_s": 10.64372256398201,
+        "initialization_statistics": {
+          "initial_condition_policy": "legacy",
+          "preparation_wall_s": 0.315008553,
+          "ida_setup_and_ic_wall_s": 0.204017211,
+          "first_ida_output_interval_wall_s": 1.408476758,
+          "ic_residual_calls": 5,
+          "ic_jacobian_setups": 2,
+          "ic_linear_solves": 5
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 8.358179334,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 496.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0442105263157895,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 248.0
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi2_t0.02_pair1_legacy",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "run": 2,
+        "policy": "native_0d",
+        "solver_policy": "iterative",
+        "use_direct_solver": false,
+        "file_output_interval": 0.02,
+        "input_sha256": "d1d5c08e1128524cec89faf659f56891b8f314f308a4828855a7ff8505980282",
+        "whole_process_wall_s": 6.883127264678478,
+        "initialization_statistics": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.197604998,
+          "ida_setup_and_ic_wall_s": 0.001304076,
+          "first_ida_output_interval_wall_s": 1.477299071,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 1,
+          "largest_trace_block": 6,
+          "algebraic_defect": 4.6664889393921425e-05,
+          "differential_defect": 2.149635825227992e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 4.639908656,
+          "n_steps": 288.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 311.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 288.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0798611111111112,
+          "steps_per_output": 144.0,
+          "nonlin_iters_per_output": 155.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi2_t0.02_pair2_native_0d",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 3921,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "run": 2,
+        "policy": "legacy",
+        "solver_policy": "iterative",
+        "use_direct_solver": false,
+        "file_output_interval": 0.02,
+        "input_sha256": "ad196c91f3729a4b0b72821744bf19d77a6888d1127bcc0b30c0990397204767",
+        "whole_process_wall_s": 10.642686691135168,
+        "initialization_statistics": {
+          "initial_condition_policy": "legacy",
+          "preparation_wall_s": 0.301206634,
+          "ida_setup_and_ic_wall_s": 0.200082841,
+          "first_ida_output_interval_wall_s": 1.398626998,
+          "ic_residual_calls": 5,
+          "ic_jacobian_setups": 2,
+          "ic_linear_solves": 5
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 8.315489137,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 496.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0442105263157895,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 248.0
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi2_t0.02_pair2_legacy",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-06,
+          "Relative error tolerance": 1e-05,
+          "Initial step size": 0.001,
+          "Minimum step size": 1e-06,
+          "Maximum order of BDF": 2.0
+        },
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "run": 2,
+        "policy": "native_rest",
+        "solver_policy": "iterative",
+        "use_direct_solver": false,
+        "file_output_interval": 0.02,
+        "input_sha256": "f5a977415af4cdc04e7d8cc6a9aeff25dce7e5b60180296c58ab3e3c4861239b",
+        "whole_process_wall_s": 10.391779862344265,
+        "initialization_statistics": {
+          "initial_state_source": "rest",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.284024269,
+          "ida_setup_and_ic_wall_s": 0.001261823,
+          "first_ida_output_interval_wall_s": 1.399567071,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 2,
+          "largest_trace_block": 6,
+          "algebraic_defect": 8.727062201609341e-05,
+          "differential_defect": 3.9229989611806785e-11,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 8.113229037,
+          "n_steps": 475.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 493.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 475.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0378947368421052,
+          "steps_per_output": 237.5,
+          "nonlin_iters_per_output": 246.5
+        },
+        "host": "lnx4",
+        "sample_id": "adan56_mpi2_t0.02_pair2_native_rest",
+        "physical_validation": {
+          "physical_vessels": 77,
+          "physical_terminals": 32,
+          "output_times": [
+            0,
+            0.02
+          ],
+          "positive_volumes": true,
+          "finite_numeric_fields": 5604,
+          "adaptive_internal_times_finite_increasing": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-05,
+          "Relative error tolerance": 1e-06,
+          "Initial step size": 0.0001,
+          "Minimum step size": 1e-07,
+          "Maximum order of BDF": 1.0
+        },
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "run": 0,
+        "policy": "legacy",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.002,
+        "input_sha256": "36bb27c51493d4b3cb0162cb37e8f3d34ab5f34d3001cfef38c520eaa29259a1",
+        "whole_process_wall_s": 46.236911192536354,
+        "initialization_statistics": {
+          "initial_condition_policy": "legacy",
+          "preparation_wall_s": 0.115060861,
+          "ida_setup_and_ic_wall_s": 7.163568592,
+          "first_ida_output_interval_wall_s": 14.130802876,
+          "ic_residual_calls": 3,
+          "ic_jacobian_setups": 2,
+          "ic_linear_solves": 3
+        },
+        "ida_statistics": {
+          "max_order": 1.0,
+          "wall_time": 30.043530753,
+          "n_steps": 59.0,
+          "n_err_test_fails": 1.0,
+          "n_nonlin_iters": 65.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 59.0,
+          "bdf2_steps": 0.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.1016949152542372,
+          "steps_per_output": 29.5,
+          "nonlin_iters_per_output": 32.5
+        },
+        "host": "lnx3",
+        "sample_id": "network10k_mpi1_t0.002_pair0_legacy",
+        "physical_validation": {
+          "physical_files": {
+            "HDG_IDA_Vessel_*.csv": 20001,
+            "terminal_*.csv": 10002,
+            "mass_conservation.csv": 1
+          },
+          "physical_rows": 60008,
+          "max_time_delta_s": 0.0,
+          "finite_exported_numeric_fields": true,
+          "positive_probe_area_min_m2": 2.2156980000000003e-10,
+          "positive_volumes": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-05,
+          "Relative error tolerance": 1e-06,
+          "Initial step size": 0.0001,
+          "Minimum step size": 1e-07,
+          "Maximum order of BDF": 1.0
+        },
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "run": 0,
+        "policy": "native_rest",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.002,
+        "input_sha256": "1abbd2ff798912dca39160a15d56e134158438505c5f146a65ccec319378e3c2",
+        "whole_process_wall_s": 41.82589130103588,
+        "initialization_statistics": {
+          "initial_state_source": "rest",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 1.184795474,
+          "ida_setup_and_ic_wall_s": 0.014259707,
+          "first_ida_output_interval_wall_s": 14.074040545,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 0,
+          "differential_defect": 1.503887280448558e-23,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 1.0,
+          "wall_time": 25.128122504,
+          "n_steps": 60.0,
+          "n_err_test_fails": 1.0,
+          "n_nonlin_iters": 64.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 60.0,
+          "bdf2_steps": 0.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0666666666666667,
+          "steps_per_output": 30.0,
+          "nonlin_iters_per_output": 32.0
+        },
+        "host": "lnx3",
+        "sample_id": "network10k_mpi1_t0.002_pair0_native_rest",
+        "physical_validation": {
+          "physical_files": {
+            "HDG_IDA_Vessel_*.csv": 20001,
+            "terminal_*.csv": 10002,
+            "mass_conservation.csv": 1
+          },
+          "physical_rows": 60008,
+          "max_time_delta_s": 0.0,
+          "finite_exported_numeric_fields": true,
+          "positive_probe_area_min_m2": 2.2156980000000003e-10,
+          "positive_volumes": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-05,
+          "Relative error tolerance": 1e-06,
+          "Initial step size": 0.0001,
+          "Minimum step size": 1e-07,
+          "Maximum order of BDF": 1.0
+        },
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "run": 0,
+        "policy": "native_0d",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.002,
+        "input_sha256": "9396ce867d1e689e407e41d0e1ac003a34faae4bd31e572edc6b5a508397a9a9",
+        "whole_process_wall_s": 137.5221290141344,
+        "initialization_statistics": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 1.450536365,
+          "ida_setup_and_ic_wall_s": 0.01782556,
+          "first_ida_output_interval_wall_s": 43.427536108,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 3.529496647614438e-18,
+          "differential_defect": 1.4388571782986236e-23,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 1.0,
+          "wall_time": 119.910636912,
+          "n_steps": 353.0,
+          "n_err_test_fails": 1.0,
+          "n_nonlin_iters": 389.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 353.0,
+          "bdf2_steps": 0.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.1019830028328612,
+          "steps_per_output": 176.5,
+          "nonlin_iters_per_output": 194.5
+        },
+        "host": "lnx3",
+        "sample_id": "network10k_mpi1_t0.002_pair0_native_0d",
+        "physical_validation": {
+          "physical_files": {
+            "HDG_IDA_Vessel_*.csv": 20001,
+            "terminal_*.csv": 10002,
+            "mass_conservation.csv": 1
+          },
+          "physical_rows": 60008,
+          "max_time_delta_s": 0.0,
+          "finite_exported_numeric_fields": true,
+          "positive_probe_area_min_m2": 1.867194683390884e-10,
+          "positive_volumes": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-05,
+          "Relative error tolerance": 1e-06,
+          "Initial step size": 0.0001,
+          "Minimum step size": 1e-07,
+          "Maximum order of BDF": 1.0
+        },
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "run": 1,
+        "policy": "native_rest",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.002,
+        "input_sha256": "7ab16dd2c97dc70034567c9128d40761cbcb09ce524e6368d6f161b0ad72ca70",
+        "whole_process_wall_s": 45.8858260512352,
+        "initialization_statistics": {
+          "initial_state_source": "rest",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 1.249220774,
+          "ida_setup_and_ic_wall_s": 0.024249751,
+          "first_ida_output_interval_wall_s": 15.314974781,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 0,
+          "differential_defect": 1.503887280448558e-23,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 1.0,
+          "wall_time": 26.870871522,
+          "n_steps": 60.0,
+          "n_err_test_fails": 1.0,
+          "n_nonlin_iters": 64.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 60.0,
+          "bdf2_steps": 0.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0666666666666667,
+          "steps_per_output": 30.0,
+          "nonlin_iters_per_output": 32.0
+        },
+        "host": "lnx3",
+        "sample_id": "network10k_mpi1_t0.002_pair1_native_rest",
+        "physical_validation": {
+          "physical_files": {
+            "HDG_IDA_Vessel_*.csv": 20001,
+            "terminal_*.csv": 10002,
+            "mass_conservation.csv": 1
+          },
+          "physical_rows": 60008,
+          "max_time_delta_s": 0.0,
+          "finite_exported_numeric_fields": true,
+          "positive_probe_area_min_m2": 2.2156980000000003e-10,
+          "positive_volumes": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-05,
+          "Relative error tolerance": 1e-06,
+          "Initial step size": 0.0001,
+          "Minimum step size": 1e-07,
+          "Maximum order of BDF": 1.0
+        },
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "run": 1,
+        "policy": "native_0d",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.002,
+        "input_sha256": "63fd73e23ba343f14af8041ae3d1551341e8fbc2f718ef9ea9587a22f4cbb169",
+        "whole_process_wall_s": 137.37657237052917,
+        "initialization_statistics": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 1.331022088,
+          "ida_setup_and_ic_wall_s": 0.021658222,
+          "first_ida_output_interval_wall_s": 43.215107381,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 3.529496647614438e-18,
+          "differential_defect": 1.4388571782986236e-23,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 1.0,
+          "wall_time": 118.490509297,
+          "n_steps": 353.0,
+          "n_err_test_fails": 1.0,
+          "n_nonlin_iters": 389.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 353.0,
+          "bdf2_steps": 0.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.1019830028328612,
+          "steps_per_output": 176.5,
+          "nonlin_iters_per_output": 194.5
+        },
+        "host": "lnx3",
+        "sample_id": "network10k_mpi1_t0.002_pair1_native_0d",
+        "physical_validation": {
+          "physical_files": {
+            "HDG_IDA_Vessel_*.csv": 20001,
+            "terminal_*.csv": 10002,
+            "mass_conservation.csv": 1
+          },
+          "physical_rows": 60008,
+          "max_time_delta_s": 0.0,
+          "finite_exported_numeric_fields": true,
+          "positive_probe_area_min_m2": 1.867194683390884e-10,
+          "positive_volumes": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-05,
+          "Relative error tolerance": 1e-06,
+          "Initial step size": 0.0001,
+          "Minimum step size": 1e-07,
+          "Maximum order of BDF": 1.0
+        },
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "run": 1,
+        "policy": "legacy",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.002,
+        "input_sha256": "9bb3696f7445b0848b6730acbdfe4fa33f541c6e2101f877947f6c2a839c4900",
+        "whole_process_wall_s": 45.58387377858162,
+        "initialization_statistics": {
+          "initial_condition_policy": "legacy",
+          "preparation_wall_s": 0.11862491,
+          "ida_setup_and_ic_wall_s": 7.307183707,
+          "first_ida_output_interval_wall_s": 13.945581351,
+          "ic_residual_calls": 3,
+          "ic_jacobian_setups": 2,
+          "ic_linear_solves": 3
+        },
+        "ida_statistics": {
+          "max_order": 1.0,
+          "wall_time": 29.297612172,
+          "n_steps": 59.0,
+          "n_err_test_fails": 1.0,
+          "n_nonlin_iters": 65.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 59.0,
+          "bdf2_steps": 0.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.1016949152542372,
+          "steps_per_output": 29.5,
+          "nonlin_iters_per_output": 32.5
+        },
+        "host": "lnx3",
+        "sample_id": "network10k_mpi1_t0.002_pair1_legacy",
+        "physical_validation": {
+          "physical_files": {
+            "HDG_IDA_Vessel_*.csv": 20001,
+            "terminal_*.csv": 10002,
+            "mass_conservation.csv": 1
+          },
+          "physical_rows": 60008,
+          "max_time_delta_s": 0.0,
+          "finite_exported_numeric_fields": true,
+          "positive_probe_area_min_m2": 2.2156980000000003e-10,
+          "positive_volumes": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-05,
+          "Relative error tolerance": 1e-06,
+          "Initial step size": 0.0001,
+          "Minimum step size": 1e-07,
+          "Maximum order of BDF": 1.0
+        },
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "run": 2,
+        "policy": "native_0d",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.002,
+        "input_sha256": "b7110e9fc1bd7e3ac46c59fc488436ed4edac3d2abbb72df8ca23afec92f4840",
+        "whole_process_wall_s": 132.46391773223877,
+        "initialization_statistics": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 1.263474542,
+          "ida_setup_and_ic_wall_s": 0.014224785,
+          "first_ida_output_interval_wall_s": 40.43107222,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 3.529496647614438e-18,
+          "differential_defect": 1.4388571782986236e-23,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 1.0,
+          "wall_time": 115.233700074,
+          "n_steps": 353.0,
+          "n_err_test_fails": 1.0,
+          "n_nonlin_iters": 389.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 353.0,
+          "bdf2_steps": 0.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.1019830028328612,
+          "steps_per_output": 176.5,
+          "nonlin_iters_per_output": 194.5
+        },
+        "host": "lnx3",
+        "sample_id": "network10k_mpi1_t0.002_pair2_native_0d",
+        "physical_validation": {
+          "physical_files": {
+            "HDG_IDA_Vessel_*.csv": 20001,
+            "terminal_*.csv": 10002,
+            "mass_conservation.csv": 1
+          },
+          "physical_rows": 60008,
+          "max_time_delta_s": 0.0,
+          "finite_exported_numeric_fields": true,
+          "positive_probe_area_min_m2": 1.867194683390884e-10,
+          "positive_volumes": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-05,
+          "Relative error tolerance": 1e-06,
+          "Initial step size": 0.0001,
+          "Minimum step size": 1e-07,
+          "Maximum order of BDF": 1.0
+        },
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "run": 2,
+        "policy": "legacy",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.002,
+        "input_sha256": "3954d0f43f9d1f6595517d65e5cc618328156ec3669e5d7deb169296b459dd22",
+        "whole_process_wall_s": 44.73554474115372,
+        "initialization_statistics": {
+          "initial_condition_policy": "legacy",
+          "preparation_wall_s": 0.115093503,
+          "ida_setup_and_ic_wall_s": 7.02218141,
+          "first_ida_output_interval_wall_s": 13.605405851,
+          "ic_residual_calls": 3,
+          "ic_jacobian_setups": 2,
+          "ic_linear_solves": 3
+        },
+        "ida_statistics": {
+          "max_order": 1.0,
+          "wall_time": 28.259048833,
+          "n_steps": 59.0,
+          "n_err_test_fails": 1.0,
+          "n_nonlin_iters": 65.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 59.0,
+          "bdf2_steps": 0.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.1016949152542372,
+          "steps_per_output": 29.5,
+          "nonlin_iters_per_output": 32.5
+        },
+        "host": "lnx3",
+        "sample_id": "network10k_mpi1_t0.002_pair2_legacy",
+        "physical_validation": {
+          "physical_files": {
+            "HDG_IDA_Vessel_*.csv": 20001,
+            "terminal_*.csv": 10002,
+            "mass_conservation.csv": 1
+          },
+          "physical_rows": 60008,
+          "max_time_delta_s": 0.0,
+          "finite_exported_numeric_fields": true,
+          "positive_probe_area_min_m2": 2.2156980000000003e-10,
+          "positive_volumes": true
+        }
+      },
+      {
+        "actual_solver_controls": {
+          "Absolute error tolerance": 1e-05,
+          "Relative error tolerance": 1e-06,
+          "Initial step size": 0.0001,
+          "Minimum step size": 1e-07,
+          "Maximum order of BDF": 1.0
+        },
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "run": 2,
+        "policy": "native_rest",
+        "solver_policy": "serial_direct",
+        "use_direct_solver": true,
+        "file_output_interval": 0.002,
+        "input_sha256": "085a51184e3b2c49158b3a48c207ac8d26cb366105d408d5008cce823f8972e1",
+        "whole_process_wall_s": 43.88021805882454,
+        "initialization_statistics": {
+          "initial_state_source": "rest",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 1.160500936,
+          "ida_setup_and_ic_wall_s": 0.014342465,
+          "first_ida_output_interval_wall_s": 14.730142215,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 0,
+          "differential_defect": 1.503887280448558e-23,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 1.0,
+          "wall_time": 26.86387577,
+          "n_steps": 60.0,
+          "n_err_test_fails": 1.0,
+          "n_nonlin_iters": 64.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 60.0,
+          "bdf2_steps": 0.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 2.0,
+          "nonlin_iters_per_step": 1.0666666666666667,
+          "steps_per_output": 30.0,
+          "nonlin_iters_per_output": 32.0
+        },
+        "host": "lnx3",
+        "sample_id": "network10k_mpi1_t0.002_pair2_native_rest",
+        "physical_validation": {
+          "physical_files": {
+            "HDG_IDA_Vessel_*.csv": 20001,
+            "terminal_*.csv": 10002,
+            "mass_conservation.csv": 1
+          },
+          "physical_rows": 60008,
+          "max_time_delta_s": 0.0,
+          "finite_exported_numeric_fields": true,
+          "positive_probe_area_min_m2": 2.2156980000000003e-10,
+          "positive_volumes": true
+        }
+      }
+    ],
+    "summaries": [
+      {
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "host": "lnx4",
+        "method": "legacy",
+        "process_wall_samples_s": [
+          20.36965413764119,
+          20.51976026594639,
+          20.51968263462186
+        ],
+        "median_process_wall_s": 20.51968263462186,
+        "paired_process_speedups_vs_legacy": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "median_paired_process_speedup_vs_legacy": 1.0,
+        "median_phases_s": {
+          "preparation_wall_s": 0.334916483,
+          "ida_setup_and_ic_wall_s": 1.210808598,
+          "first_ida_output_interval_wall_s": 5.084250519
+        },
+        "steps": [
+          475.0,
+          475.0,
+          475.0
+        ],
+        "nonlinear_iterations": [
+          496.0,
+          496.0,
+          496.0
+        ]
+      },
+      {
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "host": "lnx4",
+        "method": "native_rest",
+        "process_wall_samples_s": [
+          19.36688420921564,
+          19.11653595417738,
+          19.165365055203438
+        ],
+        "median_process_wall_s": 19.165365055203438,
+        "paired_process_speedups_vs_legacy": [
+          1.0517775558315356,
+          1.0734036917113308,
+          1.0706648464830948
+        ],
+        "median_paired_process_speedup_vs_legacy": 1.0706648464830948,
+        "median_phases_s": {
+          "preparation_wall_s": 0.344800645,
+          "ida_setup_and_ic_wall_s": 0.001952994,
+          "first_ida_output_interval_wall_s": 5.079056111
+        },
+        "steps": [
+          475.0,
+          475.0,
+          475.0
+        ],
+        "nonlinear_iterations": [
+          493.0,
+          493.0,
+          493.0
+        ]
+      },
+      {
+        "case": "adan56",
+        "ranks": 1,
+        "horizon": 0.02,
+        "host": "lnx4",
+        "method": "native_0d",
+        "process_wall_samples_s": [
+          16.559436328709126,
+          16.709625463932753,
+          16.5587758384645
+        ],
+        "median_process_wall_s": 16.559436328709126,
+        "paired_process_speedups_vs_legacy": [
+          1.2300934484301427,
+          1.2280203592975618,
+          1.2392028755505309
+        ],
+        "median_paired_process_speedup_vs_legacy": 1.2300934484301427,
+        "median_phases_s": {
+          "preparation_wall_s": 0.24220825,
+          "ida_setup_and_ic_wall_s": 0.00196528,
+          "first_ida_output_interval_wall_s": 5.452014757
+        },
+        "steps": [
+          288.0,
+          288.0,
+          288.0
+        ],
+        "nonlinear_iterations": [
+          311.0,
+          311.0,
+          311.0
+        ]
+      },
+      {
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "host": "lnx4",
+        "method": "legacy",
+        "process_wall_samples_s": [
+          10.79319953173399,
+          10.64372256398201,
+          10.642686691135168
+        ],
+        "median_process_wall_s": 10.64372256398201,
+        "paired_process_speedups_vs_legacy": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "median_paired_process_speedup_vs_legacy": 1.0,
+        "median_phases_s": {
+          "preparation_wall_s": 0.301206634,
+          "ida_setup_and_ic_wall_s": 0.204017211,
+          "first_ida_output_interval_wall_s": 1.408476758
+        },
+        "steps": [
+          475.0,
+          475.0,
+          475.0
+        ],
+        "nonlinear_iterations": [
+          496.0,
+          496.0,
+          496.0
+        ]
+      },
+      {
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "host": "lnx4",
+        "method": "native_rest",
+        "process_wall_samples_s": [
+          10.342513982206583,
+          10.442307934165001,
+          10.391779862344265
+        ],
+        "median_process_wall_s": 10.391779862344265,
+        "paired_process_speedups_vs_legacy": [
+          1.043576015493213,
+          1.0192883250605953,
+          1.0241447405655784
+        ],
+        "median_paired_process_speedup_vs_legacy": 1.0241447405655784,
+        "median_phases_s": {
+          "preparation_wall_s": 0.284024269,
+          "ida_setup_and_ic_wall_s": 0.001248077,
+          "first_ida_output_interval_wall_s": 1.423521201
+        },
+        "steps": [
+          475.0,
+          475.0,
+          475.0
+        ],
+        "nonlinear_iterations": [
+          493.0,
+          493.0,
+          493.0
+        ]
+      },
+      {
+        "case": "adan56",
+        "ranks": 2,
+        "horizon": 0.02,
+        "host": "lnx4",
+        "method": "native_0d",
+        "process_wall_samples_s": [
+          6.832689065486193,
+          6.782302435487509,
+          6.883127264678478
+        ],
+        "median_process_wall_s": 6.832689065486193,
+        "paired_process_speedups_vs_legacy": [
+          1.57964154790146,
+          1.5693376497471017,
+          1.546199319275888
+        ],
+        "median_paired_process_speedup_vs_legacy": 1.5693376497471017,
+        "median_phases_s": {
+          "preparation_wall_s": 0.197726509,
+          "ida_setup_and_ic_wall_s": 0.001302687,
+          "first_ida_output_interval_wall_s": 1.479335689
+        },
+        "steps": [
+          288.0,
+          288.0,
+          288.0
+        ],
+        "nonlinear_iterations": [
+          311.0,
+          311.0,
+          311.0
+        ]
+      },
+      {
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "host": "lnx3",
+        "method": "legacy",
+        "process_wall_samples_s": [
+          46.236911192536354,
+          45.58387377858162,
+          44.73554474115372
+        ],
+        "median_process_wall_s": 45.58387377858162,
+        "paired_process_speedups_vs_legacy": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "median_paired_process_speedup_vs_legacy": 1.0,
+        "median_phases_s": {
+          "preparation_wall_s": 0.115093503,
+          "ida_setup_and_ic_wall_s": 7.163568592,
+          "first_ida_output_interval_wall_s": 13.945581351
+        },
+        "steps": [
+          59.0,
+          59.0,
+          59.0
+        ],
+        "nonlinear_iterations": [
+          65.0,
+          65.0,
+          65.0
+        ]
+      },
+      {
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "host": "lnx3",
+        "method": "native_rest",
+        "process_wall_samples_s": [
+          41.82589130103588,
+          45.8858260512352,
+          43.88021805882454
+        ],
+        "median_process_wall_s": 43.88021805882454,
+        "paired_process_speedups_vs_legacy": [
+          1.1054614678681391,
+          0.9934194870477775,
+          1.019492307015944
+        ],
+        "median_paired_process_speedup_vs_legacy": 1.019492307015944,
+        "median_phases_s": {
+          "preparation_wall_s": 1.184795474,
+          "ida_setup_and_ic_wall_s": 0.014342465,
+          "first_ida_output_interval_wall_s": 14.730142215
+        },
+        "steps": [
+          60.0,
+          60.0,
+          60.0
+        ],
+        "nonlinear_iterations": [
+          64.0,
+          64.0,
+          64.0
+        ]
+      },
+      {
+        "case": "network10k",
+        "ranks": 1,
+        "horizon": 0.002,
+        "host": "lnx3",
+        "method": "native_0d",
+        "process_wall_samples_s": [
+          137.5221290141344,
+          137.37657237052917,
+          132.46391773223877
+        ],
+        "median_process_wall_s": 137.37657237052917,
+        "paired_process_speedups_vs_legacy": [
+          0.33621433527824574,
+          0.3318169393223305,
+          0.3377187199881986
+        ],
+        "median_paired_process_speedup_vs_legacy": 0.33621433527824574,
+        "median_phases_s": {
+          "preparation_wall_s": 1.331022088,
+          "ida_setup_and_ic_wall_s": 0.01782556,
+          "first_ida_output_interval_wall_s": 43.215107381
+        },
+        "steps": [
+          353.0,
+          353.0,
+          353.0
+        ],
+        "nonlinear_iterations": [
+          389.0,
+          389.0,
+          389.0
+        ]
+      }
+    ],
+    "protocols": [
+      {
+        "created_utc": "2026-10-25T00:18:52.746582+00:00",
+        "expected_host": "lnx4",
+        "actual_host": "lnx4",
+        "source": "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/ramp_petsc_source",
+        "script_sha256": "8666a2d7e834f5b4701a0fc47e3cba0a3ed9fdc3067cd4aabc947d0b09b8fa63",
+        "case_input_sha256": {
+          "adan56": "2441a29c5f4ebb92f4a6bc6be68d0a5bd5cfc9fed420081cd9d6fd0165676479"
+        },
+        "archive_sha256": {
+          "native_rest": {
+            "blood_flow": "358c0e1e989691b323afadf97ad3e507c769dc048c37bba693b10ab8062c9d0a",
+            "libmetric_flow_x.so": "7e00d96b801e5b137280e98c8d429c459ec8ccaff1d9deb6196695edc716daf3"
+          },
+          "native_0d": {
+            "blood_flow": "358c0e1e989691b323afadf97ad3e507c769dc048c37bba693b10ab8062c9d0a",
+            "libmetric_flow_x.so": "7e00d96b801e5b137280e98c8d429c459ec8ccaff1d9deb6196695edc716daf3"
+          },
+          "legacy": {
+            "blood_flow": "a3a167074d3aeb67a1f0503474f28d1644aa405f7425103d6ade4996608a9897",
+            "libmetric_flow_x.so": "de6c890eeefdeb38e5d1a167e68164c668ae3c9300d76848a17d6f590e391f96"
+          }
+        },
+        "variants": [
+          "legacy",
+          "native_rest",
+          "native_0d"
+        ],
+        "cases": [
+          "adan56"
+        ],
+        "horizons": [
+          0.02
+        ],
+        "ranks": [
+          1,
+          2
+        ],
+        "runs": 3,
+        "preserve_reference_tolerances": true,
+        "file_output_interval_override": 0.02,
+        "measurement_kind": "formal",
+        "exclude_from_formal_summary": false,
+        "mpi_command": "mpirun --bind-to core --map-by pe-list=8,9:ordered --report-bindings -np {ranks}",
+        "expected_rank_cpus": [
+          [
+            8,
+            32
+          ],
+          [
+            9,
+            33
+          ]
+        ],
+        "maximum_busy_fraction": 0.05,
+        "descriptor_limits_effective": [
+          32768,
+          1048576
+        ],
+        "requested_open_file_limit": 32768
+      },
+      {
+        "created_utc": "2026-10-25T00:20:40.089446+00:00",
+        "expected_host": "lnx3",
+        "actual_host": "lnx3",
+        "source": "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/source",
+        "script_sha256": "8666a2d7e834f5b4701a0fc47e3cba0a3ed9fdc3067cd4aabc947d0b09b8fa63",
+        "case_input_sha256": {
+          "network10k": "d9fd20fe98b6df8336db3119f7f142a977ac13755b87f64f92d6ff4fd7d874ec"
+        },
+        "archive_sha256": {
+          "native_rest": {
+            "blood_flow": "2008a88965e22478996cf2b9b7de834ad5334a5b259d479ed90cd74e62941512",
+            "libmetric_flow_x.so": "7cc047dab2c82bbbc4091492dd6f7847d8839d8bb2746e7a26ffe68bfee4e750"
+          },
+          "native_0d": {
+            "blood_flow": "2008a88965e22478996cf2b9b7de834ad5334a5b259d479ed90cd74e62941512",
+            "libmetric_flow_x.so": "7cc047dab2c82bbbc4091492dd6f7847d8839d8bb2746e7a26ffe68bfee4e750"
+          },
+          "legacy": {
+            "blood_flow": "33132a1498bd7a706d378d13213718b9dff57b9d407a8081f0ea07af4713bb04",
+            "libmetric_flow_x.so": "b912f3618cd9d8f1fb4fbc25b1a50db1da023691f0f26c1966ab65511cceb82d"
+          }
+        },
+        "variants": [
+          "legacy",
+          "native_rest",
+          "native_0d"
+        ],
+        "cases": [
+          "network10k"
+        ],
+        "horizons": [
+          0.002
+        ],
+        "ranks": [
+          1
+        ],
+        "runs": 3,
+        "preserve_reference_tolerances": true,
+        "file_output_interval_override": 0.002,
+        "measurement_kind": "formal",
+        "exclude_from_formal_summary": false,
+        "mpi_command": "mpirun --bind-to core --map-by pe-list=8,9:ordered --report-bindings -np {ranks}",
+        "expected_rank_cpus": [
+          [
+            8,
+            32
+          ],
+          [
+            9,
+            33
+          ]
+        ],
+        "maximum_busy_fraction": 0.05,
+        "descriptor_limits_effective": [
+          32768,
+          1048576
+        ],
+        "requested_open_file_limit": 32768
+      }
+    ],
+    "scope": "ADAN20ms MPI1/2 and10k2ms MPI1; compare policies only within the same host/rank/case/horizon.",
+    "native_0d": "Different physical initial state; no early-trajectory equivalence claim. Report its 10k cost regression; default remains rest.",
+    "failed_10k_mpi2": "Iterative nonconvergence diagnostic; excluded from formal data. No generalized MPI2 network claim."
+  },
+  "ramp": {
+    "protocol": {
+      "declared_utc": "2026-10-25T00:04:37.052649+00:00",
+      "source_revision": "a19a5e899e65e57d843d5f154bf9d690b0cd800d",
+      "script_sha256": "e6ac37f9beb5f85c3175aebddc70759a128b627687a44d8cc53f540d3db94dc2",
+      "policy_sha256": "01b615dbe085c40aa6dba3b16b64c4f3dedf3aec27bbd7b245adc277adf2855d",
+      "physics_helper_sha256": "91aa6d2eb3b84a76bba744c752961a5f75183c684d96a9709f1bb16382866f7b",
+      "cases": [
+        "uniform-0",
+        "ramp-0",
+        "ramp-1",
+        "uniform-1",
+        "uniform-2",
+        "ramp-2",
+        "ramp-3",
+        "uniform-3",
+        "reference"
+      ],
+      "measurement_kind": "formal_performance",
+      "placement": "pe-list=8:ordered",
+      "affinity": [
+        8,
+        32
+      ],
+      "preflight_utilization_percent": {
+        "cpu8": 0.0,
+        "cpu32": 1.5075376884422065
+      },
+      "artifacts_sha256": {
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow": "358c0e1e989691b323afadf97ad3e507c769dc048c37bba693b10ab8062c9d0a",
+        "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/libmetric_flow_x.so": "7e00d96b801e5b137280e98c8d429c459ec8ccaff1d9deb6196695edc716daf3"
+      },
+      "parameter_sha256": {
+        "uniform-0": "6f899f0ec6deedc92100621b20e5f97112e55acfbc0d278112610b53dd6f6195",
+        "ramp-0": "1b626e8e7daf8869bf069a20158d14733a5af246e6d1a62996becfafcffe0854",
+        "ramp-1": "5205ddd7f1818a7985f8d7358f02bd39f934d7ac7171b7bda9dcf4ea89dc59a0",
+        "uniform-1": "25e97de5e2a314e94343fa3ea148b935ff0dc68e941815822b084aa75be9d8e5",
+        "uniform-2": "f6f525b18fa08db49648e92c594f9b5f425acaf9a116f19fc703b803d6a167b2",
+        "ramp-2": "4498fc0b0f7def4983dd454e5f8e9f676605625d5ac34d7d62c5d8a6940b6922",
+        "ramp-3": "141dc185a621597be766fcf9e8cb011e95451853d5b589c5564bc022d05f86b0",
+        "uniform-3": "34a996e0778b65a33d000a9ec36a2892417eb81782351fa7c2ab6d1b134e010d",
+        "reference": "213862bee22b4144d5c6e583782a6fdf958418a72f0fa3aa3e401b1412db38a2"
+      },
+      "ended_utc": "2026-10-25T00:05:18.778690+00:00",
+      "returncode": 0
+    },
+    "policy": {
+      "scope": "One unrefined degree-one ASCII single-vessel case; scalar global IDA weights; native0D initial state; no external pressure provider.",
+      "final_time": 10.0,
+      "initial_time": 0.0,
+      "late_window": [
+        9.0,
+        10.0
+      ],
+      "callback_interval": 0.05,
+      "file_interval": 0.05,
+      "waveform": "1e-6*(1+0.5*sin(2*3.141592653589793238462643383279502884*t))",
+      "base_atol": 1e-12,
+      "base_rtol": 1e-07,
+      "reference_atol": 1e-14,
+      "reference_rtol": 1e-09,
+      "ramp": {
+        "relative_factor": 1000.0,
+        "absolute_factor": 100.0,
+        "hold_duration": 0.1,
+        "end_time": 1.0
+      },
+      "physical": {
+        "rho": 1060.0,
+        "mu": 0.004,
+        "xi": 2.0,
+        "R1": 10000000.0,
+        "R2": 100000000.0,
+        "C": 1e-08,
+        "P_out": 1000.0
+      },
+      "initial_step_size": 0.0001,
+      "minimum_step_size": 1e-08,
+      "maximum_bdf_order": 2,
+      "runs_per_variant": 4,
+      "performance_order": [
+        "uniform-0",
+        "ramp-0",
+        "ramp-1",
+        "uniform-1",
+        "uniform-2",
+        "ramp-2",
+        "ramp-3",
+        "uniform-3"
+      ],
+      "reference_runs": 1,
+      "reference_excluded_from_timing_comparison": true,
+      "mpi_ranks": 1,
+      "map_by": "pe-list=8:ordered",
+      "bind_to": "core",
+      "preflight_maximum_busy_percent": 5.0,
+      "physical_gate": "Every one of the 13 late-window state/derived-output differences for every uniform/ramp pair must be strictly below its unchanged final solver-weight budget (normalized error<1). Tighter-run comparisons remain accuracy diagnostics, including failed metrics. All run validity, full output grids, finite data and physical-input checks remain mandatory.",
+      "physical_comparator_sha256": "91aa6d2eb3b84a76bba744c752961a5f75183c684d96a9709f1bb16382866f7b",
+      "diagnostics_only": [
+        "IDA adaptive internal times",
+        "IDA counters",
+        "relative mass imbalance"
+      ],
+      "all_raw_runs_retained": true,
+      "timeout_per_process_s": 1800,
+      "numerical_flux": "HLL_HDG",
+      "theta": 0.001,
+      "theta_boundary": 0.0,
+      "nominal_output_grid_roundoff_bound_s": 5.684341886080801e-13,
+      "pair_output_time_bound_s": 1e-14,
+      "description": "One-cell 10-second tolerance-ramp validation and balanced full-process benchmark; pilot timings are excluded from formal performance.",
+      "pilot": {
+        "measurement_kind": "correctness_only",
+        "actual_pair_count": 1,
+        "all_timings_excluded_from_formal_performance": true
+      },
+      "maximum_ida_internal_steps_per_output": 10000,
+      "protocol_version": 4,
+      "acceptance_target": "uniform_baseline_equivalence",
+      "mandatory_comparisons": "every_uniform_ramp_pair",
+      "diagnostic_comparisons": "each_production_run_vs_tighter_run",
+      "absolute_accuracy_certified": false,
+      "protocol_amendment": "After the failed v3 pilot and before fresh formal measurements, acceptance was narrowed to optimization equivalence against the unchanged uniform-tolerance baseline. The v3 pilot remains failed and its timings are excluded. No numerical bounds, grids, physical inputs or solver tolerances changed; no absolute trajectory-accuracy claim is made."
+    },
+    "samples": [
+      {
+        "case": "uniform-0",
+        "command": [
+          "/software/spack-v2/var/spack/views/dealii/bin/mpirun",
+          "--bind-to",
+          "core",
+          "--map-by",
+          "pe-list=8:ordered",
+          "-n",
+          "1",
+          "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow",
+          "parameters.prm"
+        ],
+        "process_wall_s": 3.4233095459640026,
+        "included_in_performance": true,
+        "initialization": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.002049647,
+          "ida_setup_and_ic_wall_s": 0.000379557,
+          "first_ida_output_interval_wall_s": 0.037370963,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 4.770527334262464e-06,
+          "differential_defect": 1.9237079187337272e-26,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.575739014,
+          "n_steps": 7127.0,
+          "n_err_test_fails": 2.0,
+          "n_nonlin_iters": 7555.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 7127.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0600533183667742,
+          "steps_per_output": 35.45771144278607,
+          "nonlin_iters_per_output": 37.58706467661692
+        },
+        "history_counters_through_ramp_end": {
+          "steps_interval": 905.0,
+          "nonlin_iters_interval": 989.0,
+          "nonlin_fails_interval": 0.0,
+          "err_test_fails_interval": 2.0,
+          "residual_evals_interval": 989.0,
+          "lin_setups_interval": 13.0
+        }
+      },
+      {
+        "case": "ramp-0",
+        "command": [
+          "/software/spack-v2/var/spack/views/dealii/bin/mpirun",
+          "--bind-to",
+          "core",
+          "--map-by",
+          "pe-list=8:ordered",
+          "-n",
+          "1",
+          "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow",
+          "parameters.prm"
+        ],
+        "process_wall_s": 3.273037675768137,
+        "included_in_performance": true,
+        "initialization": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.002424619,
+          "ida_setup_and_ic_wall_s": 0.000414274,
+          "first_ida_output_interval_wall_s": 0.008200633,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 4.770527334262464e-06,
+          "differential_defect": 1.9237079187337272e-26,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": true,
+          "ramp_registrations": 1,
+          "ramp_weight_evaluations": 6527,
+          "ramp_stop_arms": 1,
+          "ramp_stop_releases": 1,
+          "ramp_last_relative_factor": 1,
+          "ramp_last_absolute_factor": 1
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.468349895,
+          "n_steps": 6527.0,
+          "n_err_test_fails": 0.0,
+          "n_nonlin_iters": 6933.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 6527.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0622031561207292,
+          "steps_per_output": 32.472636815920396,
+          "nonlin_iters_per_output": 34.492537313432834
+        },
+        "history_counters_through_ramp_end": {
+          "steps_interval": 279.0,
+          "nonlin_iters_interval": 371.0,
+          "nonlin_fails_interval": 0.0,
+          "err_test_fails_interval": 0.0,
+          "residual_evals_interval": 371.0,
+          "lin_setups_interval": 11.0
+        }
+      },
+      {
+        "case": "ramp-1",
+        "command": [
+          "/software/spack-v2/var/spack/views/dealii/bin/mpirun",
+          "--bind-to",
+          "core",
+          "--map-by",
+          "pe-list=8:ordered",
+          "-n",
+          "1",
+          "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow",
+          "parameters.prm"
+        ],
+        "process_wall_s": 3.273341789841652,
+        "included_in_performance": true,
+        "initialization": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.002182865,
+          "ida_setup_and_ic_wall_s": 0.000354602,
+          "first_ida_output_interval_wall_s": 0.007739639,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 4.770527334262464e-06,
+          "differential_defect": 1.9237079187337272e-26,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": true,
+          "ramp_registrations": 1,
+          "ramp_weight_evaluations": 6527,
+          "ramp_stop_arms": 1,
+          "ramp_stop_releases": 1,
+          "ramp_last_relative_factor": 1,
+          "ramp_last_absolute_factor": 1
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.464272242,
+          "n_steps": 6527.0,
+          "n_err_test_fails": 0.0,
+          "n_nonlin_iters": 6933.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 6527.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0622031561207292,
+          "steps_per_output": 32.472636815920396,
+          "nonlin_iters_per_output": 34.492537313432834
+        },
+        "history_counters_through_ramp_end": {
+          "steps_interval": 279.0,
+          "nonlin_iters_interval": 371.0,
+          "nonlin_fails_interval": 0.0,
+          "err_test_fails_interval": 0.0,
+          "residual_evals_interval": 371.0,
+          "lin_setups_interval": 11.0
+        }
+      },
+      {
+        "case": "uniform-1",
+        "command": [
+          "/software/spack-v2/var/spack/views/dealii/bin/mpirun",
+          "--bind-to",
+          "core",
+          "--map-by",
+          "pe-list=8:ordered",
+          "-n",
+          "1",
+          "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow",
+          "parameters.prm"
+        ],
+        "process_wall_s": 3.47343048453331,
+        "included_in_performance": true,
+        "initialization": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.002084795,
+          "ida_setup_and_ic_wall_s": 0.00038862,
+          "first_ida_output_interval_wall_s": 0.038026685,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 4.770527334262464e-06,
+          "differential_defect": 1.9237079187337272e-26,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.644021056,
+          "n_steps": 7127.0,
+          "n_err_test_fails": 2.0,
+          "n_nonlin_iters": 7555.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 7127.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0600533183667742,
+          "steps_per_output": 35.45771144278607,
+          "nonlin_iters_per_output": 37.58706467661692
+        },
+        "history_counters_through_ramp_end": {
+          "steps_interval": 905.0,
+          "nonlin_iters_interval": 989.0,
+          "nonlin_fails_interval": 0.0,
+          "err_test_fails_interval": 2.0,
+          "residual_evals_interval": 989.0,
+          "lin_setups_interval": 13.0
+        }
+      },
+      {
+        "case": "uniform-2",
+        "command": [
+          "/software/spack-v2/var/spack/views/dealii/bin/mpirun",
+          "--bind-to",
+          "core",
+          "--map-by",
+          "pe-list=8:ordered",
+          "-n",
+          "1",
+          "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow",
+          "parameters.prm"
+        ],
+        "process_wall_s": 3.373715240508318,
+        "included_in_performance": true,
+        "initialization": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.002201576,
+          "ida_setup_and_ic_wall_s": 0.000377423,
+          "first_ida_output_interval_wall_s": 0.038691431,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 4.770527334262464e-06,
+          "differential_defect": 1.9237079187337272e-26,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.617168095,
+          "n_steps": 7127.0,
+          "n_err_test_fails": 2.0,
+          "n_nonlin_iters": 7555.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 7127.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0600533183667742,
+          "steps_per_output": 35.45771144278607,
+          "nonlin_iters_per_output": 37.58706467661692
+        },
+        "history_counters_through_ramp_end": {
+          "steps_interval": 905.0,
+          "nonlin_iters_interval": 989.0,
+          "nonlin_fails_interval": 0.0,
+          "err_test_fails_interval": 2.0,
+          "residual_evals_interval": 989.0,
+          "lin_setups_interval": 13.0
+        }
+      },
+      {
+        "case": "ramp-2",
+        "command": [
+          "/software/spack-v2/var/spack/views/dealii/bin/mpirun",
+          "--bind-to",
+          "core",
+          "--map-by",
+          "pe-list=8:ordered",
+          "-n",
+          "1",
+          "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow",
+          "parameters.prm"
+        ],
+        "process_wall_s": 3.1750225350260735,
+        "included_in_performance": true,
+        "initialization": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.002016548,
+          "ida_setup_and_ic_wall_s": 0.000485952,
+          "first_ida_output_interval_wall_s": 0.007640859,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 4.770527334262464e-06,
+          "differential_defect": 1.9237079187337272e-26,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": true,
+          "ramp_registrations": 1,
+          "ramp_weight_evaluations": 6527,
+          "ramp_stop_arms": 1,
+          "ramp_stop_releases": 1,
+          "ramp_last_relative_factor": 1,
+          "ramp_last_absolute_factor": 1
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.46651632,
+          "n_steps": 6527.0,
+          "n_err_test_fails": 0.0,
+          "n_nonlin_iters": 6933.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 6527.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0622031561207292,
+          "steps_per_output": 32.472636815920396,
+          "nonlin_iters_per_output": 34.492537313432834
+        },
+        "history_counters_through_ramp_end": {
+          "steps_interval": 279.0,
+          "nonlin_iters_interval": 371.0,
+          "nonlin_fails_interval": 0.0,
+          "err_test_fails_interval": 0.0,
+          "residual_evals_interval": 371.0,
+          "lin_setups_interval": 11.0
+        }
+      },
+      {
+        "case": "ramp-3",
+        "command": [
+          "/software/spack-v2/var/spack/views/dealii/bin/mpirun",
+          "--bind-to",
+          "core",
+          "--map-by",
+          "pe-list=8:ordered",
+          "-n",
+          "1",
+          "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow",
+          "parameters.prm"
+        ],
+        "process_wall_s": 3.3235893733799458,
+        "included_in_performance": true,
+        "initialization": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.002059148,
+          "ida_setup_and_ic_wall_s": 0.000385387,
+          "first_ida_output_interval_wall_s": 0.007713935,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 4.770527334262464e-06,
+          "differential_defect": 1.9237079187337272e-26,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": true,
+          "ramp_registrations": 1,
+          "ramp_weight_evaluations": 6527,
+          "ramp_stop_arms": 1,
+          "ramp_stop_releases": 1,
+          "ramp_last_relative_factor": 1,
+          "ramp_last_absolute_factor": 1
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.47146013,
+          "n_steps": 6527.0,
+          "n_err_test_fails": 0.0,
+          "n_nonlin_iters": 6933.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 6527.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0622031561207292,
+          "steps_per_output": 32.472636815920396,
+          "nonlin_iters_per_output": 34.492537313432834
+        },
+        "history_counters_through_ramp_end": {
+          "steps_interval": 279.0,
+          "nonlin_iters_interval": 371.0,
+          "nonlin_fails_interval": 0.0,
+          "err_test_fails_interval": 0.0,
+          "residual_evals_interval": 371.0,
+          "lin_setups_interval": 11.0
+        }
+      },
+      {
+        "case": "uniform-3",
+        "command": [
+          "/software/spack-v2/var/spack/views/dealii/bin/mpirun",
+          "--bind-to",
+          "core",
+          "--map-by",
+          "pe-list=8:ordered",
+          "-n",
+          "1",
+          "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow",
+          "parameters.prm"
+        ],
+        "process_wall_s": 3.4236144199967384,
+        "included_in_performance": true,
+        "initialization": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.002106315,
+          "ida_setup_and_ic_wall_s": 0.000354049,
+          "first_ida_output_interval_wall_s": 0.038259481,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 4.770527334262464e-06,
+          "differential_defect": 1.9237079187337272e-26,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.606873097,
+          "n_steps": 7127.0,
+          "n_err_test_fails": 2.0,
+          "n_nonlin_iters": 7555.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 7127.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0600533183667742,
+          "steps_per_output": 35.45771144278607,
+          "nonlin_iters_per_output": 37.58706467661692
+        },
+        "history_counters_through_ramp_end": {
+          "steps_interval": 905.0,
+          "nonlin_iters_interval": 989.0,
+          "nonlin_fails_interval": 0.0,
+          "err_test_fails_interval": 2.0,
+          "residual_evals_interval": 989.0,
+          "lin_setups_interval": 13.0
+        }
+      },
+      {
+        "case": "reference",
+        "command": [
+          "/software/spack-v2/var/spack/views/dealii/bin/mpirun",
+          "--bind-to",
+          "core",
+          "--map-by",
+          "pe-list=8:ordered",
+          "-n",
+          "1",
+          "/data/home/lheltai/codes/metric-flow-x/build/initialization_campaign/native_final_archive4/blood_flow",
+          "parameters.prm"
+        ],
+        "process_wall_s": 8.135785531252623,
+        "included_in_performance": false,
+        "initialization": {
+          "initial_state_source": "steady network",
+          "initial_condition_policy": "native",
+          "preparation_wall_s": 0.002117755,
+          "ida_setup_and_ic_wall_s": 0.000366824,
+          "first_ida_output_interval_wall_s": 0.176181009,
+          "ic_residual_calls": 0,
+          "ic_jacobian_setups": 0,
+          "ic_linear_solves": 0,
+          "trace_iterations": 0,
+          "largest_trace_block": 0,
+          "algebraic_defect": 0.00047705273342624644,
+          "differential_defect": 1.923707918733727e-24,
+          "native_pair_verified": true,
+          "tolerance_ramp_enabled": false
+        },
+        "ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 6.403102927,
+          "n_steps": 33375.0,
+          "n_err_test_fails": 4.0,
+          "n_nonlin_iters": 34132.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 33375.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0226816479400749,
+          "steps_per_output": 166.044776119403,
+          "nonlin_iters_per_output": 169.81094527363183
+        },
+        "history_counters_through_ramp_end": {
+          "steps_interval": 4394.0,
+          "nonlin_iters_interval": 4549.0,
+          "nonlin_fails_interval": 0.0,
+          "err_test_fails_interval": 4.0,
+          "residual_evals_interval": 4549.0,
+          "lin_setups_interval": 17.0
+        }
+      }
+    ],
+    "pairs": [
+      {
+        "pair": 0,
+        "uniform_process_wall_s": 3.4233095459640026,
+        "ramp_process_wall_s": 3.273037675768137,
+        "process_speedup": 1.0459120502365127,
+        "uniform_ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.575739014,
+          "n_steps": 7127.0,
+          "n_err_test_fails": 2.0,
+          "n_nonlin_iters": 7555.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 7127.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0600533183667742,
+          "steps_per_output": 35.45771144278607,
+          "nonlin_iters_per_output": 37.58706467661692
+        },
+        "ramp_ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.468349895,
+          "n_steps": 6527.0,
+          "n_err_test_fails": 0.0,
+          "n_nonlin_iters": 6933.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 6527.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0622031561207292,
+          "steps_per_output": 32.472636815920396,
+          "nonlin_iters_per_output": 34.492537313432834
+        },
+        "ida_speedup": 1.0731359190106389,
+        "all13_metrics_pass": true,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.012776995296901308,
+            "max_abs_error": 4.238696524848373e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 0.4421149472225355,
+            "max_abs_error": 1.8968043108413823e-10,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "pressure": {
+            "max_normalized_error": 0.012776993160985885,
+            "max_abs_error": 2.962706821563188e-05,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 0.22264850127157831,
+            "max_abs_error": 6.238206184730195e-14,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.012857814526536246,
+            "max_abs_error": 4.2652914620383564e-13,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 0.8736844071857858,
+            "max_abs_error": 3.5893527820102245e-10,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.012857815037841955,
+            "max_abs_error": 2.9813743822160177e-05,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 0.43743239243830456,
+            "max_abs_error": 1.1686812406491373e-13,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 0.26500312779169516,
+            "max_abs_error": 2.899154469560017e-05,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "volume": {
+            "max_normalized_error": 0.012776992585148278,
+            "max_abs_error": 1.0230939630640618e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.0005683777272621189,
+            "max_abs_error": 1.8211316786184706e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 0.23883296808897914,
+            "max_abs_error": 1.0785617207974317e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "imbalance": {
+            "max_normalized_error": 0.00046423685142323815,
+            "max_abs_error": 1.4901685321389426e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        }
+      },
+      {
+        "pair": 1,
+        "uniform_process_wall_s": 3.47343048453331,
+        "ramp_process_wall_s": 3.273341789841652,
+        "process_speedup": 1.0611267345538449,
+        "uniform_ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.644021056,
+          "n_steps": 7127.0,
+          "n_err_test_fails": 2.0,
+          "n_nonlin_iters": 7555.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 7127.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0600533183667742,
+          "steps_per_output": 35.45771144278607,
+          "nonlin_iters_per_output": 37.58706467661692
+        },
+        "ramp_ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.464272242,
+          "n_steps": 6527.0,
+          "n_err_test_fails": 0.0,
+          "n_nonlin_iters": 6933.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 6527.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0622031561207292,
+          "steps_per_output": 32.472636815920396,
+          "nonlin_iters_per_output": 34.492537313432834
+        },
+        "ida_speedup": 1.12275641704065,
+        "all13_metrics_pass": true,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.012776995296901308,
+            "max_abs_error": 4.238696524848373e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 0.4421149472225355,
+            "max_abs_error": 1.8968043108413823e-10,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "pressure": {
+            "max_normalized_error": 0.012776993160985885,
+            "max_abs_error": 2.962706821563188e-05,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 0.22264850127157831,
+            "max_abs_error": 6.238206184730195e-14,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.012857814526536246,
+            "max_abs_error": 4.2652914620383564e-13,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 0.8736844071857858,
+            "max_abs_error": 3.5893527820102245e-10,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.012857815037841955,
+            "max_abs_error": 2.9813743822160177e-05,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 0.43743239243830456,
+            "max_abs_error": 1.1686812406491373e-13,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 0.26500312779169516,
+            "max_abs_error": 2.899154469560017e-05,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "volume": {
+            "max_normalized_error": 0.012776992585148278,
+            "max_abs_error": 1.0230939630640618e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.0005683777272621189,
+            "max_abs_error": 1.8211316786184706e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 0.23883296808897914,
+            "max_abs_error": 1.0785617207974317e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "imbalance": {
+            "max_normalized_error": 0.00046423685142323815,
+            "max_abs_error": 1.4901685321389426e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        }
+      },
+      {
+        "pair": 2,
+        "uniform_process_wall_s": 3.373715240508318,
+        "ramp_process_wall_s": 3.1750225350260735,
+        "process_speedup": 1.0625799355092176,
+        "uniform_ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.617168095,
+          "n_steps": 7127.0,
+          "n_err_test_fails": 2.0,
+          "n_nonlin_iters": 7555.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 7127.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0600533183667742,
+          "steps_per_output": 35.45771144278607,
+          "nonlin_iters_per_output": 37.58706467661692
+        },
+        "ramp_ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.46651632,
+          "n_steps": 6527.0,
+          "n_err_test_fails": 0.0,
+          "n_nonlin_iters": 6933.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 6527.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0622031561207292,
+          "steps_per_output": 32.472636815920396,
+          "nonlin_iters_per_output": 34.492537313432834
+        },
+        "ida_speedup": 1.1027276498361778,
+        "all13_metrics_pass": true,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.012776995296901308,
+            "max_abs_error": 4.238696524848373e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 0.4421149472225355,
+            "max_abs_error": 1.8968043108413823e-10,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "pressure": {
+            "max_normalized_error": 0.012776993160985885,
+            "max_abs_error": 2.962706821563188e-05,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 0.22264850127157831,
+            "max_abs_error": 6.238206184730195e-14,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.012857814526536246,
+            "max_abs_error": 4.2652914620383564e-13,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 0.8736844071857858,
+            "max_abs_error": 3.5893527820102245e-10,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.012857815037841955,
+            "max_abs_error": 2.9813743822160177e-05,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 0.43743239243830456,
+            "max_abs_error": 1.1686812406491373e-13,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 0.26500312779169516,
+            "max_abs_error": 2.899154469560017e-05,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "volume": {
+            "max_normalized_error": 0.012776992585148278,
+            "max_abs_error": 1.0230939630640618e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.0005683777272621189,
+            "max_abs_error": 1.8211316786184706e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 0.23883296808897914,
+            "max_abs_error": 1.0785617207974317e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "imbalance": {
+            "max_normalized_error": 0.00046423685142323815,
+            "max_abs_error": 1.4901685321389426e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        }
+      },
+      {
+        "pair": 3,
+        "uniform_process_wall_s": 3.4236144199967384,
+        "ramp_process_wall_s": 3.3235893733799458,
+        "process_speedup": 1.0300954887562033,
+        "uniform_ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.606873097,
+          "n_steps": 7127.0,
+          "n_err_test_fails": 2.0,
+          "n_nonlin_iters": 7555.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 7127.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0600533183667742,
+          "steps_per_output": 35.45771144278607,
+          "nonlin_iters_per_output": 37.58706467661692
+        },
+        "ramp_ida_statistics": {
+          "max_order": 2.0,
+          "wall_time": 1.47146013,
+          "n_steps": 6527.0,
+          "n_err_test_fails": 0.0,
+          "n_nonlin_iters": 6933.0,
+          "n_nonlin_conv_fails": 0.0,
+          "bdf1_steps": 0.0,
+          "bdf2_steps": 6527.0,
+          "bdf3_steps": 0.0,
+          "bdf4_steps": 0.0,
+          "bdf5_steps": 0.0,
+          "n_outputs": 201.0,
+          "nonlin_iters_per_step": 1.0622031561207292,
+          "steps_per_output": 32.472636815920396,
+          "nonlin_iters_per_output": 34.492537313432834
+        },
+        "ida_speedup": 1.092026256260168,
+        "all13_metrics_pass": true,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.012776995296901308,
+            "max_abs_error": 4.238696524848373e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 0.4421149472225355,
+            "max_abs_error": 1.8968043108413823e-10,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "pressure": {
+            "max_normalized_error": 0.012776993160985885,
+            "max_abs_error": 2.962706821563188e-05,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 0.22264850127157831,
+            "max_abs_error": 6.238206184730195e-14,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.012857814526536246,
+            "max_abs_error": 4.2652914620383564e-13,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 0.8736844071857858,
+            "max_abs_error": 3.5893527820102245e-10,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.012857815037841955,
+            "max_abs_error": 2.9813743822160177e-05,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 0.43743239243830456,
+            "max_abs_error": 1.1686812406491373e-13,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 0.26500312779169516,
+            "max_abs_error": 2.899154469560017e-05,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "volume": {
+            "max_normalized_error": 0.012776992585148278,
+            "max_abs_error": 1.0230939630640618e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.0005683777272621189,
+            "max_abs_error": 1.8211316786184706e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 0.23883296808897914,
+            "max_abs_error": 1.0785617207974317e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "imbalance": {
+            "max_normalized_error": 0.00046423685142323815,
+            "max_abs_error": 1.4901685321389426e-13,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        }
+      }
+    ],
+    "performance": {
+      "median_paired_process_speedup": 1.0535193923951787,
+      "paired_process_speedups": [
+        1.0459120502365127,
+        1.0611267345538449,
+        1.0625799355092176,
+        1.0300954887562033
+      ],
+      "median_paired_ida_speedup": 1.097376953048173,
+      "paired_ida_speedups": [
+        1.0731359190106389,
+        1.12275641704065,
+        1.1027276498361778,
+        1.092026256260168
+      ]
+    },
+    "step_counts": {
+      "uniform_through_1s": 905.0,
+      "ramp_through_1s": 279.0,
+      "uniform_total": 7127.0,
+      "ramp_total": 6527.0
+    },
+    "paired_metric_maxima": {
+      "area": 0.012776995296901308,
+      "velocity": 0.4421149472225355,
+      "pressure": 0.012776993160985885,
+      "flow": 0.22264850127157831,
+      "terminal_area": 0.012857814526536246,
+      "terminal_velocity": 0.8736844071857858,
+      "terminal_pressure": 0.012857815037841955,
+      "terminal_flow": 0.43743239243830456,
+      "reconstructed_Pc": 0.26500312779169516,
+      "volume": 0.012776992585148278,
+      "dVdt": 0.0005683777272621189,
+      "net_flux": 0.23883296808897914,
+      "imbalance": 0.00046423685142323815
+    },
+    "reference_metric_maxima": {
+      "area": 0.17168004812292617,
+      "velocity": 14.022487446446146,
+      "pressure": 0.1716800471951184,
+      "flow": 6.924386938273909,
+      "terminal_area": 0.18459000712784093,
+      "terminal_velocity": 24.421879836478407,
+      "terminal_pressure": 0.18459000549994176,
+      "terminal_flow": 12.049764655530433,
+      "reconstructed_Pc": 3.4333654930668014,
+      "volume": 0.17168004819898156,
+      "dVdt": 0.03467231018525779,
+      "net_flux": 6.139735723370707,
+      "imbalance": 0.02974323135750197
+    },
+    "reference_diagnostics": {
+      "uniform-0": {
+        "accepted": false,
+        "window": [
+          9.0,
+          10.0
+        ],
+        "late_samples": 21,
+        "atol": 1e-12,
+        "rtol": 1e-07,
+        "baseline_is_tighter_reference": true,
+        "candidate_ramp_enabled": false,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.16282452041518466,
+            "max_abs_error": 5.4044686477808246e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 13.657565642976977,
+            "max_abs_error": 4.1142081633888106e-09,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "pressure": {
+            "max_normalized_error": 0.16282452050398205,
+            "max_abs_error": 0.00037765136767120566,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 6.7410970713775615,
+            "max_abs_error": 1.3036760787906728e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.1756575524814412,
+            "max_abs_error": 5.830198411722887e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 23.94252066582151,
+            "max_abs_error": 7.137463736359151e-09,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.17565755173876066,
+            "max_abs_error": 0.0004074084154126467,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 11.810187365460024,
+            "max_abs_error": 2.27925788861252e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 3.2515604601522683,
+            "max_abs_error": 0.0003595029645566683,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "volume": {
+            "max_normalized_error": 0.1628245190991013,
+            "max_abs_error": 1.3044765869709915e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.034553585541250625,
+            "max_abs_error": 1.1072110567798832e-11,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 5.970872102685561,
+            "max_abs_error": 2.2589888461002085e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "imbalance": {
+            "max_normalized_error": 0.029439244195749975,
+            "max_abs_error": 9.450397460021085e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        },
+        "parameters_sha256": {
+          "before": "23b657050b92ea1d43b2da76c16af3f6fe9e79ebc007b73ed52006494acf8277",
+          "after": "4c4b75550d7a930d0441d829618415bd83f63eec2fc70628acbe2b19547bb5e4"
+        },
+        "fixture_sha256": "528463ba0d90079b32f6be4c72016cfd9f67c6d03f254f5676212deb3da05352",
+        "diagnostics_only": [
+          "IDA adaptive internal times",
+          "IDA counters",
+          "relative mass imbalance"
+        ]
+      },
+      "ramp-0": {
+        "accepted": false,
+        "window": [
+          9.0,
+          10.0
+        ],
+        "late_samples": 21,
+        "atol": 1e-12,
+        "rtol": 1e-07,
+        "baseline_is_tighter_reference": true,
+        "candidate_ramp_enabled": true,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.17168004812292617,
+            "max_abs_error": 5.69840116933229e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 14.022487446446146,
+            "max_abs_error": 3.924527732304672e-09,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "pressure": {
+            "max_normalized_error": 0.1716800471951184,
+            "max_abs_error": 0.00039819066842028406,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 6.924386938273909,
+            "max_abs_error": 1.2412940169433709e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.18459000712784093,
+            "max_abs_error": 6.126672899477853e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 24.421879836478407,
+            "max_abs_error": 6.7785284581581284e-09,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.18459000549994176,
+            "max_abs_error": 0.00042812575338757597,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 12.049764655530433,
+            "max_abs_error": 2.1623897645476063e-12,
+            "checks": 42,
+            "changed": 41,
+            "accepted": false
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 3.4333654930668014,
+            "max_abs_error": 0.00037960391273372807,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "volume": {
+            "max_normalized_error": 0.17168004819898156,
+            "max_abs_error": 1.3754230908510565e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.03467231018525779,
+            "max_abs_error": 1.1110153866778633e-11,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 6.139735723370707,
+            "max_abs_error": 2.1511326740204654e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "imbalance": {
+            "max_normalized_error": 0.02974323135750197,
+            "max_abs_error": 9.547981469790689e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        },
+        "parameters_sha256": {
+          "before": "23b657050b92ea1d43b2da76c16af3f6fe9e79ebc007b73ed52006494acf8277",
+          "after": "e4664056b9ffa31eb46a72ceb83724cf72a36588df50d3ecc605c3139c7d10f0"
+        },
+        "fixture_sha256": "528463ba0d90079b32f6be4c72016cfd9f67c6d03f254f5676212deb3da05352",
+        "diagnostics_only": [
+          "IDA adaptive internal times",
+          "IDA counters",
+          "relative mass imbalance"
+        ]
+      },
+      "uniform-1": {
+        "accepted": false,
+        "window": [
+          9.0,
+          10.0
+        ],
+        "late_samples": 21,
+        "atol": 1e-12,
+        "rtol": 1e-07,
+        "baseline_is_tighter_reference": true,
+        "candidate_ramp_enabled": false,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.16282452041518466,
+            "max_abs_error": 5.4044686477808246e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 13.657565642976977,
+            "max_abs_error": 4.1142081633888106e-09,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "pressure": {
+            "max_normalized_error": 0.16282452050398205,
+            "max_abs_error": 0.00037765136767120566,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 6.7410970713775615,
+            "max_abs_error": 1.3036760787906728e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.1756575524814412,
+            "max_abs_error": 5.830198411722887e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 23.94252066582151,
+            "max_abs_error": 7.137463736359151e-09,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.17565755173876066,
+            "max_abs_error": 0.0004074084154126467,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 11.810187365460024,
+            "max_abs_error": 2.27925788861252e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 3.2515604601522683,
+            "max_abs_error": 0.0003595029645566683,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "volume": {
+            "max_normalized_error": 0.1628245190991013,
+            "max_abs_error": 1.3044765869709915e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.034553585541250625,
+            "max_abs_error": 1.1072110567798832e-11,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 5.970872102685561,
+            "max_abs_error": 2.2589888461002085e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "imbalance": {
+            "max_normalized_error": 0.029439244195749975,
+            "max_abs_error": 9.450397460021085e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        },
+        "parameters_sha256": {
+          "before": "23b657050b92ea1d43b2da76c16af3f6fe9e79ebc007b73ed52006494acf8277",
+          "after": "b34d2b9746acd749ff19ae45952bb68c3b37713a0ec7903f672e02e4b1a6f3f0"
+        },
+        "fixture_sha256": "528463ba0d90079b32f6be4c72016cfd9f67c6d03f254f5676212deb3da05352",
+        "diagnostics_only": [
+          "IDA adaptive internal times",
+          "IDA counters",
+          "relative mass imbalance"
+        ]
+      },
+      "ramp-1": {
+        "accepted": false,
+        "window": [
+          9.0,
+          10.0
+        ],
+        "late_samples": 21,
+        "atol": 1e-12,
+        "rtol": 1e-07,
+        "baseline_is_tighter_reference": true,
+        "candidate_ramp_enabled": true,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.17168004812292617,
+            "max_abs_error": 5.69840116933229e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 14.022487446446146,
+            "max_abs_error": 3.924527732304672e-09,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "pressure": {
+            "max_normalized_error": 0.1716800471951184,
+            "max_abs_error": 0.00039819066842028406,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 6.924386938273909,
+            "max_abs_error": 1.2412940169433709e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.18459000712784093,
+            "max_abs_error": 6.126672899477853e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 24.421879836478407,
+            "max_abs_error": 6.7785284581581284e-09,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.18459000549994176,
+            "max_abs_error": 0.00042812575338757597,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 12.049764655530433,
+            "max_abs_error": 2.1623897645476063e-12,
+            "checks": 42,
+            "changed": 41,
+            "accepted": false
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 3.4333654930668014,
+            "max_abs_error": 0.00037960391273372807,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "volume": {
+            "max_normalized_error": 0.17168004819898156,
+            "max_abs_error": 1.3754230908510565e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.03467231018525779,
+            "max_abs_error": 1.1110153866778633e-11,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 6.139735723370707,
+            "max_abs_error": 2.1511326740204654e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "imbalance": {
+            "max_normalized_error": 0.02974323135750197,
+            "max_abs_error": 9.547981469790689e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        },
+        "parameters_sha256": {
+          "before": "23b657050b92ea1d43b2da76c16af3f6fe9e79ebc007b73ed52006494acf8277",
+          "after": "c73b4be665401e88d2de55ae93965f5965873c7ece8bb1d52b9c35e86ea02b81"
+        },
+        "fixture_sha256": "528463ba0d90079b32f6be4c72016cfd9f67c6d03f254f5676212deb3da05352",
+        "diagnostics_only": [
+          "IDA adaptive internal times",
+          "IDA counters",
+          "relative mass imbalance"
+        ]
+      },
+      "uniform-2": {
+        "accepted": false,
+        "window": [
+          9.0,
+          10.0
+        ],
+        "late_samples": 21,
+        "atol": 1e-12,
+        "rtol": 1e-07,
+        "baseline_is_tighter_reference": true,
+        "candidate_ramp_enabled": false,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.16282452041518466,
+            "max_abs_error": 5.4044686477808246e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 13.657565642976977,
+            "max_abs_error": 4.1142081633888106e-09,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "pressure": {
+            "max_normalized_error": 0.16282452050398205,
+            "max_abs_error": 0.00037765136767120566,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 6.7410970713775615,
+            "max_abs_error": 1.3036760787906728e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.1756575524814412,
+            "max_abs_error": 5.830198411722887e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 23.94252066582151,
+            "max_abs_error": 7.137463736359151e-09,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.17565755173876066,
+            "max_abs_error": 0.0004074084154126467,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 11.810187365460024,
+            "max_abs_error": 2.27925788861252e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 3.2515604601522683,
+            "max_abs_error": 0.0003595029645566683,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "volume": {
+            "max_normalized_error": 0.1628245190991013,
+            "max_abs_error": 1.3044765869709915e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.034553585541250625,
+            "max_abs_error": 1.1072110567798832e-11,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 5.970872102685561,
+            "max_abs_error": 2.2589888461002085e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "imbalance": {
+            "max_normalized_error": 0.029439244195749975,
+            "max_abs_error": 9.450397460021085e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        },
+        "parameters_sha256": {
+          "before": "23b657050b92ea1d43b2da76c16af3f6fe9e79ebc007b73ed52006494acf8277",
+          "after": "f512ab41da902781f835a01ce1e69137845ce7ce70e4846e8725a9070331a2e0"
+        },
+        "fixture_sha256": "528463ba0d90079b32f6be4c72016cfd9f67c6d03f254f5676212deb3da05352",
+        "diagnostics_only": [
+          "IDA adaptive internal times",
+          "IDA counters",
+          "relative mass imbalance"
+        ]
+      },
+      "ramp-2": {
+        "accepted": false,
+        "window": [
+          9.0,
+          10.0
+        ],
+        "late_samples": 21,
+        "atol": 1e-12,
+        "rtol": 1e-07,
+        "baseline_is_tighter_reference": true,
+        "candidate_ramp_enabled": true,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.17168004812292617,
+            "max_abs_error": 5.69840116933229e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 14.022487446446146,
+            "max_abs_error": 3.924527732304672e-09,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "pressure": {
+            "max_normalized_error": 0.1716800471951184,
+            "max_abs_error": 0.00039819066842028406,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 6.924386938273909,
+            "max_abs_error": 1.2412940169433709e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.18459000712784093,
+            "max_abs_error": 6.126672899477853e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 24.421879836478407,
+            "max_abs_error": 6.7785284581581284e-09,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.18459000549994176,
+            "max_abs_error": 0.00042812575338757597,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 12.049764655530433,
+            "max_abs_error": 2.1623897645476063e-12,
+            "checks": 42,
+            "changed": 41,
+            "accepted": false
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 3.4333654930668014,
+            "max_abs_error": 0.00037960391273372807,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "volume": {
+            "max_normalized_error": 0.17168004819898156,
+            "max_abs_error": 1.3754230908510565e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.03467231018525779,
+            "max_abs_error": 1.1110153866778633e-11,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 6.139735723370707,
+            "max_abs_error": 2.1511326740204654e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "imbalance": {
+            "max_normalized_error": 0.02974323135750197,
+            "max_abs_error": 9.547981469790689e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        },
+        "parameters_sha256": {
+          "before": "23b657050b92ea1d43b2da76c16af3f6fe9e79ebc007b73ed52006494acf8277",
+          "after": "b5ebaed72654fab06b68dd64709b6d67bec1d8f338aaf94e127b489e2b3d65cf"
+        },
+        "fixture_sha256": "528463ba0d90079b32f6be4c72016cfd9f67c6d03f254f5676212deb3da05352",
+        "diagnostics_only": [
+          "IDA adaptive internal times",
+          "IDA counters",
+          "relative mass imbalance"
+        ]
+      },
+      "uniform-3": {
+        "accepted": false,
+        "window": [
+          9.0,
+          10.0
+        ],
+        "late_samples": 21,
+        "atol": 1e-12,
+        "rtol": 1e-07,
+        "baseline_is_tighter_reference": true,
+        "candidate_ramp_enabled": false,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.16282452041518466,
+            "max_abs_error": 5.4044686477808246e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 13.657565642976977,
+            "max_abs_error": 4.1142081633888106e-09,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "pressure": {
+            "max_normalized_error": 0.16282452050398205,
+            "max_abs_error": 0.00037765136767120566,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 6.7410970713775615,
+            "max_abs_error": 1.3036760787906728e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.1756575524814412,
+            "max_abs_error": 5.830198411722887e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 23.94252066582151,
+            "max_abs_error": 7.137463736359151e-09,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.17565755173876066,
+            "max_abs_error": 0.0004074084154126467,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 11.810187365460024,
+            "max_abs_error": 2.27925788861252e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 3.2515604601522683,
+            "max_abs_error": 0.0003595029645566683,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "volume": {
+            "max_normalized_error": 0.1628245190991013,
+            "max_abs_error": 1.3044765869709915e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.034553585541250625,
+            "max_abs_error": 1.1072110567798832e-11,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 5.970872102685561,
+            "max_abs_error": 2.2589888461002085e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "imbalance": {
+            "max_normalized_error": 0.029439244195749975,
+            "max_abs_error": 9.450397460021085e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        },
+        "parameters_sha256": {
+          "before": "23b657050b92ea1d43b2da76c16af3f6fe9e79ebc007b73ed52006494acf8277",
+          "after": "70bdf0dace3f9e8a3650fb176cf789310fcd66d826d2dc86a7a90565ef8c5cb3"
+        },
+        "fixture_sha256": "528463ba0d90079b32f6be4c72016cfd9f67c6d03f254f5676212deb3da05352",
+        "diagnostics_only": [
+          "IDA adaptive internal times",
+          "IDA counters",
+          "relative mass imbalance"
+        ]
+      },
+      "ramp-3": {
+        "accepted": false,
+        "window": [
+          9.0,
+          10.0
+        ],
+        "late_samples": 21,
+        "atol": 1e-12,
+        "rtol": 1e-07,
+        "baseline_is_tighter_reference": true,
+        "candidate_ramp_enabled": true,
+        "metrics": {
+          "area": {
+            "max_normalized_error": 0.17168004812292617,
+            "max_abs_error": 5.69840116933229e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 14.022487446446146,
+            "max_abs_error": 3.924527732304672e-09,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "pressure": {
+            "max_normalized_error": 0.1716800471951184,
+            "max_abs_error": 0.00039819066842028406,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 6.924386938273909,
+            "max_abs_error": 1.2412940169433709e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "terminal_area": {
+            "max_normalized_error": 0.18459000712784093,
+            "max_abs_error": 6.126672899477853e-12,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 24.421879836478407,
+            "max_abs_error": 6.7785284581581284e-09,
+            "checks": 42,
+            "changed": 42,
+            "accepted": false
+          },
+          "terminal_pressure": {
+            "max_normalized_error": 0.18459000549994176,
+            "max_abs_error": 0.00042812575338757597,
+            "checks": 42,
+            "changed": 42,
+            "accepted": true
+          },
+          "terminal_flow": {
+            "max_normalized_error": 12.049764655530433,
+            "max_abs_error": 2.1623897645476063e-12,
+            "checks": 42,
+            "changed": 41,
+            "accepted": false
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 3.4333654930668014,
+            "max_abs_error": 0.00037960391273372807,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "volume": {
+            "max_normalized_error": 0.17168004819898156,
+            "max_abs_error": 1.3754230908510565e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 0.03467231018525779,
+            "max_abs_error": 1.1110153866778633e-11,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 6.139735723370707,
+            "max_abs_error": 2.1511326740204654e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": false
+          },
+          "imbalance": {
+            "max_normalized_error": 0.02974323135750197,
+            "max_abs_error": 9.547981469790689e-12,
+            "checks": 21,
+            "changed": 21,
+            "accepted": true
+          }
+        },
+        "parameters_sha256": {
+          "before": "23b657050b92ea1d43b2da76c16af3f6fe9e79ebc007b73ed52006494acf8277",
+          "after": "26b5376e0649834461e682dd2d039bdb854c2ffb6b5cfe04cb139a439d7fd152"
+        },
+        "fixture_sha256": "528463ba0d90079b32f6be4c72016cfd9f67c6d03f254f5676212deb3da05352",
+        "diagnostics_only": [
+          "IDA adaptive internal times",
+          "IDA counters",
+          "relative mass imbalance"
+        ]
+      }
+    },
+    "equivalence_passed": true,
+    "tighter_reference_diagnostics_passed": false,
+    "absolute_accuracy_certified": false
+  },
+  "validation": {
+    "single_vessel": {
+      "all_time_equivalent": false,
+      "all_time_maxima": {
+        "area": 4.572326052033318e-08,
+        "velocity": 0.015292708034140286,
+        "pressure": 0.003822832300615793,
+        "flow": 1959.2197287089543,
+        "terminal_area": 0.0038228320505036455,
+        "terminal_velocity": 1959.4159183469692,
+        "reconstructed_Pc": 0.022028334681079807,
+        "volume": 3.6434130836678967e-09,
+        "dVdt": 2.4287475873780415e-09,
+        "net_flux": 979.7548916778754,
+        "imbalance": 979.7548916778754
+      },
+      "initial_legacy_outlet_flow_m3_s": 8.8659388757e-13,
+      "initial_native_outlet_flow_m3_s": 0,
+      "initial_cell_state_matches": true,
+      "final_output_time": 0.01,
+      "final_outputs_within_weights": true,
+      "final_maxima": {
+        "area": 4.3378615807303125e-08,
+        "velocity": 0.006193001635269595,
+        "pressure": 4.471385928534448e-08,
+        "flow": 0.003568625689731483,
+        "terminal_area": 9.393123963207597e-09,
+        "terminal_velocity": 1.0517455961227685e-05,
+        "reconstructed_Pc": 2.521331290041399e-08,
+        "volume": 2.4290140067675775e-09,
+        "dVdt": 1.2144890153701272e-09,
+        "net_flux": 5.206012018874519e-06,
+        "imbalance": 1.2368423798098158e-09
+      },
+      "final_four_case_metrics": {
+        "analytic-1": {
+          "area": {
+            "max_normalized_error": 4.337861580730306e-08,
+            "max_abs_error": 2.0057740190981832e-18,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 0.005878557993323372,
+            "max_abs_error": 2.0956658988453142e-14,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "pressure": {
+            "max_normalized_error": 4.471385928534448e-08,
+            "max_abs_error": 1.2187229003757238e-10,
+            "checks": 3,
+            "changed": 3,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 0.003387430186455703,
+            "max_abs_error": 9.480484090953986e-18,
+            "checks": 3,
+            "changed": 2,
+            "accepted": true
+          },
+          "terminal_area": {
+            "max_normalized_error": 9.379114543399051e-09,
+            "max_abs_error": 4.336808689942018e-19,
+            "checks": 2,
+            "changed": 2,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 1.7764978364922844e-06,
+            "max_abs_error": 1.3608905669038052e-15,
+            "checks": 2,
+            "changed": 1,
+            "accepted": true
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 2.521331290041399e-08,
+            "max_abs_error": 2.3646862246096134e-11,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "volume": {
+            "max_normalized_error": 1.2145070033837887e-09,
+            "max_abs_error": 1.3552527156068805e-20,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 6.072445076850637e-10,
+            "max_abs_error": 1.3552527156068805e-17,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 8.746293881265958e-07,
+            "max_abs_error": 6.11981304391232e-19,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "imbalance": {
+            "max_normalized_error": 5.798054451532515e-10,
+            "max_abs_error": 1.2940545851677573e-17,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          }
+        },
+        "analytic-2": {
+          "area": {
+            "max_normalized_error": 3.8689035720027104e-08,
+            "max_abs_error": 1.7889335846010823e-18,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 0.005355395742133439,
+            "max_abs_error": 1.9091621187607155e-14,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "pressure": {
+            "max_normalized_error": 3.804014894424832e-08,
+            "max_abs_error": 1.0368239600211382e-10,
+            "checks": 3,
+            "changed": 3,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 0.0030859669215455962,
+            "max_abs_error": 8.636771446678473e-18,
+            "checks": 3,
+            "changed": 2,
+            "accepted": true
+          },
+          "terminal_area": {
+            "max_normalized_error": 7.0343359075492885e-09,
+            "max_abs_error": 3.2526065174565133e-19,
+            "checks": 2,
+            "changed": 2,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 1.4402200433512565e-06,
+            "max_abs_error": 1.1032841307212493e-15,
+            "checks": 2,
+            "changed": 1,
+            "accepted": true
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 3.878971215448302e-09,
+            "max_abs_error": 3.637978807091713e-12,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "volume": {
+            "max_normalized_error": 0.0,
+            "max_abs_error": 0.0,
+            "checks": 1,
+            "changed": 0,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 1.214489015370127e-09,
+            "max_abs_error": 2.710505431213761e-17,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 7.142302269822452e-07,
+            "max_abs_error": 4.997494388800372e-19,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "imbalance": {
+            "max_normalized_error": 1.2368423798098158e-09,
+            "max_abs_error": 2.7604803751017648e-17,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          }
+        },
+        "csv-1": {
+          "area": {
+            "max_normalized_error": 3.868903572002706e-08,
+            "max_abs_error": 1.7889335846010823e-18,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 0.006134042265342466,
+            "max_abs_error": 2.186744302344959e-14,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "pressure": {
+            "max_normalized_error": 4.0709633080686774e-08,
+            "max_abs_error": 1.1095835361629725e-10,
+            "checks": 3,
+            "changed": 3,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 0.003534651496556971,
+            "max_abs_error": 9.89251598895645e-18,
+            "checks": 3,
+            "changed": 2,
+            "accepted": true
+          },
+          "terminal_area": {
+            "max_normalized_error": 9.393123963207597e-09,
+            "max_abs_error": 4.336808689942018e-19,
+            "checks": 2,
+            "changed": 2,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 1.0517455961227685e-05,
+            "max_abs_error": 8.05692318417428e-15,
+            "checks": 2,
+            "changed": 1,
+            "accepted": true
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 1.9394856077241523e-08,
+            "max_abs_error": 1.8189894035458565e-11,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "volume": {
+            "max_normalized_error": 1.2145070033837885e-09,
+            "max_abs_error": 1.3552527156068805e-20,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 1.2144890153701268e-09,
+            "max_abs_error": 2.710505431213761e-17,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 5.206012018874519e-06,
+            "max_abs_error": 3.6426651896671186e-18,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "imbalance": {
+            "max_normalized_error": 1.051240119654556e-09,
+            "max_abs_error": 2.3462389122470492e-17,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          }
+        },
+        "csv-2": {
+          "area": {
+            "max_normalized_error": 4.3378615807303125e-08,
+            "max_abs_error": 2.0057740190981832e-18,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 0.006193001635269595,
+            "max_abs_error": 2.207762916711306e-14,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "pressure": {
+            "max_normalized_error": 4.07096330806868e-08,
+            "max_abs_error": 1.1095835361629725e-10,
+            "checks": 3,
+            "changed": 2,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 0.003568625689731483,
+            "max_abs_error": 9.98760040036942e-18,
+            "checks": 3,
+            "changed": 2,
+            "accepted": true
+          },
+          "terminal_area": {
+            "max_normalized_error": 2.3447786358497627e-09,
+            "max_abs_error": 1.0842021724855044e-19,
+            "checks": 2,
+            "changed": 1,
+            "accepted": true
+          },
+          "terminal_velocity": {
+            "max_normalized_error": 1.7210176618664227e-07,
+            "max_abs_error": 1.3183898417423734e-16,
+            "checks": 2,
+            "changed": 1,
+            "accepted": true
+          },
+          "reconstructed_Pc": {
+            "max_normalized_error": 0.0,
+            "max_abs_error": 0.0,
+            "checks": 1,
+            "changed": 0,
+            "accepted": true
+          },
+          "volume": {
+            "max_normalized_error": 2.4290140067675775e-09,
+            "max_abs_error": 2.710505431213761e-20,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "dVdt": {
+            "max_normalized_error": 1.2144890153701272e-09,
+            "max_abs_error": 2.710505431213761e-17,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "net_flux": {
+            "max_normalized_error": 8.534445932584886e-08,
+            "max_abs_error": 5.971582278142817e-20,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          },
+          "imbalance": {
+            "max_normalized_error": 1.211775353364146e-09,
+            "max_abs_error": 2.7045338489356183e-17,
+            "checks": 1,
+            "changed": 1,
+            "accepted": true
+          }
+        }
+      },
+      "physical_bound_functions": "Unmodified frozen91aa state_bound/pressure_bound/flow_bound/area_from_pressure/record_metric; original all-row derivative formula retained",
+      "projection_allowlist": {
+        "Initial state source": "rest",
+        "Initial condition policy": "native",
+        "Initial consistency tolerance": "0.01",
+        "Initial consistency maximum iterations": "30",
+        "Check Jacobian at startup": "false",
+        "Tolerance ramp enabled": "false",
+        "Tolerance ramp initial relative factor": "100",
+        "Tolerance ramp initial absolute factor": "100",
+        "Tolerance ramp hold duration": "0",
+        "Tolerance ramp end time": "0",
+        "Maximum IDA internal steps per output": "500"
+      },
+      "frozen_helper_sha256": "91aa6d2eb3b84a76bba744c752961a5f75183c684d96a9709f1bb16382866f7b"
+    },
+    "adan_final_midpoint_pairs": [
+      {
+        "ranks": 1,
+        "run": 0,
+        "scope": "Final t=.02 midpointA/U/Q only; not fullnetworkpressure/Pc/conservationproof",
+        "metrics": {
+          "area": {
+            "max_normalized_error": 2.5889055010170137e-12,
+            "max_abs_error": 2.6020852139652106e-18,
+            "checks": 77,
+            "changed": 66,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 1.9818188881043983e-08,
+            "max_abs_error": 2.3526319781197458e-14,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 7.818027349267165e-09,
+            "max_abs_error": 1.1927917963235057e-17,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          }
+        },
+        "accepted": true
+      },
+      {
+        "ranks": 1,
+        "run": 1,
+        "scope": "Final t=.02 midpointA/U/Q only; not fullnetworkpressure/Pc/conservationproof",
+        "metrics": {
+          "area": {
+            "max_normalized_error": 2.5889055010170137e-12,
+            "max_abs_error": 2.6020852139652106e-18,
+            "checks": 77,
+            "changed": 66,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 1.9818188881043983e-08,
+            "max_abs_error": 2.3526319781197458e-14,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 7.818027349267165e-09,
+            "max_abs_error": 1.1927917963235057e-17,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          }
+        },
+        "accepted": true
+      },
+      {
+        "ranks": 1,
+        "run": 2,
+        "scope": "Final t=.02 midpointA/U/Q only; not fullnetworkpressure/Pc/conservationproof",
+        "metrics": {
+          "area": {
+            "max_normalized_error": 2.5889055010170137e-12,
+            "max_abs_error": 2.6020852139652106e-18,
+            "checks": 77,
+            "changed": 66,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 1.9818188881043983e-08,
+            "max_abs_error": 2.3526319781197458e-14,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 7.818027349267165e-09,
+            "max_abs_error": 1.1927917963235057e-17,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          }
+        },
+        "accepted": true
+      },
+      {
+        "ranks": 2,
+        "run": 0,
+        "scope": "Final t=.02 midpointA/U/Q only; not fullnetworkpressure/Pc/conservationproof",
+        "metrics": {
+          "area": {
+            "max_normalized_error": 3.7754871889831454e-12,
+            "max_abs_error": 3.7947076036992655e-18,
+            "checks": 77,
+            "changed": 65,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 1.9593148246353606e-08,
+            "max_abs_error": 2.325917236589703e-14,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 7.028689455800477e-09,
+            "max_abs_error": 1.1772063900940266e-17,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          }
+        },
+        "accepted": true
+      },
+      {
+        "ranks": 2,
+        "run": 1,
+        "scope": "Final t=.02 midpointA/U/Q only; not fullnetworkpressure/Pc/conservationproof",
+        "metrics": {
+          "area": {
+            "max_normalized_error": 3.7754871889831454e-12,
+            "max_abs_error": 3.7947076036992655e-18,
+            "checks": 77,
+            "changed": 65,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 1.9593148246353606e-08,
+            "max_abs_error": 2.325917236589703e-14,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 7.028689455800477e-09,
+            "max_abs_error": 1.1772063900940266e-17,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          }
+        },
+        "accepted": true
+      },
+      {
+        "ranks": 2,
+        "run": 2,
+        "scope": "Final t=.02 midpointA/U/Q only; not fullnetworkpressure/Pc/conservationproof",
+        "metrics": {
+          "area": {
+            "max_normalized_error": 3.7754871889831454e-12,
+            "max_abs_error": 3.7947076036992655e-18,
+            "checks": 77,
+            "changed": 65,
+            "accepted": true
+          },
+          "velocity": {
+            "max_normalized_error": 1.9593148246353606e-08,
+            "max_abs_error": 2.325917236589703e-14,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          },
+          "flow": {
+            "max_normalized_error": 7.028689455800477e-09,
+            "max_abs_error": 1.1772063900940266e-17,
+            "checks": 77,
+            "changed": 77,
+            "accepted": true
+          }
+        },
+        "accepted": true
+      }
+    ],
+    "network10k_final_midpoint_equivalence": {
+      "policy": {
+        "declared_utc": "2026-10-25T00:37:13.431666+00:00",
+        "scope": "Final exported vessel-midpoint area, velocity and derived flow ONLY; not all-state or pressure/Pc equivalence.",
+        "time": 0.002,
+        "absolute_tolerance": 1e-05,
+        "relative_tolerance": 1e-06,
+        "strict_normalized_max_exclusive": 1,
+        "physical_helper_sha256": "91aa6d2eb3b84a76bba744c752961a5f75183c684d96a9709f1bb16382866f7b",
+        "pairs": 3,
+        "all_exported_rows_already_validated": true
+      },
+      "all_pairs_passed": true,
+      "metrics": {
+        "area": {
+          "max_normalized_error": 5.88383089726468e-09,
+          "max_abs_error": 5.883831252994048e-14,
+          "checks": 60003,
+          "changed": 60003,
+          "accepted": true
+        },
+        "velocity": {
+          "max_normalized_error": 0.21534278033152113,
+          "max_abs_error": 2.1917887841893524e-06,
+          "checks": 60003,
+          "changed": 60003,
+          "accepted": true
+        },
+        "flow": {
+          "max_normalized_error": 2.8304628735252423e-06,
+          "max_abs_error": 8.708985066690187e-13,
+          "checks": 60003,
+          "changed": 60003,
+          "accepted": true
+        }
+      },
+      "pairs": [
+        {
+          "run": 0,
+          "vessels": 20001,
+          "metrics": {
+            "area": {
+              "max_normalized_error": 5.88383089726468e-09,
+              "max_abs_error": 5.883831252994048e-14,
+              "checks": 20001,
+              "changed": 20001,
+              "accepted": true
+            },
+            "velocity": {
+              "max_normalized_error": 0.21534278033152113,
+              "max_abs_error": 2.1917887841893524e-06,
+              "checks": 20001,
+              "changed": 20001,
+              "accepted": true
+            },
+            "flow": {
+              "max_normalized_error": 2.8304628735252423e-06,
+              "max_abs_error": 8.708985066690187e-13,
+              "checks": 20001,
+              "changed": 20001,
+              "accepted": true
+            }
+          },
+          "accepted": true
+        },
+        {
+          "run": 1,
+          "vessels": 20001,
+          "metrics": {
+            "area": {
+              "max_normalized_error": 5.88383089726468e-09,
+              "max_abs_error": 5.883831252994048e-14,
+              "checks": 20001,
+              "changed": 20001,
+              "accepted": true
+            },
+            "velocity": {
+              "max_normalized_error": 0.21534278033152113,
+              "max_abs_error": 2.1917887841893524e-06,
+              "checks": 20001,
+              "changed": 20001,
+              "accepted": true
+            },
+            "flow": {
+              "max_normalized_error": 2.8304628735252423e-06,
+              "max_abs_error": 8.708985066690187e-13,
+              "checks": 20001,
+              "changed": 20001,
+              "accepted": true
+            }
+          },
+          "accepted": true
+        },
+        {
+          "run": 2,
+          "vessels": 20001,
+          "metrics": {
+            "area": {
+              "max_normalized_error": 5.88383089726468e-09,
+              "max_abs_error": 5.883831252994048e-14,
+              "checks": 20001,
+              "changed": 20001,
+              "accepted": true
+            },
+            "velocity": {
+              "max_normalized_error": 0.21534278033152113,
+              "max_abs_error": 2.1917887841893524e-06,
+              "checks": 20001,
+              "changed": 20001,
+              "accepted": true
+            },
+            "flow": {
+              "max_normalized_error": 2.8304628735252423e-06,
+              "max_abs_error": 8.708985066690187e-13,
+              "checks": 20001,
+              "changed": 20001,
+              "accepted": true
+            }
+          },
+          "accepted": true
+        }
+      ]
+    },
+    "network_physics_limit": "ADAN final midpoint A/U/Q only; no full-field or network pressure/Pc/conservation equivalence assertion. 10k final20,001midpoint A/U/Q also pass actual weights across all3runs; no full-state or pressure/Pc claim."
+  }
+}

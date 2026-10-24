@@ -71,7 +71,9 @@ endforeach()
 
 set(METRIC_FLOW_X_SOURCES
   source/blood_flow_system.cc
+  source/blood_flow_initialization.cc
   source/inflow_series.cc
+  source/steady_network.cc
   source/io/vtk_utils.cc
   source/parsed_tools/constants.cc
   source/parsed_tools/function.cc
