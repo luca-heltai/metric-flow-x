@@ -15,6 +15,7 @@ import math
 import os
 from pathlib import Path
 import platform
+import re
 import statistics
 import subprocess
 import sys
@@ -22,6 +23,28 @@ import sys
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+# This subset of the C++ hexfloat output has magnitude strictly below 2**1000,
+# hence every matched value is finite in binary64. Other forms use the parser.
+_CANONICAL_SNAPSHOT_ROW = re.compile(
+    rb"^[0-9]{1,20}(?: [0-9]{1,20})? -?0x[01](?:\.[0-9a-f]{1,13})?p[+-][0-9]{1,3}\n",
+    re.MULTILINE)
+
+
+def canonical_snapshot_entries(path, chunk_size=1024 * 1024):
+    """Count strictly finite indexed rows in C; None requests full parsing."""
+    entries, carry = 0, b""
+    with path.open("rb") as stream:
+        while block := stream.read(chunk_size):
+            data = carry + block
+            end = data.rfind(b"\n") + 1
+            complete, carry = data[:end], data[end:]
+            remaining, count = _CANONICAL_SNAPSHOT_ROW.subn(b"", complete)
+            if remaining or len(carry) > 80:
+                return None
+            entries += count
+    return None if carry else entries
 
 
 def compare_snapshots(before, after, rtol=0.0, atol=0.0):
@@ -32,6 +55,12 @@ def compare_snapshots(before, after, rtol=0.0, atol=0.0):
               "changed_entries": 0, "violations": 0, "max_abs_error": 0.0,
               "max_relative_error": 0.0, "max_scaled_error": 0.0}
     exact = result["sha256"] == result["after_sha256"]
+    if (exact and all(math.isfinite(t) and t >= 0 for t in [rtol, atol])
+            and math.isfinite(atol + rtol * math.ldexp(1.0, 1000))):
+        entries = canonical_snapshot_entries(before)
+        if entries is not None:
+            result.update(entries=entries, exact=True, accepted=True)
+            return result
     with before.open() as left, after.open() as right:
         for number, (a, b) in enumerate(zip_longest(left, right), 1):
             if a is None or b is None:
@@ -116,6 +145,7 @@ def main():
     parser.add_argument("--ranks", type=int, nargs="+", default=[1, 2])
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--repetitions", type=int, default=20)
+    parser.add_argument("--map-by", default="core", help="Open MPI mapping specification")
     parser.add_argument("--rtol", type=float, default=0.0)
     parser.add_argument("--atol", type=float, default=0.0)
     parser.add_argument("--output", type=Path, required=True)
@@ -132,6 +162,7 @@ def main():
         "host": platform.node(), "platform": platform.platform(),
         "cpu_info": Path("/proc/cpuinfo").read_text().split("\n\n")[0],
         "runs": args.runs, "repetitions": args.repetitions,
+        "map_by": args.map_by, "bind_to": "core",
         "builds": {name: {"path": str(path),
                          "revision": (path / "revision.txt").read_text().strip(),
                          "executable_sha256": digest(path / "benchmark_assembly"),
@@ -152,7 +183,7 @@ def main():
                     build = builds[variant]
                     env = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
                     env["LD_LIBRARY_PATH"] = str(build) + ":" + env.get("LD_LIBRARY_PATH", "")
-                    command = ["mpirun", "--bind-to", "core", "--map-by", "core",
+                    command = ["mpirun", "--bind-to", "core", "--map-by", args.map_by,
                                "-n", str(ranks), str(build / "benchmark_assembly"),
                                str(parameters.resolve()), str(args.repetitions)]
                     if run == 0:
@@ -185,7 +216,7 @@ def main():
                 if not comparison["accepted"]:
                     raise RuntimeError(f"Numerical result outside tolerance: {before}; see equivalence.json")
     rows = summarize(records)
-    compact_metadata = {key: metadata[key] for key in ["host", "runs", "repetitions"]}
+    compact_metadata = {key: metadata[key] for key in ["host", "runs", "repetitions", "map_by", "bind_to"]}
     compact_metadata.update({
         "baseline": metadata["builds"]["before"]["revision"],
         "candidate": metadata["builds"]["after"]["revision"], "ranks": args.ranks,

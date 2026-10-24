@@ -61,9 +61,10 @@ $$
 
 The characteristic speeds are $U-c$ and $U+c$. At fixed vessel properties,
 the invariants are $W_\pm=U\pm4(c-c_0)$, where $c_0=c(A_d)$.
-The registered parameter `m` must remain at $1/2$: it enters a wave-speed
-derivative, while the pressure law itself is fixed to the square root.
-Changing `m` does not select a different constitutive law.
+For areas above the numerical area floor, the derivative is
+$\partial c/\partial A=c/(4A)$, independently of the registered constant `m`.
+This constant remains available in parsed expressions; changing it does not
+select a different constitutive law.
 
 ## Cell fields and face traces
 
