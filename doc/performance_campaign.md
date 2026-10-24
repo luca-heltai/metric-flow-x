@@ -44,6 +44,9 @@ python3 tools/plot_assembly_results.py \
 Plotting requires Matplotlib. Use `--map-by POLICY` to keep placement on
 verified idle cores identical before and after.
 
+The CLI budget `--repetitions 20` uses 20 residual/derivative and 2 state-Jacobian
+assemblies per sample, with three samples and one untimed warmup per kernel.
+
 Raw logs stay in the local output directory. Commit only the final summary
 and figure. Exact snapshot comparison is the default; explicit `--rtol` and
 `--atol` permit small floating-point errors in later experiments. Set the
@@ -123,3 +126,23 @@ All **54 snapshots** and fresh **32 trajectory CSVs / 2372 rows** match exactly;
 measurements, controls, bounds and provenance. These are assembly timings.
 
 ![Junction workspace reuse](performance_data/12_junction_workspace/comparison.svg)
+
+## 13. Cache physical-boundary traversal
+
+Rebuild physical-boundary cells, face numbers and canonical trace indices with
+DoF setup, preserving traversal order. Boundary/RCR assembly reads current
+geometry, labels, parameters and external pressure at each call.
+Five alternating Release/PETSc pairs on lnx4 use verified idle cores 8/9,
+MPI1/MPI2 and the CLI budget above. Network residual speedups are
+**1.122/1.146x**, Jacobians **1.065/1.061x**, with all **20 pairs** faster.
+Boundary residual/Jacobian scopes improve **1.42–1.90x / 1.27–2.41x**
+(all **40 pairs**). ADAN residuals measure **1.049/1.007x** and Jacobians
+**1.006/1.017x**; small changes vary with unchanged controls.
+
+All **54 snapshots** and **32 trajectory CSVs / 2372 rows** match exactly;
+**29 Release regressions**, cache MPI2/MPI4 and boundary-rebuild checks pass.
+[Results](performance_data/13_boundary_topology/results.json) retain every pair,
+controls and provenance, plus two bulk-Jacobian trials that were not promoted.
+Their complete raw data remain local and separate.
+
+![Physical-boundary traversal](performance_data/13_boundary_topology/comparison.svg)

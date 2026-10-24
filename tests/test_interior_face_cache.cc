@@ -1,4 +1,4 @@
-// Rebuilding the mesh/DoFs must replace the interior traversal, including on
+// Rebuilding the mesh/DoFs must replace face traversals, including on
 // MPI ranks with no owned cells. The fixture is a single vessel with N-1
 // ordinary interior faces, independent of partition and trace numbering.
 #include <deal.II/base/mpi.h>
@@ -46,6 +46,23 @@ test()
                       ExcInternalError());
           AssertThrow(!face.cell->face(face.face_no)->at_boundary(),
                       ExcInternalError());
+        }
+      AssertThrow(
+        Utilities::MPI::sum<unsigned int>(flow.boundary_faces.size(),
+                                          flow.mpi_communicator()) == 2,
+        ExcMessage("The single vessel must retain its two endpoints."));
+      for (const auto &face : flow.boundary_faces)
+        {
+          AssertThrow(face.cell->is_locally_owned(), ExcInternalError());
+          AssertThrow(face.cell->face(face.face_no)->at_boundary(),
+                      ExcInternalError());
+          std::vector<types::global_dof_index> dofs(
+            flow.fe_->n_dofs_per_cell());
+          face.cell->get_dof_indices(dofs);
+          const auto [area, velocity] =
+            flow.face_trace_dofs(dofs, face.face_no);
+          AssertThrow(face.a_hat_dof == area && face.u_hat_dof == velocity,
+                      ExcMessage("Boundary trace indices must be refreshed."));
         }
       auto y = flow.make_state();
       flow.compute_initial_solution(y, 0.0);
