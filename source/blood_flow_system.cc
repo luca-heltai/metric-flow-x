@@ -45,6 +45,10 @@
 #include <metric_flow_x/blood_flow_system.h>
 #include <metric_flow_x/io/vtk_utils.h>
 
+#ifdef METRIC_FLOW_X_WITH_PETSC
+#  include <petscoptions.h>
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -482,16 +486,35 @@ namespace MetricFlowX
                   ExcMessage("PETSc preconditioner setup error " +
                              std::to_string(error)));
     };
-    const PC pc = preconditioner.get_pc();
-    PCType   type;
+    const PC     pc            = preconditioner.get_pc();
+    PetscBool    explicit_type = PETSC_FALSE;
+    const char  *prefix        = nullptr;
+    PetscOptions options       = nullptr;
+    check(
+      PetscObjectGetOptionsPrefix(reinterpret_cast<PetscObject>(pc), &prefix));
+    check(PetscObjectGetOptions(reinterpret_cast<PetscObject>(pc), &options));
+    check(PetscOptionsHasName(options, prefix, "-pc_type", &explicit_type));
+    if (!explicit_type && n_mpi_processes > 1)
+      {
+        // A rank-local DAE block can be singular even when the global
+        // Jacobian is invertible. Include neighboring equations before ILU.
+        check(PCSetType(pc, PCASM));
+        check(PCASMSetOverlap(pc, 1));
+        check(PCSetFromOptions(pc));
+      }
+    PCType type;
     check(PCGetType(pc, &type));
-    if (std::string(type) != PCBJACOBI)
+    const std::string name(type);
+    if (name != PCBJACOBI && name != PCASM)
       return; // Respect a different preconditioner explicitly selected by PETSc
               // options.
     check(PCSetUp(pc));
     PetscInt count;
     KSP     *subsolvers;
-    check(PCBJacobiGetSubKSP(pc, &count, nullptr, &subsolvers));
+    if (name == PCASM)
+      check(PCASMGetSubKSP(pc, &count, nullptr, &subsolvers));
+    else
+      check(PCBJacobiGetSubKSP(pc, &count, nullptr, &subsolvers));
     for (PetscInt i = 0; i < count; ++i)
       {
         PC subpc;
@@ -508,6 +531,7 @@ namespace MetricFlowX
     // diagonal entries even when the global Jacobian is invertible.
     typename IterativePreconditioner::AdditionalData data;
     data.ilu_atol = 1e-5;
+    data.overlap  = 1;
     preconditioner.initialize(matrix, data);
 #endif
   }
@@ -2065,8 +2089,10 @@ namespace MetricFlowX
             }
           else
             {
-              SolverControl   solver_control(1000, 1e-12 * rhs.l2_norm());
-              LA::SolverGMRES newton_solver(solver_control);
+              SolverControl solver_control(1000, 1e-12 * rhs.l2_norm());
+              LA::SolverGMRES::AdditionalData solver_data;
+              solver_data.right_preconditioning = true;
+              LA::SolverGMRES newton_solver(solver_control, solver_data);
               IterativePreconditioner preconditioner;
               initialize_iterative_preconditioner(preconditioner,
                                                   linear_system_matrix);

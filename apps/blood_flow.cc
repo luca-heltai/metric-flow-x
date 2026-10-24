@@ -330,8 +330,10 @@ namespace MetricFlowX
               }
             else
               {
-                SolverControl   solver_control(1000, 1e-10 * r.l2_norm());
-                LA::SolverGMRES solver(solver_control);
+                SolverControl solver_control(1000, 1e-10 * r.l2_norm());
+                LA::SolverGMRES::AdditionalData solver_data;
+                solver_data.right_preconditioning = true;
+                LA::SolverGMRES solver(solver_control, solver_data);
                 solver.solve(problem.linear_system_matrix,
                              z,
                              r,
