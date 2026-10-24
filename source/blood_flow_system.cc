@@ -4537,6 +4537,11 @@ namespace MetricFlowX
     std::vector<int>    orient;
     std::vector<types::global_dof_index>              a_row, u_row;
     std::vector<std::vector<types::global_dof_index>> cell_dofs;
+    std::vector<types::global_dof_index>              mass_columns;
+    std::vector<double>                               mass_values;
+    std::vector<types::global_dof_index>              compatibility_columns(
+      2 + fe_->n_dofs_per_cell());
+    std::vector<double> compatibility_values(2 + fe_->n_dofs_per_cell());
 
     for (const auto &J : junctions)
       {
@@ -4604,12 +4609,24 @@ namespace MetricFlowX
         // Each row group is guarded exactly as in the residual, so the two stay
         // in step and the sparsity built by build_junction_sparsity() matches.
         if (locally_owned_dofs_.is_element(a_row[0]))
-          for (unsigned int i = 0; i < K; ++i)
-            {
-              const double s = static_cast<double>(orient[i]);
-              jacobian_matrix.add(a_row[0], a_row[i], s * U_hat[i]);
-              jacobian_matrix.add(a_row[0], u_row[i], s * A_hat[i]);
-            }
+          {
+            mass_columns.resize(2 * K);
+            mass_values.resize(2 * K);
+            for (unsigned int i = 0; i < K; ++i)
+              {
+                const double s          = static_cast<double>(orient[i]);
+                mass_columns[2 * i]     = a_row[i];
+                mass_columns[2 * i + 1] = u_row[i];
+                mass_values[2 * i]      = s * U_hat[i];
+                mass_values[2 * i + 1]  = s * A_hat[i];
+              }
+            jacobian_matrix.add(a_row[0],
+                                mass_columns.size(),
+                                mass_columns.data(),
+                                mass_values.data(),
+                                true,
+                                false);
+          }
 
         // Rows u_row[0..K-2]: H_0 − H_i = 0
         for (unsigned int i = 1; i < K; ++i)
@@ -4619,12 +4636,22 @@ namespace MetricFlowX
 
             // \partialH_0/\partialA_hat_0 ,
             // \partialH_0/\partialU_hat_0
-            jacobian_matrix.add(u_row[i - 1], a_row[0], dP_hat[0] / rho);
-            jacobian_matrix.add(u_row[i - 1], u_row[0], gamma * U_hat[0]);
             //  \partial(-H_i)/\partialA_hat_i,
             //  \partial(-H_i)/\partialU_hat_i
-            jacobian_matrix.add(u_row[i - 1], a_row[i], -dP_hat[i] / rho);
-            jacobian_matrix.add(u_row[i - 1], u_row[i], -gamma * U_hat[i]);
+            const std::array<types::global_dof_index, 4> columns{a_row[0],
+                                                                 u_row[0],
+                                                                 a_row[i],
+                                                                 u_row[i]};
+            const std::array<double, 4>                  values{dP_hat[0] / rho,
+                                               gamma * U_hat[0],
+                                               -dP_hat[i] / rho,
+                                               -gamma * U_hat[i]};
+            jacobian_matrix.add(u_row[i - 1],
+                                columns.size(),
+                                columns.data(),
+                                values.data(),
+                                true,
+                                false);
           }
 
         // Compat row for vessel 0 -> u_row[K-1]
@@ -4640,8 +4667,10 @@ namespace MetricFlowX
 
             // \partial/\partialA_hat_i, \partial/\partialU_hat_i of
             // (U_hat_i + s*4(c_hat_i - c0_i) - W_i)
-            jacobian_matrix.add(rr, a_row[i], s * 4.0 * dc_hat_v[i]);
-            jacobian_matrix.add(rr, u_row[i], 1.0);
+            compatibility_columns[0] = a_row[i];
+            compatibility_columns[1] = u_row[i];
+            compatibility_values[0]  = s * 4.0 * dc_hat_v[i];
+            compatibility_values[1]  = 1.0;
 
             // \partial(-W_i)/\partial(A_int_i, U_int_i)
             const unsigned int vid = J.half_faces[i].cell->material_id();
@@ -4654,8 +4683,15 @@ namespace MetricFlowX
                 // \partialW_i/\partialw = phi_U +
                 // s*4*dc_int_v[i]*phi_A
                 const double dW = phi_U + s * 4.0 * dc_int_v[i] * phi_A;
-                jacobian_matrix.add(rr, cell_dofs[i][j], -dW);
+                compatibility_columns[2 + j] = cell_dofs[i][j];
+                compatibility_values[2 + j]  = -dW;
               }
+            jacobian_matrix.add(rr,
+                                compatibility_columns.size(),
+                                compatibility_columns.data(),
+                                compatibility_values.data(),
+                                true,
+                                false);
             (void)vid;
           }
       }
