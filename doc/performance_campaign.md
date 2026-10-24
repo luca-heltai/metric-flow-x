@@ -146,3 +146,22 @@ controls and provenance, plus two bulk-Jacobian trials that were not promoted.
 Their complete raw data remain local and separate.
 
 ![Physical-boundary traversal](performance_data/13_boundary_topology/comparison.svg)
+
+## 14. Batch nonzero cell-to-trace Jacobian rows
+
+Pack trace contributions into invocation-local inline storage and add nonzero
+rows together; retain the original expressions and cell-matrix scatter order.
+Five alternating pairs on lnx3 use CLI budget 20 (20 residual/2 Jacobian calls
+per sample), three samples and verified idle cores 8/9 at MPI1/MPI2.
+ADAN56 Jacobian speedups are **1.086/1.005x**; the network reaches
+**1.035/1.044x**. Target cell-Jacobian scopes improve **1.036–1.114x**, with
+**19/20 pairs** faster. ADAN56 residual ratios are **0.993/1.008x** and network
+ratios **1.016/1.009x**. The ADAN MPI2 Jacobian gain is small; wide MPI1 ranges
+and all slower pairs remain in the results. No uniform residual gain is claimed.
+
+All **54 snapshots** and fresh **32 trajectory CSVs / 2372 rows** match exactly;
+**29 Release tests** and MPI2/MPI4 cache/empty-rank checks pass.
+[Results](performance_data/14_cell_trace_rows/results.json) retain every process
+timing field, paired range, control and provenance record.
+
+![Nonzero cell-to-trace row scatter](performance_data/14_cell_trace_rows/comparison.svg)
