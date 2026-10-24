@@ -3373,16 +3373,26 @@ namespace MetricFlowX
     std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
     std::vector<double>                  local_values(fe_->n_dofs_per_cell());
     std::vector<double>                  Av(1), Uv(1);
+    std::vector<double>                  A_int, U_int, c0, W;
+    std::vector<double>                  A_hat, U_hat, c_hat;
+    std::vector<int>                     s;
+    std::vector<types::global_dof_index> a_idx, u_idx;
 
     for (const auto &J : junctions)
       {
         const unsigned int K = J.n_vessels();
 
-        // Per-vessel quantities
-        std::vector<double>                  A_int(K), U_int(K), c0(K), W(K);
-        std::vector<double>                  A_hat(K), U_hat(K), c_hat(K);
-        std::vector<int>                     s(K);
-        std::vector<types::global_dof_index> a_idx(K), u_idx(K);
+        // Reuse per-vessel storage across junctions of different sizes.
+        A_int.resize(K);
+        U_int.resize(K);
+        c0.resize(K);
+        W.resize(K);
+        A_hat.resize(K);
+        U_hat.resize(K);
+        c_hat.resize(K);
+        s.resize(K);
+        a_idx.resize(K);
+        u_idx.resize(K);
 
         for (unsigned int i = 0; i < K; ++i)
           {
@@ -4523,18 +4533,25 @@ namespace MetricFlowX
 
     std::vector<double> local_values(fe_->n_dofs_per_cell());
     std::vector<double> Av(1);
+    std::vector<double> A_int, A_hat, U_hat, dP_hat, dc_hat_v, dc_int_v;
+    std::vector<int>    orient;
+    std::vector<types::global_dof_index>              a_row, u_row;
+    std::vector<std::vector<types::global_dof_index>> cell_dofs;
 
     for (const auto &J : junctions)
       {
         const unsigned int K = J.n_vessels();
 
-        std::vector<double>                  A_int(K);
-        std::vector<double>                  A_hat(K), U_hat(K);
-        std::vector<double>                  dP_hat(K), dc_hat_v(K);
-        std::vector<double>                  dc_int_v(K);
-        std::vector<int>                     orient(K);
-        std::vector<types::global_dof_index> a_row(K), u_row(K);
-        std::vector<std::vector<types::global_dof_index>> cell_dofs(K);
+        A_int.resize(K);
+        A_hat.resize(K);
+        U_hat.resize(K);
+        dP_hat.resize(K);
+        dc_hat_v.resize(K);
+        dc_int_v.resize(K);
+        orient.resize(K);
+        a_row.resize(K);
+        u_row.resize(K);
+        cell_dofs.resize(K);
 
         for (unsigned int i = 0; i < K; ++i)
           {
