@@ -4293,6 +4293,9 @@ namespace MetricFlowX
     std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
     std::vector<double>                  local_values(fe_->n_dofs_per_cell());
     std::vector<double>                  A_int_v(1);
+    std::vector<types::global_dof_index> trace_rows(2);
+    FullMatrix<double>                   trace_block(2, 2);
+    FullMatrix<double>                   cell_block(2, fe_->n_dofs_per_cell());
 
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
@@ -4343,8 +4346,14 @@ namespace MetricFlowX
               {
                 jacobian_matrix.add(a_row, a_row, 1.0);
                 jacobian_matrix.add(u_row, u_row, 1.0);
+                continue;
               }
-            else if (bid == 0) // inflow
+
+            trace_rows[0] = a_row;
+            trace_rows[1] = u_row;
+            cell_block    = 0.0;
+
+            if (bid == 0) // inflow
               {
                 // R1 = A_hat * U_hat - Q_in(t)
                 // R2 = U_hat - 4(c_hat - c0) - W2_int
@@ -4352,13 +4361,13 @@ namespace MetricFlowX
 
                 // \partialR1/ \partialA_hat, \partialR1/
                 // \partialU_hat
-                jacobian_matrix.add(a_row, a_row, U_hat_cur);
-                jacobian_matrix.add(a_row, u_row, A_hat);
+                trace_block(0, 0) = U_hat_cur;
+                trace_block(0, 1) = A_hat;
 
                 // \partialR2/\partialA_hat,
                 // \partialR2/\partialU_hat
-                jacobian_matrix.add(u_row, a_row, -4.0 * dc_hat);
-                jacobian_matrix.add(u_row, u_row, 1.0);
+                trace_block(1, 0) = -4.0 * dc_hat;
+                trace_block(1, 1) = 1.0;
 
                 // \partialR2/\partial(A_int, U_int) — block (2,1)
                 for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
@@ -4367,9 +4376,7 @@ namespace MetricFlowX
                     const double phi_U = fef[velocity_extractor].value(j, 0);
                     // \partialW2_int/\partialw_int = phi_U -
                     // 4*dc_int*phi_A
-                    jacobian_matrix.add(u_row,
-                                        ldofs[j],
-                                        -(phi_U - 4.0 * dc_int * phi_A));
+                    cell_block(1, j) = -(phi_U - 4.0 * dc_int * phi_A);
                   }
               }
             else if (outlet_type == "RCR" && rcr_map.count(bid) &&
@@ -4386,15 +4393,13 @@ namespace MetricFlowX
                     // res_U = U_hat + 4(c_hat - c0) - W1_int
                     // dres_A/dA_hat = dP/dA_hat - R1*U_hat
                     // dres_A/dU_hat = -R1*A_hat
-                    jacobian_matrix.add(a_row,
-                                        a_row,
-                                        dPdA_hat - rcr.R1 * U_hat_cur);
-                    jacobian_matrix.add(a_row, u_row, -rcr.R1 * A_hat);
+                    trace_block(0, 0) = dPdA_hat - rcr.R1 * U_hat_cur;
+                    trace_block(0, 1) = -rcr.R1 * A_hat;
 
                     // dres_U/dA_hat = 4*dc_hat
                     // dres_U/dU_hat = 1
-                    jacobian_matrix.add(u_row, a_row, 4.0 * dc_hat);
-                    jacobian_matrix.add(u_row, u_row, 1.0);
+                    trace_block(1, 0) = 4.0 * dc_hat;
+                    trace_block(1, 1) = 1.0;
 
                     // dres_U/d(A_int, U_int)
                     for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
@@ -4402,26 +4407,22 @@ namespace MetricFlowX
                         const double phi_A = fef[area_extractor].value(j, 0);
                         const double phi_U =
                           fef[velocity_extractor].value(j, 0);
-                        jacobian_matrix.add(u_row,
-                                            ldofs[j],
-                                            -(phi_U + 4.0 * dc_int * phi_A));
+                        cell_block(1, j) = -(phi_U + 4.0 * dc_int * phi_A);
                       }
                   }
                 else
                   {
                     // C=0: P = (R1 + R2)*Q + P_out; no capacitor unknown.
                     const double resistance = rcr.R1 + rcr.R2;
-                    jacobian_matrix.add(a_row,
-                                        a_row,
-                                        dPdA_hat - resistance * U_hat_cur);
-                    jacobian_matrix.add(a_row, u_row, -resistance * A_hat);
+                    trace_block(0, 0)       = dPdA_hat - resistance * U_hat_cur;
+                    trace_block(0, 1)       = -resistance * A_hat;
 
                     // dres_U/dA_hat = 4*dc_hat
                     // dres_U/dU_hat = 1
                     // (identical to RCR — res_U has no R
                     // dependence)
-                    jacobian_matrix.add(u_row, a_row, 4.0 * dc_hat);
-                    jacobian_matrix.add(u_row, u_row, 1.0);
+                    trace_block(1, 0) = 4.0 * dc_hat;
+                    trace_block(1, 1) = 1.0;
 
                     // dres_U/d(A_int, U_int)
                     for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
@@ -4429,9 +4430,7 @@ namespace MetricFlowX
                         const double phi_A = fef[area_extractor].value(j, 0);
                         const double phi_U =
                           fef[velocity_extractor].value(j, 0);
-                        jacobian_matrix.add(u_row,
-                                            ldofs[j],
-                                            -(phi_U + 4.0 * dc_int * phi_A));
+                        cell_block(1, j) = -(phi_U + 4.0 * dc_int * phi_A);
                       }
                   }
               }
@@ -4444,13 +4443,13 @@ namespace MetricFlowX
 
                 // \partialR1/\partialA_hat,
                 // \partialR1/\partialU_hat
-                jacobian_matrix.add(a_row, a_row, 4.0 * dc_hat);
-                jacobian_matrix.add(a_row, u_row, 1.0);
+                trace_block(0, 0) = 4.0 * dc_hat;
+                trace_block(0, 1) = 1.0;
 
                 // \partialR2/\partialA_hat,
                 // \partialR2/\partialU_hat
-                jacobian_matrix.add(u_row, a_row, -4.0 * dc_hat);
-                jacobian_matrix.add(u_row, u_row, 1.0);
+                trace_block(1, 0) = -4.0 * dc_hat;
+                trace_block(1, 1) = 1.0;
 
                 // \partialR1 and \partialR2 /\partial(A_int,U_int)
                 // via W1_int
@@ -4459,10 +4458,13 @@ namespace MetricFlowX
                     const double phi_A = fef[area_extractor].value(j, 0);
                     const double phi_U = fef[velocity_extractor].value(j, 0);
                     const double dW1   = phi_U + 4.0 * dc_int * phi_A;
-                    jacobian_matrix.add(a_row, ldofs[j], -dW1);
-                    jacobian_matrix.add(u_row, ldofs[j], Rt * dW1);
+                    cell_block(0, j)   = -dW1;
+                    cell_block(1, j)   = Rt * dW1;
                   }
               }
+
+            jacobian_matrix.add(trace_rows, trace_block);
+            jacobian_matrix.add(trace_rows, ldofs, cell_block);
           }
       }
   }
