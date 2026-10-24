@@ -523,6 +523,10 @@ namespace MetricFlowX
         if (std::string(type) == PCILU || std::string(type) == PCLU)
           {
             check(PCFactorSetShiftType(subpc, MAT_SHIFT_NONZERO));
+            // The coupled vessel equations need fill beyond their original
+            // sparsity pattern for a useful local approximation.
+            if (n_mpi_processes > 1 && std::string(type) == PCILU)
+              check(PCFactorSetLevels(subpc, 1));
             check(PCSetFromOptions(subpc));
           }
       }
@@ -531,6 +535,7 @@ namespace MetricFlowX
     // diagonal entries even when the global Jacobian is invertible.
     typename IterativePreconditioner::AdditionalData data;
     data.ilu_atol = 1e-5;
+    data.ilu_fill = n_mpi_processes > 1 ? 1 : 0;
     data.overlap  = 1;
     preconditioner.initialize(matrix, data);
 #endif

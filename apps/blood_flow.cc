@@ -19,6 +19,7 @@
 #include <deal.II/base/timer.h>
 
 #include <metric_flow_x/blood_flow_system.h> // header exposing BloodFlowSystem
+#include <metric_flow_x/serial_direct_solver.h>
 
 #include <algorithm>
 #include <chrono>
@@ -252,13 +253,14 @@ namespace MetricFlowX
             return 0;
           };
 
-          ida.setup_jacobian =
-            [&problem,
-             &initial_output_seen,
-             &ic_jacobian_setups](const double      t,
-                                  const VectorType &y,
-                                  const VectorType &ydot,
-                                  const double      alpha) -> int {
+          std::unique_ptr<SerialDirectSolver> serial_direct;
+          ida.setup_jacobian = [&problem,
+                                &initial_output_seen,
+                                &ic_jacobian_setups,
+                                &serial_direct](const double      t,
+                                                const VectorType &y,
+                                                const VectorType &ydot,
+                                                const double alpha) -> int {
             if (!initial_output_seen)
               ++ic_jacobian_setups;
             TimerOutput::Scope ts(problem.computing_timer, "setup_jacobian");
@@ -277,16 +279,16 @@ namespace MetricFlowX
                   problem.n_mpi_processes == 1,
                   ExcMessage(
                     "Parallel direct solves require PETSc with MUMPS. Set Use direct solver = false."));
-                problem.direct_lu =
-                  std::make_unique<PETScWrappers::PreconditionLU>(
-                    problem.linear_system_matrix);
-                // Inflow trace rows can have a zero diagonal at rest.
-                const PetscErrorCode error = PCFactorReorderForNonzeroDiagonal(
-                  problem.direct_lu->get_pc(),
-                  PETScWrappers::PreconditionLU::AdditionalData().zero_pivot);
-                AssertThrow(error == 0,
-                            ExcMessage(
-                              "Cannot reorder the native PETSc LU diagonal."));
+#    ifdef DEAL_II_WITH_UMFPACK
+                if (!serial_direct)
+                  serial_direct = std::make_unique<SerialDirectSolver>();
+                serial_direct->initialize(problem.linear_system_matrix);
+#    else
+                AssertThrow(
+                  false,
+                  ExcMessage(
+                    "Serial direct solves require deal.II with UMFPACK or PETSc with MUMPS. Set Use direct solver = false."));
+#    endif
 
 #  endif
 #else
@@ -307,7 +309,7 @@ namespace MetricFlowX
           };
 
           ida.solve_with_jacobian =
-            [&problem, &initial_output_seen, &ic_linear_solves](
+            [&problem, &initial_output_seen, &ic_linear_solves, &serial_direct](
               const VectorType &r, VectorType &z, const double /*tol*/) -> int {
             if (!initial_output_seen)
               ++ic_linear_solves;
@@ -322,7 +324,14 @@ namespace MetricFlowX
                                              z,
                                              r);
 #  else
-                problem.direct_lu->vmult(z, r);
+#    ifdef DEAL_II_WITH_UMFPACK
+                serial_direct->vmult(z, r);
+#    else
+                AssertThrow(
+                  false,
+                  ExcMessage(
+                    "Serial direct solves require deal.II with UMFPACK or PETSc with MUMPS. Set Use direct solver = false."));
+#    endif
 #  endif
 #else
                 problem.direct_solver->solve(z, r);
