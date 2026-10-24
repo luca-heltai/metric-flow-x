@@ -104,3 +104,22 @@ All **54 snapshots** and **32 trajectory CSVs / 2372 rows** match exactly;
 ranges, controls and provenance.
 
 ![Unused face-Jacobian evaluations](performance_data/11_unused_face_jacobian/comparison.svg)
+
+## 12. Reuse junction assembly workspace
+
+Reuse invocation-local per-vessel vectors across junctions; resize for each
+junction and overwrite every active entry. Five alternating Release/PETSc pairs
+on lnx3 use 20 repetitions, three samples and idle cores 8/9 at MPI1/MPI2.
+The 10k network residual improves **1.028/1.052x**, Jacobian **1.025/1.052x**;
+all five MPI2 pairs improve for both metrics. Junction residual scopes improve
+**1.134/1.156x** and Jacobian scopes **1.074/1.107x** on that network.
+ADAN56 overall residual/Jacobian ratios are **1.028/0.988x** at MPI1 and
+**0.992/1.100x** at MPI2; unchanged controls also vary. All pairs, including
+the slower network MPI1 pair, remain in the results.
+
+All **54 snapshots** and fresh **32 trajectory CSVs / 2372 rows** match exactly;
+**29 Release regressions** and MPI2/MPI4 cache/empty-rank checks pass.
+[Results](performance_data/12_junction_workspace/results.json) include paired
+measurements, controls, bounds and provenance. These are assembly timings.
+
+![Junction workspace reuse](performance_data/12_junction_workspace/comparison.svg)
