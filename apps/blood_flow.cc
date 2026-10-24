@@ -24,6 +24,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -77,10 +78,20 @@ namespace MetricFlowX
           // mass_conservation.csv and ida_step_history.csv, and resets the
           // IDA counters for this cycle.
           problem.open_output_files();
+          const auto preparation_start = std::chrono::steady_clock::now();
           problem.initialize_state(problem.solution,
                                    problem.ida_parameters.initial_time);
           problem.initialize_state_derivative(
             problem.solution_dot, problem.ida_parameters.initial_time);
+          const double preparation_wall =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                          preparation_start)
+              .count();
+          bool          initial_output_seen = false;
+          unsigned long ic_residual_calls = 0, ic_jacobian_setups = 0,
+                        ic_linear_solves = 0;
+          double ida_initialization_wall = 0., first_interval_wall = -1.;
+          std::chrono::steady_clock::time_point solve_start, integration_start;
           problem.time = problem.ida_parameters.initial_time;
 
           auto check_jacobian_fd = [&problem](const VectorType &y0) {
@@ -227,19 +238,29 @@ namespace MetricFlowX
             return is;
           };
 
-          ida.residual = [&problem, &ida](const double      t,
-                                          const VectorType &y,
-                                          const VectorType &ydot,
-                                          VectorType       &res) -> int {
+          ida.residual = [&problem,
+                          &ida,
+                          &initial_output_seen,
+                          &ic_residual_calls](const double      t,
+                                              const VectorType &y,
+                                              const VectorType &ydot,
+                                              VectorType       &res) -> int {
+            if (!initial_output_seen)
+              ++ic_residual_calls;
             problem.poll_ida_internal_step(ida);
             problem.assemble_residual(t, y, ydot, res);
             return 0;
           };
 
-          ida.setup_jacobian = [&problem](const double      t,
-                                          const VectorType &y,
-                                          const VectorType &ydot,
-                                          const double      alpha) -> int {
+          ida.setup_jacobian =
+            [&problem,
+             &initial_output_seen,
+             &ic_jacobian_setups](const double      t,
+                                  const VectorType &y,
+                                  const VectorType &ydot,
+                                  const double      alpha) -> int {
+            if (!initial_output_seen)
+              ++ic_jacobian_setups;
             TimerOutput::Scope ts(problem.computing_timer, "setup_jacobian");
             problem.assemble_jacobian(t, y, ydot, alpha);
             problem.linear_system_matrix.copy_from(problem.jacobian_matrix);
@@ -285,9 +306,11 @@ namespace MetricFlowX
             return 0;
           };
 
-          ida.solve_with_jacobian = [&problem](const VectorType &r,
-                                               VectorType       &z,
-                                               const double /*tol*/) -> int {
+          ida.solve_with_jacobian =
+            [&problem, &initial_output_seen, &ic_linear_solves](
+              const VectorType &r, VectorType &z, const double /*tol*/) -> int {
+            if (!initial_output_seen)
+              ++ic_linear_solves;
             TimerOutput::Scope ts(problem.computing_timer,
                                   "solve_with_jacobian");
 
@@ -328,10 +351,33 @@ namespace MetricFlowX
              initial_output_time,
              final_output_time,
              &next_output_time,
-             &output_number](const double      t,
-                             const VectorType &sol,
-                             const VectorType & /*ydot*/,
-                             const unsigned int /*step_number*/) {
+             &output_number,
+             &initial_output_seen,
+             &ida_initialization_wall,
+             &solve_start,
+             &integration_start,
+             &first_interval_wall](const double      callback_time,
+                                   const VectorType &sol,
+                                   const VectorType & /*ydot*/,
+                                   const unsigned int step_number) {
+              // deal.II IDA reports zero for its initial output callback,
+              // including when integration starts at a nonzero time.
+              const double t =
+                step_number == 0 ? initial_output_time : callback_time;
+              if (step_number == 0)
+                {
+                  ida_initialization_wall =
+                    std::chrono::duration<double>(
+                      std::chrono::steady_clock::now() - solve_start)
+                      .count();
+                  initial_output_seen = true;
+                }
+              if (step_number != 0 && first_interval_wall < 0.)
+                first_interval_wall =
+                  std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - integration_start)
+                    .count();
+
               problem.time = t;
               const double tolerance =
                 16.0 * std::numeric_limits<double>::epsilon() *
@@ -374,16 +420,43 @@ namespace MetricFlowX
                       std::nextafter(t,
                                      std::numeric_limits<double>::infinity());
                 }
+              if (step_number == 0)
+                integration_start = std::chrono::steady_clock::now();
             };
 
-          problem.solution_dot   = 0.0;
-          problem.time           = problem.ida_parameters.initial_time;
-          const auto solve_start = std::chrono::steady_clock::now();
+          problem.solution_dot = 0.0;
+          problem.time         = problem.ida_parameters.initial_time;
+          solve_start          = std::chrono::steady_clock::now();
           ida.solve_dae(problem.solution, problem.solution_dot);
           const double solve_wall_time =
             std::chrono::duration<double>(std::chrono::steady_clock::now() -
                                           solve_start)
               .count();
+          if (problem.this_mpi_process == 0)
+            {
+              const std::string folder = problem.output_directory.empty() ?
+                                           "." :
+                                           problem.output_directory;
+              std::ofstream     statistics(folder +
+                                       "/initialization_statistics.json");
+              statistics << std::setprecision(17)
+                         << "{\n  \"initial_condition_policy\": \"legacy\",\n"
+                         << "  \"preparation_wall_s\": " << preparation_wall
+                         << ",\n"
+                         << "  \"ida_setup_and_ic_wall_s\": "
+                         << ida_initialization_wall << ",\n"
+                         << "  \"first_ida_output_interval_wall_s\": "
+                         << first_interval_wall << ",\n"
+                         << "  \"ic_residual_calls\": " << ic_residual_calls
+                         << ",\n"
+                         << "  \"ic_jacobian_setups\": " << ic_jacobian_setups
+                         << ",\n"
+                         << "  \"ic_linear_solves\": " << ic_linear_solves
+                         << "\n}\n";
+              AssertThrow(statistics.good(),
+                          ExcMessage(
+                            "Cannot write initialization statistics."));
+            }
           problem.finalize_output(ida, solve_wall_time);
           problem.compute_pressure(problem.solution, problem.pressure_);
           problem.compute_errors(cycle);
