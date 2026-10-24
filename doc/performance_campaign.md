@@ -165,3 +165,46 @@ All **54 snapshots** and fresh **32 trajectory CSVs / 2372 rows** match exactly;
 timing field, paired range, control and provenance record.
 
 ![Nonzero cell-to-trace row scatter](performance_data/14_cell_trace_rows/comparison.svg)
+
+## 15. Reuse junction reference-face evaluators
+
+Within each junction residual/Jacobian call, initialize scalar DGQ face-value
+evaluators once per reference endpoint. Current local DoF values still pass
+through the same library APIs; geometry, material and pressure queries stay live.
+Five alternating Release/PETSc pairs on lnx4 cores 8/9 use MPI1/MPI2 and the
+CLI budget above. Network residual speedups are **1.016/1.040x** (all **10 pairs**
+faster), Jacobians **1.062/1.017x** (**9/10 pairs**). Target network junction
+residual/Jacobian scopes measure **1.141/1.183x / 1.163/1.082x**.
+
+**ADAN full Jacobians are 1.3%/2.0% slower (8/10 pairs)**, a measured unresolved
+loss accepted as an explicit tradeoff. ADAN residuals measure **1.002/0.999x**.
+There is no uniform full-assembly improvement claim.
+
+All **54 snapshots** and **32 trajectory CSVs / 2372 rows** match exactly;
+**29 Release regressions** and cache MPI2/MPI4 checks pass.
+[Results](performance_data/15_junction_reference_values/results.json) retain all
+pairs, ranges, controls, the tradeoff and source/build provenance.
+
+![Junction reference-face evaluators](performance_data/15_junction_reference_values/comparison.svg)
+
+## Five assembly changes (11–15)
+
+Remove unused face-Jacobian work; reuse junction scratch; cache physical-boundary
+topology; batch nonzero cell-to-trace rows; reuse reference-face values in junctions.
+Three alternating Release/PETSc pairs on lnx3 directly compare `d22b1bf` with
+`4b77600` at MPI1/2/4/8, using three samples and CLI budget 20 (20 residual/
+2 state-Jacobian calls per sample). All 48 process records remain included.
+
+ADAN56 residual/Jacobian paired speedups are **1.052–1.078x / 1.024–1.120x**;
+the network reaches **1.196–1.223x / 1.161–1.199x**.
+Individual-step ADAN56 Jacobian decreases remain disclosed in intervention 15.
+
+All **270 snapshots match bit-for-bit**; fresh **32 physical CSVs / 2372 rows** match exactly.
+Among rank-1 component scopes, the largest remaining costs are adan56: cells, ordinary interior faces; network10k: cells, junctions.
+These are assembly timings and short regressions; full-solver startup,
+factorization and output require separate measurements.
+
+[Final results](performance_data/11_15_overall/results.json) preserve all timing
+fields, ranges, pairs, controls and compact provenance.
+
+![Five assembly changes](performance_data/11_15_overall/comparison.svg)

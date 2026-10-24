@@ -3354,8 +3354,20 @@ namespace MetricFlowX
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
 
-    const QGauss<dim - 1>       quad_face(1);
-    FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
+    const QGauss<dim - 1> quad_face(1);
+    // Scalar DGQ values are reference-face data. Only these values are reused;
+    // all material, geometry and pressure evaluations below remain current.
+    std::array<std::unique_ptr<FEFaceValues<dim, spacedim>>,
+               GeometryInfo<dim>::faces_per_cell>
+      face_fe_values;
+    for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+      {
+        face_fe_values[f] =
+          std::make_unique<FEFaceValues<dim, spacedim>>(*fe_,
+                                                        quad_face,
+                                                        update_values);
+        face_fe_values[f]->reinit(junctions.front().half_faces.front().cell, f);
+      }
 
     const double rho   = density;
     const double A_min = 1e-10;
@@ -3390,7 +3402,7 @@ namespace MetricFlowX
             const unsigned int vid = hf.cell->material_id();
 
             // Interior cell value at the junction face — use y_cell
-            fef.reinit(hf.cell, hf.face_no);
+            auto &fef = *face_fe_values[hf.face_no];
             hf.cell->get_dof_indices(ldofs);
             y_cell.extract_subvector_to(ldofs, local_values);
             fef[area_extractor].get_function_values_from_local_dof_values(
@@ -4505,6 +4517,9 @@ namespace MetricFlowX
     TimerOutput::Scope timer(computing_timer,
                              "assemble_jacobian_trace_junction_block");
 
+    if (junctions.empty())
+      return;
+
     // FEValues and FEFaceValues read through the ghosted FE-range vector.  It
     // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
     // it holds every entry a locally owned cell can ask for, including the ones
@@ -4514,8 +4529,20 @@ namespace MetricFlowX
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
 
-    const QGauss<dim - 1>       quad_face(1);
-    FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
+    const QGauss<dim - 1> quad_face(1);
+    // Scalar DGQ values are reference-face data. Only these values are reused;
+    // all material, geometry and pressure evaluations below remain current.
+    std::array<std::unique_ptr<FEFaceValues<dim, spacedim>>,
+               GeometryInfo<dim>::faces_per_cell>
+      face_fe_values;
+    for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+      {
+        face_fe_values[f] =
+          std::make_unique<FEFaceValues<dim, spacedim>>(*fe_,
+                                                        quad_face,
+                                                        update_values);
+        face_fe_values[f]->reinit(junctions.front().half_faces.front().cell, f);
+      }
 
     const double rho   = density;
     const double A_min = 1e-10;
@@ -4550,7 +4577,7 @@ namespace MetricFlowX
             cell_dofs[i].resize(fe_->n_dofs_per_cell());
             hf.cell->get_dof_indices(cell_dofs[i]);
             y_cell.extract_subvector_to(cell_dofs[i], local_values);
-            fef.reinit(hf.cell, hf.face_no);
+            auto &fef = *face_fe_values[hf.face_no];
             fef[area_extractor].get_function_values_from_local_dof_values(
               local_values, Av);
 
@@ -4634,7 +4661,7 @@ namespace MetricFlowX
 
             // \partial(-W_i)/\partial(A_int_i, U_int_i)
             const unsigned int vid = J.half_faces[i].cell->material_id();
-            fef.reinit(J.half_faces[i].cell, J.half_faces[i].face_no);
+            auto              &fef = *face_fe_values[J.half_faces[i].face_no];
 
             for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
               {
