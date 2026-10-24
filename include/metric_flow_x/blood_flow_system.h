@@ -59,6 +59,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -696,6 +697,17 @@ namespace MetricFlowX
     // -----------------------------------------------------------------------
     std::map<FaceKey, FaceTraceDof> face_dof_map;
 
+    struct InteriorFace
+    {
+      typename DoFHandler<dim, spacedim>::active_cell_iterator cell, neighbor;
+      unsigned int face_no, neighbor_face_no;
+      FaceTraceDof trace;
+    };
+
+    // Rebuilt with face_dof_map after DoF distribution. Keep the first-owned-
+    // cell traversal and canonical trace-row ownership of uncached assembly.
+    std::vector<InteriorFace> interior_faces;
+
     // VertexKey
     // face_key(const typename DoFHandler<dim, spacedim>::active_cell_iterator
     // &cell,
@@ -712,7 +724,6 @@ namespace MetricFlowX
     // Parameter entries refer to stable map values. These references avoid
     // string lookups and automatically observe subsequent parameter reloads.
     const double &density                = par["rho"];
-    const double &tube_law_exponent      = par["m"];
     const double &viscosity              = par["mu"];
     const double &friction_profile       = par["xi"];
     const double &reflection_coefficient = par["Rt"];
@@ -730,7 +741,11 @@ namespace MetricFlowX
     // arc-length bounds entering compute_a_d_local() are a property of the
     // vessel as a whole rather than of the locally stored part of it.
     // -----------------------------------------------------------------------
-    using VesselPhysicalProperties = VesselProperties;
+    struct VesselPhysicalProperties : VesselProperties
+    {
+      // E and wall thickness are fixed until network data is rebuilt.
+      double beta_p = 0.0;
+    };
     std::map<unsigned int, VesselPhysicalProperties> vessel_map;
 
     ExternalPressureProvider external_pressure_provider;
@@ -1126,6 +1141,24 @@ namespace MetricFlowX
       return compute_directional_vector(cell) * normal;
     }
 
+    double
+    compute_interior_tangent_normal_product(
+      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+      const Tensor<1, spacedim> &normal) const
+    {
+      const auto direction = compute_directional_vector(cell);
+      if constexpr (spacedim == 3)
+        // Preserve the original contraction order: a normal's last-bit change
+        // can be amplified by cancellation in the trace Jacobian.
+        return std::fma(direction[2],
+                        normal[2],
+                        std::fma(direction[0],
+                                 normal[0],
+                                 direction[1] * normal[1]));
+      else
+        return direction * normal;
+    }
+
     // -----------------------------------------------------------------------
     // Internal helpers — physics / constitutive law
     // -----------------------------------------------------------------------
@@ -1218,7 +1251,7 @@ namespace MetricFlowX
       // The physical pressure used by assembly is this value plus the
       // prescribed external pressure, through compute_physical_pressure().
       const auto  &vpp  = vessel_map.at(vid);
-      const double beta = compute_beta_p(vpp.E, vpp.h_wall);
+      const double beta = vpp.beta_p;
       return vpp.p0 + beta / a_d_local * (std::sqrt(A) - std::sqrt(a_d_local)) +
              vpp.p_d;
     }
@@ -1229,7 +1262,7 @@ namespace MetricFlowX
                                 const double       a_d_local) const
     {
       const auto  &vpp    = vessel_map.at(vid);
-      const double beta_p = compute_beta_p(vpp.E, vpp.h_wall);
+      const double beta_p = vpp.beta_p;
       return beta_p / (2.0 * a_d_local * std::sqrt(std::max(A, 1e-30)));
     }
 
@@ -1249,8 +1282,8 @@ namespace MetricFlowX
                                   const double       a_d_local) const
     {
       const double A_safe = std::max(A, 1e-10);
-      return compute_wave_speed(A_safe, vid, a_d_local) * tube_law_exponent /
-             (2.0 * A_safe);
+      // The square-root tube law gives c(A) proportional to A^(1/4).
+      return compute_wave_speed(A_safe, vid, a_d_local) * 0.5 / (2.0 * A_safe);
     }
 
     // ---- Cell-iterator wrappers (compute a_d_local internally)

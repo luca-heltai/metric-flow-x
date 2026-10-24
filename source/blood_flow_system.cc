@@ -959,6 +959,7 @@ namespace MetricFlowX
         vp.r_d    = cell_r_d[vid];
         vp.r_in   = (cell_r_in.size() > vid) ? cell_r_in[vid] : 0.0;
         vp.r_out  = (cell_r_out.size() > vid) ? cell_r_out[vid] : 0.0;
+        vp.beta_p = compute_beta_p(vp.E, vp.h_wall);
 
         vessel_map[vid] = vp;
       }
@@ -1201,6 +1202,7 @@ namespace MetricFlowX
 
     face_dof_map.clear();
     trace_continuity_pairs.clear();
+    interior_faces.clear();
 
     std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
     std::vector<types::global_dof_index> nb_dofs(fe_->n_dofs_per_cell());
@@ -1253,6 +1255,26 @@ namespace MetricFlowX
               }
           }
       }
+
+    std::set<FaceKey> processed;
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        for (const auto f : cell->face_indices())
+          {
+            if (cell->face(f)->at_boundary() || is_junction_face(cell->id(), f))
+              continue;
+            const auto key = canonical_face_key(cell, f);
+            if (!processed.insert(key).second)
+              continue;
+            const auto &trace = face_dof_map.at(key);
+            if (!dof_handler_.locally_owned_dofs().is_element(trace.a_hat_dof))
+              continue;
+            interior_faces.push_back({cell,
+                                      cell->neighbor(f),
+                                      f,
+                                      cell->neighbor_of_neighbor(f),
+                                      trace});
+          }
 
     const types::global_dof_index n_pairs =
       Utilities::MPI::sum<types::global_dof_index>(
@@ -2832,7 +2854,7 @@ namespace MetricFlowX
                        A * U * (b * fev[area_extractor].gradient(i, q))) *
                       JxW[q];
                   }
-                else if (comp != 0)
+                else if (comp == 1)
                   {
                     const double phi_u = fev[velocity_extractor].value(i, q);
                     if (pressure_only)
@@ -2973,145 +2995,122 @@ namespace MetricFlowX
                                     update_values | update_normal_vectors |
                                       update_quadrature_points);
 
-    // Avoid double assembly of the same face from the left and the right
-    // cell.  The set is per rank, which is enough: the ownership guard below
-    // lets exactly one rank write a given face's rows.
-    std::set<std::pair<CellId, unsigned int>> processed;
-
-    for (const auto &cell : dof_handler_.active_cell_iterators())
+    for (const auto &face : interior_faces)
       {
-        if (!cell->is_locally_owned())
-          continue;
+        const auto        &cell  = face.cell;
+        const auto        &nb    = face.neighbor;
+        const unsigned int f     = face.face_no;
+        const unsigned int nb_f  = face.neighbor_face_no;
+        const unsigned int vid_L = cell->material_id();
+        const unsigned int vid_R = nb->material_id();
+        // A non-junction interior face joins two cells of the same vessel
+        // at one point, so both states and the trace share its a_d.
+        const double ad_face = compute_a_d_at_face(cell, f);
+        const double ad_L    = ad_face;
+        const double ad_R    = ad_face;
+        // Interior cell values at face — use y_cell, not y
+        fef.reinit(cell, f);
+        const double bn_L =
+          compute_interior_tangent_normal_product(cell,
+                                                  fef.get_normal_vectors()[0]);
 
-        for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
-          {
-            if (cell->face(f)->at_boundary())
-              continue;
-            if (is_junction_face(cell->id(), f))
-              continue;
-            const auto key = canonical_face_key(cell, f);
-            if (processed.count(key))
-              continue;
-            processed.insert(key);
+        std::vector<double> A_L_v(1), U_L_v(1);
+        fef[area_extractor].get_function_values(y_cell, A_L_v);
+        fef[velocity_extractor].get_function_values(y_cell, U_L_v);
 
-            // A face's rows live on its canonical side.  If that side sits on
-            // another rank, that rank writes them and this one skips the face.
-            const auto trace_it = face_dof_map.find(key);
-            Assert(trace_it != face_dof_map.end(), ExcInternalError());
-            if (!locally_owned_dofs_.is_element(trace_it->second.a_hat_dof))
-              continue;
+        fef.reinit(nb, nb_f);
+        const double bn_R =
+          compute_interior_tangent_normal_product(nb,
+                                                  fef.get_normal_vectors()[0]);
 
-            const auto        &nb   = cell->neighbor(f);
-            const unsigned int nb_f = cell->neighbor_of_neighbor(f);
+        std::vector<double> A_R_v(1), U_R_v(1);
+        fef[area_extractor].get_function_values(y_cell, A_R_v);
+        fef[velocity_extractor].get_function_values(y_cell, U_R_v);
 
-            const unsigned int vid_L = cell->material_id();
-            const unsigned int vid_R = nb->material_id();
-            // A non-junction interior face joins two cells of the same vessel
-            // at one point, so both states and the trace share its a_d.
-            const double ad_face = compute_a_d_at_face(cell, f);
-            const double ad_L    = ad_face;
-            const double ad_R    = ad_face;
-            // Interior cell values at face — use y_cell, not y
-            fef.reinit(cell, f);
-            const double bn_L =
-              compute_tangent_normal_product(cell, fef.get_normal_vectors()[0]);
+        const double           A_L   = std::max(A_L_v[0], 1e-10);
+        const double           U_L   = U_L_v[0];
+        const double           A_R   = std::max(A_R_v[0], 1e-10);
+        const double           U_R   = U_R_v[0];
+        const Point<spacedim> &point = fef.get_quadrature_points()[0];
+        const double           external_pressure_L =
+          external_pressure({t, point, vid_L, cell->id()}, provider);
+        const double external_pressure_R =
+          external_pressure({t, point, vid_R, nb->id()}, provider);
 
-            std::vector<double> A_L_v(1), U_L_v(1);
-            fef[area_extractor].get_function_values(y_cell, A_L_v);
-            fef[velocity_extractor].get_function_values(y_cell, U_L_v);
+        // Trace state
+        double A_hat = 0.0, U_hat = 0.0;
+        A_hat = y(face.trace.a_hat_dof);
+        U_hat = y(face.trace.u_hat_dof);
+        A_hat = std::max(A_hat, 1e-10);
 
-            fef.reinit(nb, nb_f);
-            const double bn_R =
-              compute_tangent_normal_product(nb, fef.get_normal_vectors()[0]);
+        // Left HDG type flux residuals (face integrals with
+        // interior state from left cell) numerical_flux is
+        // designed for left/right states. The trace acts as the
+        // exterior state, therefore use opposite orientation on
+        // the trace side.
+        const auto [FA_L, FU_L] =
+          pressure_only ?
+            numerical_external_pressure_flux(bn_L,
+                                             bn_L,
+                                             A_L,
+                                             U_L,
+                                             A_hat,
+                                             U_hat,
+                                             vid_L,
+                                             vid_R,
+                                             ad_L,
+                                             ad_face,
+                                             external_pressure_L,
+                                             external_pressure_R) :
+            numerical_flux(bn_L,
+                           bn_L,
+                           A_L,
+                           U_L,
+                           A_hat,
+                           U_hat,
+                           vid_L,
+                           vid_R,
+                           ad_L,
+                           ad_face,
+                           external_pressure_L,
+                           external_pressure_R);
 
-            std::vector<double> A_R_v(1), U_R_v(1);
-            fef[area_extractor].get_function_values(y_cell, A_R_v);
-            fef[velocity_extractor].get_function_values(y_cell, U_R_v);
+        // Right HDG type flux residuals (face integrals with
+        // interior state from right cell)
+        const auto [FA_R, FU_R] =
+          pressure_only ?
+            numerical_external_pressure_flux(bn_R,
+                                             bn_R,
+                                             A_R,
+                                             U_R,
+                                             A_hat,
+                                             U_hat,
+                                             vid_R,
+                                             vid_L,
+                                             ad_R,
+                                             ad_face,
+                                             external_pressure_R,
+                                             external_pressure_L) :
+            numerical_flux(bn_R,
+                           bn_R,
+                           A_R,
+                           U_R,
+                           A_hat,
+                           U_hat,
+                           vid_R,
+                           vid_L,
+                           ad_R,
+                           ad_face,
+                           external_pressure_R,
+                           external_pressure_L);
 
-            const double           A_L   = std::max(A_L_v[0], 1e-10);
-            const double           U_L   = U_L_v[0];
-            const double           A_R   = std::max(A_R_v[0], 1e-10);
-            const double           U_R   = U_R_v[0];
-            const Point<spacedim> &point = fef.get_quadrature_points()[0];
-            const double           external_pressure_L =
-              external_pressure({t, point, vid_L, cell->id()}, provider);
-            const double external_pressure_R =
-              external_pressure({t, point, vid_R, nb->id()}, provider);
+        // Trace dofs
+        const FaceTraceDof &td = face.trace;
 
-            // Trace state
-            double A_hat = 0.0, U_hat = 0.0;
-            get_face_trace(y, cell, f, A_hat, U_hat);
-            A_hat = std::max(A_hat, 1e-10);
-
-            // Left HDG type flux residuals (face integrals with
-            // interior state from left cell) numerical_flux is
-            // designed for left/right states. The trace acts as the
-            // exterior state, therefore use opposite orientation on
-            // the trace side.
-            const auto [FA_L, FU_L] =
-              pressure_only ?
-                numerical_external_pressure_flux(bn_L,
-                                                 bn_L,
-                                                 A_L,
-                                                 U_L,
-                                                 A_hat,
-                                                 U_hat,
-                                                 vid_L,
-                                                 vid_R,
-                                                 ad_L,
-                                                 ad_face,
-                                                 external_pressure_L,
-                                                 external_pressure_R) :
-                numerical_flux(bn_L,
-                               bn_L,
-                               A_L,
-                               U_L,
-                               A_hat,
-                               U_hat,
-                               vid_L,
-                               vid_R,
-                               ad_L,
-                               ad_face,
-                               external_pressure_L,
-                               external_pressure_R);
-
-            // Right HDG type flux residuals (face integrals with
-            // interior state from right cell)
-            const auto [FA_R, FU_R] =
-              pressure_only ?
-                numerical_external_pressure_flux(bn_R,
-                                                 bn_R,
-                                                 A_R,
-                                                 U_R,
-                                                 A_hat,
-                                                 U_hat,
-                                                 vid_R,
-                                                 vid_L,
-                                                 ad_R,
-                                                 ad_face,
-                                                 external_pressure_R,
-                                                 external_pressure_L) :
-                numerical_flux(bn_R,
-                               bn_R,
-                               A_R,
-                               U_R,
-                               A_hat,
-                               U_hat,
-                               vid_R,
-                               vid_L,
-                               ad_R,
-                               ad_face,
-                               external_pressure_R,
-                               external_pressure_L);
-
-            // Trace dofs
-            const FaceTraceDof &td = trace_it->second;
-
-            // HDG type transmission equations
-            // sum of left and right fluxes must be zero
-            F(td.a_hat_dof) += FA_L + FA_R;
-            F(td.u_hat_dof) += FU_L + FU_R;
-          }
+        // HDG type transmission equations
+        // sum of left and right fluxes must be zero
+        F(td.a_hat_dof) += FA_L + FA_R;
+        F(td.u_hat_dof) += FU_L + FU_R;
       }
   }
 
@@ -3135,6 +3134,10 @@ namespace MetricFlowX
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
+
+    std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
+    std::vector<double>                  local_values(fe_->n_dofs_per_cell());
+    std::vector<double>                  A_int_v(1), U_int_v(1);
 
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_,
@@ -3179,9 +3182,12 @@ namespace MetricFlowX
                 continue;
               }
 
-            std::vector<double> A_int_v(1), U_int_v(1);
-            fef[area_extractor].get_function_values(y_cell, A_int_v);
-            fef[velocity_extractor].get_function_values(y_cell, U_int_v);
+            cell->get_dof_indices(ldofs);
+            y_cell.extract_subvector_to(ldofs, local_values);
+            fef[area_extractor].get_function_values_from_local_dof_values(
+              local_values, A_int_v);
+            fef[velocity_extractor].get_function_values_from_local_dof_values(
+              local_values, U_int_v);
 
             const double A_int     = std::max(A_int_v[0], 1e-10);
             const double U_int     = U_int_v[0];
@@ -3364,6 +3370,10 @@ namespace MetricFlowX
     const double rho   = density;
     const double A_min = 1e-10;
 
+    std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
+    std::vector<double>                  local_values(fe_->n_dofs_per_cell());
+    std::vector<double>                  Av(1), Uv(1);
+
     for (const auto &J : junctions)
       {
         const unsigned int K = J.n_vessels();
@@ -3381,9 +3391,12 @@ namespace MetricFlowX
 
             // Interior cell value at the junction face — use y_cell
             fef.reinit(hf.cell, hf.face_no);
-            std::vector<double> Av(1), Uv(1);
-            fef[area_extractor].get_function_values(y_cell, Av);
-            fef[velocity_extractor].get_function_values(y_cell, Uv);
+            hf.cell->get_dof_indices(ldofs);
+            y_cell.extract_subvector_to(ldofs, local_values);
+            fef[area_extractor].get_function_values_from_local_dof_values(
+              local_values, Av);
+            fef[velocity_extractor].get_function_values_from_local_dof_values(
+              local_values, Uv);
 
             A_int[i] = std::max(Av[0], A_min);
             U_int[i] = Uv[0];
@@ -3424,9 +3437,6 @@ namespace MetricFlowX
 
             // a_idx[i] = td.a_hat_dof;
             // u_idx[i] = td.u_hat_dof;
-            std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
-            hf.cell->get_dof_indices(ldofs);
-
             const auto [a_hat_dof, u_hat_dof] =
               face_trace_dofs(ldofs, hf.face_no);
 
@@ -3866,31 +3876,36 @@ namespace MetricFlowX
     const double eta =
       2.0 * (friction_profile + 2.0) * numbers::PI * viscosity / rho;
     (void)t;
-    std::vector<double> local_values(fe_->n_dofs_per_cell());
+    const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
+    std::vector<double>                  local_values(n_dofs);
+    std::vector<types::global_dof_index> ldofs(n_dofs);
+    std::vector<double>                  A_h(fev.n_quadrature_points),
+      U_h(fev.n_quadrature_points);
+    std::vector<double> Ah_q(fef.n_quadrature_points),
+      Uh_q(fef.n_quadrature_points);
+    std::vector<double> Ahat_q(fef.n_quadrature_points),
+      Uhat_q(fef.n_quadrature_points);
+    FullMatrix<double> cell_matrix(n_dofs, n_dofs);
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
 
-        const unsigned int vid    = cell->material_id();
-        const unsigned int n_dofs = fe_->n_dofs_per_cell();
+        const unsigned int vid = cell->material_id();
 
         fev.reinit(cell);
 
-        const auto                          &JxW = fev.get_JxW_values();
-        std::vector<types::global_dof_index> ldofs(n_dofs);
+        const auto &JxW = fev.get_JxW_values();
         cell->get_dof_indices(ldofs);
         y_cell.extract_subvector_to(ldofs, local_values);
 
-        std::vector<double> A_h(fev.n_quadrature_points);
-        std::vector<double> U_h(fev.n_quadrature_points);
         fev[area_extractor].get_function_values_from_local_dof_values(
           local_values, A_h);
         fev[velocity_extractor].get_function_values_from_local_dof_values(
           local_values, U_h);
 
-        FullMatrix<double> cell_matrix(n_dofs, n_dofs);
+        cell_matrix = 0.0;
 
         // ---- Block (1,1) volume - cell_matrix
         // -------------------------------
@@ -3905,6 +3920,8 @@ namespace MetricFlowX
             for (unsigned int i = 0; i < n_dofs; ++i)
               {
                 const unsigned int ci = fe_->system_to_component_index(i).first;
+                if (ci >= 2)
+                  continue;
                 const Tensor<1, spacedim> grad_phiA =
                   fev[area_extractor].gradient(i, q);
                 const Tensor<1, spacedim> grad_phiU =
@@ -3914,6 +3931,8 @@ namespace MetricFlowX
 
                 for (unsigned int j = 0; j < n_dofs; ++j)
                   {
+                    if (fe_->system_to_component_index(j).first >= 2)
+                      continue;
                     const double trial_A = fev[area_extractor].value(j, q);
                     const double trial_U = fev[velocity_extractor].value(j, q);
 
@@ -3937,11 +3956,9 @@ namespace MetricFlowX
         for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
           {
             fef.reinit(cell, f);
-            const auto         &normals = fef.get_normal_vectors();
-            const auto         &JxW_f   = fef.get_JxW_values();
-            const double        ad_face = compute_a_d_at_face(cell, f);
-            std::vector<double> Ah_q(fef.n_quadrature_points);
-            std::vector<double> Uh_q(fef.n_quadrature_points);
+            const auto  &normals = fef.get_normal_vectors();
+            const auto  &JxW_f   = fef.get_JxW_values();
+            const double ad_face = compute_a_d_at_face(cell, f);
             fef[area_extractor].get_function_values_from_local_dof_values(
               local_values, Ah_q);
             fef[velocity_extractor].get_function_values_from_local_dof_values(
@@ -3951,8 +3968,6 @@ namespace MetricFlowX
             // match the extractor read in assemble_cell_residuals,
             // otherwise the analytic Jacobian differentiates w.r.t.
             // the wrong column.
-            std::vector<double> Ahat_q(fef.n_quadrature_points);
-            std::vector<double> Uhat_q(fef.n_quadrature_points);
             fef[a_hat_extractor].get_function_values_from_local_dof_values(
               local_values, Ahat_q);
             fef[u_hat_extractor].get_function_values_from_local_dof_values(
@@ -3976,6 +3991,8 @@ namespace MetricFlowX
                   {
                     const double dA = fef[area_extractor].value(j, q);
                     const double dU = fef[velocity_extractor].value(j, q);
+                    if (dA == 0.0 && dU == 0.0)
+                      continue;
 
                     const auto [dFA, dFU] = numerical_flux_jac(bn,
                                                                bn,
@@ -4070,200 +4087,177 @@ namespace MetricFlowX
                                     quad_face,
                                     update_values | update_normal_vectors);
 
-    std::set<std::pair<CellId, unsigned int>> processed;
-
-    for (const auto &cell : dof_handler_.active_cell_iterators())
+    for (const auto &face : interior_faces)
       {
-        if (!cell->is_locally_owned())
-          continue;
+        const auto        &cell  = face.cell;
+        const auto        &nb    = face.neighbor;
+        const unsigned int f     = face.face_no;
+        const unsigned int nb_f  = face.neighbor_face_no;
+        const unsigned int vid_L = cell->material_id();
+        const unsigned int vid_R = nb->material_id();
+        // A non-junction interior face joins two cells of the same vessel
+        // at one point, so both states and the trace share its a_d.
+        const double ad_face = compute_a_d_at_face(cell, f);
+        const double ad_L    = ad_face;
+        const double ad_R    = ad_face;
+        // ---- Left cell: state and normal
+        // --------------------------------
+        fef.reinit(cell, f);
+        const double bn_L =
+          compute_interior_tangent_normal_product(cell,
+                                                  fef.get_normal_vectors()[0]);
 
-        for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+        std::vector<double> A_Lv(1), U_Lv(1);
+        fef[area_extractor].get_function_values(y_cell, A_Lv);
+        fef[velocity_extractor].get_function_values(y_cell, U_Lv);
+        const double A_L = std::max(A_Lv[0], 1e-10);
+        const double U_L = U_Lv[0];
+
+        std::vector<types::global_dof_index> ldofs_L(fe_->n_dofs_per_cell());
+        cell->get_dof_indices(ldofs_L);
+
+        // ---- Right cell: state and normal
+        // --------------------------------
+        fef.reinit(nb, nb_f);
+        const double bn_R =
+          compute_interior_tangent_normal_product(nb,
+                                                  fef.get_normal_vectors()[0]);
+
+        std::vector<double> A_Rv(1), U_Rv(1);
+        fef[area_extractor].get_function_values(y_cell, A_Rv);
+        fef[velocity_extractor].get_function_values(y_cell, U_Rv);
+        const double A_R = std::max(A_Rv[0], 1e-10);
+        const double U_R = U_Rv[0];
+
+        std::vector<types::global_dof_index> ldofs_R(fe_->n_dofs_per_cell());
+        nb->get_dof_indices(ldofs_R);
+
+        // ---- Trace state
+        // -------------------------------------------------
+        double A_hat_cur = 0.0, U_hat_cur = 0.0;
+        A_hat_cur          = y(face.trace.a_hat_dof);
+        U_hat_cur          = y(face.trace.u_hat_dof);
+        const double A_hat = std::max(A_hat_cur, 1e-10);
+        const double U_hat = U_hat_cur;
+
+        const FaceTraceDof           &td    = face.trace;
+        const types::global_dof_index a_row = td.a_hat_dof;
+        const types::global_dof_index u_row = td.u_hat_dof;
+
+        // ================================================================
+        // Block (trace, cell_L): dR/dw_L
+        // Linearise F_hat(bn_L,bn_L, A_L,U_L, A_hat,U_hat)
+        // w.r.t. w_L. Interior = L (trial nonzero), exterior =
+        // trace (trial zero).
+        // ================================================================
+        fef.reinit(cell, f);
+        for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
           {
-            if (cell->face(f)->at_boundary())
-              continue;
-            if (is_junction_face(cell->id(), f))
-              continue;
+            const double phi_A = fef[area_extractor].value(j, 0);
+            const double phi_U = fef[velocity_extractor].value(j, 0);
 
-            const auto key = canonical_face_key(cell, f);
-            if (processed.count(key))
-              continue;
-            processed.insert(key);
+            const auto [dFA, dFU] =
+              numerical_flux_jac(bn_L,
+                                 bn_L,
+                                 A_L,
+                                 U_L,
+                                 A_hat,
+                                 U_hat,
+                                 phi_A,
+                                 phi_U, // trial on interior (L)
+                                 0.0,
+                                 0.0, // trace DOF fixed here
+                                 vid_L,
+                                 vid_R,
+                                 ad_L,
+                                 ad_face);
 
-            // Same rule as the residual: the canonical side owns the rows.
-            {
-              const auto tit = face_dof_map.find(key);
-              Assert(tit != face_dof_map.end(), ExcInternalError());
-              if (!locally_owned_dofs_.is_element(tit->second.a_hat_dof))
-                continue;
-            }
+            jacobian_matrix.add(a_row, ldofs_L[j], dFA);
+            jacobian_matrix.add(u_row, ldofs_L[j], dFU);
+          }
 
-            const auto        &nb    = cell->neighbor(f);
-            const unsigned int nb_f  = cell->neighbor_of_neighbor(f);
-            const unsigned int vid_L = cell->material_id();
-            const unsigned int vid_R = nb->material_id();
-            // A non-junction interior face joins two cells of the same vessel
-            // at one point, so both states and the trace share its a_d.
-            const double ad_face = compute_a_d_at_face(cell, f);
-            const double ad_L    = ad_face;
-            const double ad_R    = ad_face;
-            // ---- Left cell: state and normal
-            // --------------------------------
-            fef.reinit(cell, f);
-            const double bn_L =
-              compute_tangent_normal_product(cell, fef.get_normal_vectors()[0]);
+        // ================================================================
+        // Block (trace, cell_R): dR/dw_R
+        // Linearise F_hat(bn_R,bn_R, A_R,U_R, A_hat,U_hat)
+        // w.r.t. w_R. Interior = R (trial nonzero), exterior =
+        // trace (trial zero).
+        // ================================================================
+        fef.reinit(nb, nb_f);
+        for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
+          {
+            const double phi_A = fef[area_extractor].value(j, 0);
+            const double phi_U = fef[velocity_extractor].value(j, 0);
 
-            std::vector<double> A_Lv(1), U_Lv(1);
-            fef[area_extractor].get_function_values(y_cell, A_Lv);
-            fef[velocity_extractor].get_function_values(y_cell, U_Lv);
-            const double A_L = std::max(A_Lv[0], 1e-10);
-            const double U_L = U_Lv[0];
+            const auto [dFA, dFU] =
+              numerical_flux_jac(bn_R,
+                                 bn_R,
+                                 A_R,
+                                 U_R,
+                                 A_hat,
+                                 U_hat,
+                                 phi_A,
+                                 phi_U, // trial on interior (R)
+                                 0.0,
+                                 0.0, // trace DOF fixed here
+                                 vid_R,
+                                 vid_L,
+                                 ad_R,
+                                 ad_face);
 
-            std::vector<types::global_dof_index> ldofs_L(
-              fe_->n_dofs_per_cell());
-            cell->get_dof_indices(ldofs_L);
+            jacobian_matrix.add(a_row, ldofs_R[j], dFA);
+            jacobian_matrix.add(u_row, ldofs_R[j], dFU);
+          }
 
-            // ---- Right cell: state and normal
-            // --------------------------------
-            fef.reinit(nb, nb_f);
-            const double bn_R =
-              compute_tangent_normal_product(nb, fef.get_normal_vectors()[0]);
+        // ================================================================
+        // Block (trace, trace): dR/d(A_hat, U_hat)
+        // Trace appears as the EXTERIOR state in both fluxes.
+        // Contribution from left flux: trial on exterior =
+        // (dA_hat, dU_hat). Contribution from right flux: same
+        // trial. Sum both contributions.
+        // ================================================================
+        // Unit perturbations in A_hat and U_hat:
+        for (const auto &[dA_hat_trial, dU_hat_trial, col] :
+             {std::tuple{1.0, 0.0, td.a_hat_dof},
+              std::tuple{0.0, 1.0, td.u_hat_dof}})
+          {
+            // Left flux: exterior trial = (dA_hat_trial,
+            // dU_hat_trial)
+            const auto [dFA_L, dFU_L] =
+              numerical_flux_jac(bn_L,
+                                 bn_L,
+                                 A_L,
+                                 U_L,
+                                 A_hat,
+                                 U_hat,
+                                 0.0,
+                                 0.0, // interior trial = 0
+                                 dA_hat_trial,
+                                 dU_hat_trial,
+                                 vid_L,
+                                 vid_R,
+                                 ad_L,
+                                 ad_face);
 
-            std::vector<double> A_Rv(1), U_Rv(1);
-            fef[area_extractor].get_function_values(y_cell, A_Rv);
-            fef[velocity_extractor].get_function_values(y_cell, U_Rv);
-            const double A_R = std::max(A_Rv[0], 1e-10);
-            const double U_R = U_Rv[0];
+            // Right flux: exterior trial = (dA_hat_trial,
+            // dU_hat_trial)
+            const auto [dFA_R, dFU_R] =
+              numerical_flux_jac(bn_R,
+                                 bn_R,
+                                 A_R,
+                                 U_R,
+                                 A_hat,
+                                 U_hat,
+                                 0.0,
+                                 0.0, // interior trial = 0
+                                 dA_hat_trial,
+                                 dU_hat_trial,
+                                 vid_R,
+                                 vid_L,
+                                 ad_R,
+                                 ad_face);
 
-            std::vector<types::global_dof_index> ldofs_R(
-              fe_->n_dofs_per_cell());
-            nb->get_dof_indices(ldofs_R);
-
-            // ---- Trace state
-            // -------------------------------------------------
-            double A_hat_cur = 0.0, U_hat_cur = 0.0;
-            get_face_trace(y, cell, f, A_hat_cur, U_hat_cur);
-            const double A_hat = std::max(A_hat_cur, 1e-10);
-            const double U_hat = U_hat_cur;
-
-            const FaceTraceDof           &td    = face_dof_map.at(key);
-            const types::global_dof_index a_row = td.a_hat_dof;
-            const types::global_dof_index u_row = td.u_hat_dof;
-
-            // ================================================================
-            // Block (trace, cell_L): dR/dw_L
-            // Linearise F_hat(bn_L,bn_L, A_L,U_L, A_hat,U_hat)
-            // w.r.t. w_L. Interior = L (trial nonzero), exterior =
-            // trace (trial zero).
-            // ================================================================
-            fef.reinit(cell, f);
-            for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
-              {
-                const double phi_A = fef[area_extractor].value(j, 0);
-                const double phi_U = fef[velocity_extractor].value(j, 0);
-
-                const auto [dFA, dFU] =
-                  numerical_flux_jac(bn_L,
-                                     bn_L,
-                                     A_L,
-                                     U_L,
-                                     A_hat,
-                                     U_hat,
-                                     phi_A,
-                                     phi_U, // trial on interior (L)
-                                     0.0,
-                                     0.0, // trace DOF fixed here
-                                     vid_L,
-                                     vid_R,
-                                     ad_L,
-                                     ad_face);
-
-                jacobian_matrix.add(a_row, ldofs_L[j], dFA);
-                jacobian_matrix.add(u_row, ldofs_L[j], dFU);
-              }
-
-            // ================================================================
-            // Block (trace, cell_R): dR/dw_R
-            // Linearise F_hat(bn_R,bn_R, A_R,U_R, A_hat,U_hat)
-            // w.r.t. w_R. Interior = R (trial nonzero), exterior =
-            // trace (trial zero).
-            // ================================================================
-            fef.reinit(nb, nb_f);
-            for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
-              {
-                const double phi_A = fef[area_extractor].value(j, 0);
-                const double phi_U = fef[velocity_extractor].value(j, 0);
-
-                const auto [dFA, dFU] =
-                  numerical_flux_jac(bn_R,
-                                     bn_R,
-                                     A_R,
-                                     U_R,
-                                     A_hat,
-                                     U_hat,
-                                     phi_A,
-                                     phi_U, // trial on interior (R)
-                                     0.0,
-                                     0.0, // trace DOF fixed here
-                                     vid_R,
-                                     vid_L,
-                                     ad_R,
-                                     ad_face);
-
-                jacobian_matrix.add(a_row, ldofs_R[j], dFA);
-                jacobian_matrix.add(u_row, ldofs_R[j], dFU);
-              }
-
-            // ================================================================
-            // Block (trace, trace): dR/d(A_hat, U_hat)
-            // Trace appears as the EXTERIOR state in both fluxes.
-            // Contribution from left flux: trial on exterior =
-            // (dA_hat, dU_hat). Contribution from right flux: same
-            // trial. Sum both contributions.
-            // ================================================================
-            // Unit perturbations in A_hat and U_hat:
-            for (const auto &[dA_hat_trial, dU_hat_trial, col] :
-                 {std::tuple{1.0, 0.0, td.a_hat_dof},
-                  std::tuple{0.0, 1.0, td.u_hat_dof}})
-              {
-                // Left flux: exterior trial = (dA_hat_trial,
-                // dU_hat_trial)
-                const auto [dFA_L, dFU_L] =
-                  numerical_flux_jac(bn_L,
-                                     bn_L,
-                                     A_L,
-                                     U_L,
-                                     A_hat,
-                                     U_hat,
-                                     0.0,
-                                     0.0, // interior trial = 0
-                                     dA_hat_trial,
-                                     dU_hat_trial,
-                                     vid_L,
-                                     vid_R,
-                                     ad_L,
-                                     ad_face);
-
-                // Right flux: exterior trial = (dA_hat_trial,
-                // dU_hat_trial)
-                const auto [dFA_R, dFU_R] =
-                  numerical_flux_jac(bn_R,
-                                     bn_R,
-                                     A_R,
-                                     U_R,
-                                     A_hat,
-                                     U_hat,
-                                     0.0,
-                                     0.0, // interior trial = 0
-                                     dA_hat_trial,
-                                     dU_hat_trial,
-                                     vid_R,
-                                     vid_L,
-                                     ad_R,
-                                     ad_face);
-
-                jacobian_matrix.add(a_row, col, dFA_L + dFA_R);
-                jacobian_matrix.add(u_row, col, dFU_L + dFU_R);
-              }
+            jacobian_matrix.add(a_row, col, dFA_L + dFA_R);
+            jacobian_matrix.add(u_row, col, dFU_L + dFU_R);
           }
       }
   }
@@ -4285,6 +4279,10 @@ namespace MetricFlowX
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
+
+    std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
+    std::vector<double>                  local_values(fe_->n_dofs_per_cell());
+    std::vector<double>                  A_int_v(1), U_int_v(1);
 
     const QGauss<dim - 1>       quad_face(1);
     FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
@@ -4308,9 +4306,12 @@ namespace MetricFlowX
             // const auto              &vpp = vessel_map.at(vid);
 
             fef.reinit(cell, f);
-            std::vector<double> A_int_v(1), U_int_v(1);
-            fef[area_extractor].get_function_values(y_cell, A_int_v);
-            fef[velocity_extractor].get_function_values(y_cell, U_int_v);
+            cell->get_dof_indices(ldofs);
+            y_cell.extract_subvector_to(ldofs, local_values);
+            fef[area_extractor].get_function_values_from_local_dof_values(
+              local_values, A_int_v);
+            fef[velocity_extractor].get_function_values_from_local_dof_values(
+              local_values, U_int_v);
 
             const double A_int     = std::max(A_int_v[0], 1e-10);
             const double a_d_local = compute_a_d_at_face(cell, f);
@@ -4332,9 +4333,6 @@ namespace MetricFlowX
             const auto                   &td    = face_dof_map.at(key);
             const types::global_dof_index a_row = td.a_hat_dof;
             const types::global_dof_index u_row = td.u_hat_dof;
-
-            std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
-            cell->get_dof_indices(ldofs);
 
             if (outlet_type == "Dirichlet")
               {
@@ -4528,6 +4526,9 @@ namespace MetricFlowX
     const double rho   = density;
     const double A_min = 1e-10;
 
+    std::vector<double> local_values(fe_->n_dofs_per_cell());
+    std::vector<double> Av(1), Uv(1);
+
     for (const auto &J : junctions)
       {
         const unsigned int K = J.n_vessels();
@@ -4545,10 +4546,14 @@ namespace MetricFlowX
             const auto        &hf  = J.half_faces[i];
             const unsigned int vid = hf.cell->material_id();
 
+            cell_dofs[i].resize(fe_->n_dofs_per_cell());
+            hf.cell->get_dof_indices(cell_dofs[i]);
+            y_cell.extract_subvector_to(cell_dofs[i], local_values);
             fef.reinit(hf.cell, hf.face_no);
-            std::vector<double> Av(1), Uv(1);
-            fef[area_extractor].get_function_values(y_cell, Av);
-            fef[velocity_extractor].get_function_values(y_cell, Uv);
+            fef[area_extractor].get_function_values_from_local_dof_values(
+              local_values, Av);
+            fef[velocity_extractor].get_function_values_from_local_dof_values(
+              local_values, Uv);
 
             A_int[i]  = std::max(Av[0], A_min);
             U_int[i]  = Uv[0];
@@ -4573,11 +4578,8 @@ namespace MetricFlowX
             // A_hat[i] = std::max(y(a_row[i]), A_min);
             // U_hat[i] = y(u_row[i]);
 
-            std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
-            hf.cell->get_dof_indices(ldofs);
-
             const auto [a_hat_dof, u_hat_dof] =
-              face_trace_dofs(ldofs, hf.face_no);
+              face_trace_dofs(cell_dofs[i], hf.face_no);
 
             a_row[i] = a_hat_dof;
             u_row[i] = u_hat_dof;
@@ -4589,9 +4591,6 @@ namespace MetricFlowX
             dc_hat_v[i] =
               compute_wave_speed_derivative(A_hat[i], vid, a_d_face);
             dP_hat[i] = compute_pressure_derivative(A_hat[i], vid, a_d_face);
-
-            cell_dofs[i].resize(fe_->n_dofs_per_cell());
-            hf.cell->get_dof_indices(cell_dofs[i]);
           }
 
         // Row a_row[0]: mass conservation \sum s_i A_hat_i U_hat_i = 0.
