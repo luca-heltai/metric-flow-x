@@ -12,18 +12,24 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def validate(executable, destination, mpi):
+def validate(executable, destination, mpi, initial_time=0.0):
     destination.mkdir(parents=True, exist_ok=True)
     source = (ROOT / "parameters/constant.prm.in").read_text().replace("@SOURCE_DIR@", str(ROOT))
     source = source.replace("= 4\n", "= 3\n").replace("= 1.1\n", "= 0.01\n")
     source = source.replace("= 0.005\n", "= 0.001\n").replace("= 1e-06", "= 1e-12")
     source = source.replace("= 1e-05", "= 1e-07").replace("= HLL\n", "= HLL_HDG\n")
-    source = source.replace("set Inflow function = 0.0", "set Inflow function = 1e-8 - 2e-6*abs(t-0.005)")
+    final_time = initial_time + 0.01
+    peak_time = initial_time + 0.005
+    source = source.replace("set Initial time                      = 0\n",
+                            f"set Initial time                      = {initial_time}\n")
+    source = source.replace("= 0.01\n", f"= {final_time}\n")
+    source = source.replace("set Inflow function = 0.0",
+                            f"set Inflow function = 1e-8 - 2e-6*abs(t-{peak_time})")
     waveform = destination / "inflow.csv"
     waveform.write_text('"note","flow_m3_s","time_s"\n'
-                        '"start, zero",0,0\n'
-                        '"peak\nannotation",1e-8,0.005\n'
-                        'end,0,0.01\n')
+                        f'"start, zero",0,{initial_time}\n'
+                        f'"peak\nannotation",1e-8,{peak_time}\n'
+                        f'end,0,{final_time}\n')
     traces = {}
     environment = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1",
                        OMPI_ALLOW_RUN_AS_ROOT="1", OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1")
@@ -54,8 +60,8 @@ def validate(executable, destination, mpi):
             with (folder / "output/mass_conservation.csv").open() as stream:
                 mass = list(csv.DictReader(stream))
             assert len(mass) == 11
-            assert abs(float(mass[0]["t"])) < 1e-14
-            assert abs(float(mass[-1]["t"]) - 0.01) < 1e-14
+            assert abs(float(mass[0]["t"]) - initial_time) < 1e-14
+            assert abs(float(mass[-1]["t"]) - final_time) < 1e-14
             assert all(math.isfinite(float(value)) for row in mass for value in row.values())
             assert all(float(row["total_volume"]) > 0 for row in mass)
             with (folder / "output/ida_statistics.csv").open() as stream:
@@ -92,10 +98,10 @@ def validate(executable, destination, mpi):
                 assert all(row["label"] == f"boundary_{boundary}" for row in rows)
                 numeric = [{key: float(value) for key, value in row.items() if key != "label"} for row in rows]
                 assert all(math.isfinite(value) for row in numeric for value in row.values())
-                assert abs(numeric[-1]["time_s"] - 0.01) < 1e-14
+                assert abs(numeric[-1]["time_s"] - final_time) < 1e-14
                 traces[kind, ranks][path.name] = numeric
             inlet = traces[kind, ranks]["terminal_0.csv"]
-            error = max(abs(row["flow_m3_s"] + max(0, 1e-8 - 2e-6 * abs(row["time_s"] - 0.005))) for row in inlet)
+            error = max(abs(row["flow_m3_s"] + max(0, 1e-8 - 2e-6 * abs(row["time_s"] - peak_time))) for row in inlet)
             assert error < 5e-11, (kind, ranks, error)
             assert max(abs(row["flow_m3_s"]) for row in inlet) > 0.99e-8
     reference = traces["analytic", 1]
@@ -129,9 +135,11 @@ def main():
     args = parser.parse_args()
     if args.workdir:
         validate(args.executable.resolve(), args.workdir.resolve(), args.mpi)
+        validate(args.executable.resolve(), args.workdir.resolve() / "nonzero-time", args.mpi, 0.02)
     else:
         with tempfile.TemporaryDirectory() as folder:
             validate(args.executable.resolve(), Path(folder), args.mpi)
+            validate(args.executable.resolve(), Path(folder) / "nonzero-time", args.mpi, 0.02)
 
 
 if __name__ == "__main__":

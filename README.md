@@ -29,8 +29,7 @@ auto y     = flow.make_state();
 auto y_dot = flow.make_state();
 auto F     = flow.make_state();
 
-flow.initialize_state(y, 0.0);
-flow.initialize_state_derivative(y_dot, 0.0);
+flow.initialize_consistent_state(y, y_dot, 0.0);
 flow.assemble_residual(0.0, y, y_dot, F);
 flow.assemble_state_jacobian(0.0, y, y_dot);      // dF/dy
 flow.assemble_derivative_jacobian(0.0, y, y_dot); // dF/dy_dot
@@ -42,6 +41,9 @@ component DoFs, and area/velocity extractors expose the discretization needed
 by an external multiphysics application. Constitutive access is provided by
 `vessel_properties()`, `pressure()`, `pressure_derivative()`, and
 `wave_speed()`.
+
+See [initialization and startup tolerances](doc/initialization.md) for the static
+0D seed, verified initial derivatives and an optional tolerance ramp.
 
 Mesh/property owners can use `setup(mesh_initializer)` to prepare the mesh
 before native DoFs are distributed. The initializer receives the unrefined
@@ -368,17 +370,20 @@ and positive at an outlet. Each boundary ID must identify exactly one terminal;
 only its owning MPI rank writes the file. Existing midpoint probe CSVs retain
 their original names and units.
 
-The PETSc direct path uses MUMPS when available and native serial LU otherwise.
-Native serial LU reorders for a nonzero diagonal before factorization.
-Parallel direct runs require PETSc built with MUMPS. Set `Use direct solver = false`
-for parallel GMRES with block Jacobi; local ILU shifts address zero pivots in DAE
-subdomain blocks and can be overridden through PETSc options. This also applies
-to trace initialization. A missing PETSc MUMPS backend must never produce an
-unchanged solution while reporting a successful direct solve.
+The PETSc direct path uses MUMPS when available and deal.II's pivoted UMFPACK
+for serial builds without MUMPS. The serial fallback requires deal.II with
+UMFPACK; parallel direct solves require PETSc with MUMPS.
+`Use direct solver = false` selects GMRES. At more than one rank, its default
+preconditioner uses ASM with one level of overlap and local ILU(1); serial runs
+retain block Jacobi with ILU(0). Overlap covers cross-rank DAE couplings, and
+additional fill improves the local approximation. Explicit PETSc options remain
+authoritative. Right preconditioning checks the original residual against the
+RHS-based tolerance. Native initialization solves its own face/junction blocks.
 
 The Trilinos backend uses Amesos for direct solves and deal.II GMRES with Ifpack
-ILU for iterative solves. Its local ILU factors use an absolute diagonal shift
-of `1e-5` for algebraic DAE rows; the Jacobian itself is unchanged.
+ILU for iterative solves, with one level of overlap and MPI fill level one
+(serial fill zero). Local factors use an absolute diagonal shift of `1e-5` for
+algebraic DAE rows; the Jacobian itself is unchanged.
 
 Validation uses a synthetic triangular waveform at one and two ranks, compares
 CSV with the equivalent analytic inlet, checks nonzero prescribed flow, and
