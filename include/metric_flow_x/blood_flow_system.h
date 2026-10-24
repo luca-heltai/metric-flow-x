@@ -1806,6 +1806,18 @@ namespace MetricFlowX
     void
     build_extended_sparsity_pattern();
 
+    struct BoundaryFace
+    {
+      typename DoFHandler<dim, spacedim>::active_cell_iterator cell;
+      unsigned int                                             face_no;
+      types::global_dof_index a_hat_dof, u_hat_dof;
+    };
+
+    // Topology and trace indices only, rebuilt with face_dof_map after DoF
+    // distribution. Geometry, labels and physical data are read during
+    // assembly.
+    std::vector<BoundaryFace> boundary_faces;
+
     friend void ::test();
   };
 

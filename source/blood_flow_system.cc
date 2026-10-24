@@ -1203,6 +1203,7 @@ namespace MetricFlowX
     face_dof_map.clear();
     trace_continuity_pairs.clear();
     interior_faces.clear();
+    boundary_faces.clear();
 
     std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
     std::vector<types::global_dof_index> nb_dofs(fe_->n_dofs_per_cell());
@@ -1252,6 +1253,13 @@ namespace MetricFlowX
                     !is_junction_face(cell->id(), f))
                   trace_continuity_pairs.push_back(
                     TraceContinuityPair{a_here, u_here, a_canon, u_canon});
+              }
+            if (cell->face(f)->at_boundary() &&
+                !is_junction_face(cell->id(), f))
+              {
+                const auto &trace = face_dof_map.at(key);
+                boundary_faces.push_back(
+                  {cell, f, trace.a_hat_dof, trace.u_hat_dof});
               }
           }
       }
@@ -3148,124 +3156,112 @@ namespace MetricFlowX
     if (outlet_type == "Dirichlet")
       exact_solution.set_time(t);
 
-    for (const auto &cell : dof_handler_.active_cell_iterators())
+    for (const auto &face : boundary_faces)
       {
-        if (!cell->is_locally_owned())
-          continue;
+        const auto        &cell = face.cell;
+        const unsigned int f    = face.face_no;
 
-        for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+        const types::boundary_id bid = cell->face(f)->boundary_id();
+        const unsigned int       vid = cell->material_id();
+
+        // Interior cell value at face — use y_cell, not y
+        fef.reinit(cell, f);
+        const Point<spacedim> &point = fef.get_quadrature_points()[0];
+
+        if (pressure_only)
           {
-            if (!cell->face(f)->at_boundary())
-              continue;
-            if (is_junction_face(cell->id(), f))
-              continue;
-
-            const types::boundary_id bid = cell->face(f)->boundary_id();
-            const unsigned int       vid = cell->material_id();
-
-            // Interior cell value at face — use y_cell, not y
-            fef.reinit(cell, f);
-            const Point<spacedim> &point = fef.get_quadrature_points()[0];
-
-            if (pressure_only)
+            if (outlet_type == "RCR" && rcr_map.count(bid) &&
+                (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
               {
-                if (outlet_type == "RCR" && rcr_map.count(bid) &&
-                    (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
-                  {
-                    const FaceTraceDof &td =
-                      face_dof_map.at(canonical_face_key(cell, f));
-                    Assert(locally_owned_dofs_.is_element(td.a_hat_dof),
-                           ExcInternalError());
-                    F(td.a_hat_dof) +=
-                      external_pressure({t, point, vid, cell->id()}, provider);
-                  }
-                continue;
+                Assert(locally_owned_dofs_.is_element(face.a_hat_dof),
+                       ExcInternalError());
+                F(face.a_hat_dof) +=
+                  external_pressure({t, point, vid, cell->id()}, provider);
               }
-
-            cell->get_dof_indices(ldofs);
-            y_cell.extract_subvector_to(ldofs, local_values);
-            fef[area_extractor].get_function_values_from_local_dof_values(
-              local_values, A_int_v);
-            fef[velocity_extractor].get_function_values_from_local_dof_values(
-              local_values, U_int_v);
-
-            const double A_int     = std::max(A_int_v[0], 1e-10);
-            const double U_int     = U_int_v[0];
-            const double a_d_local = compute_a_d_at_face(cell, f);
-            const double c0    = compute_wave_speed(a_d_local, vid, a_d_local);
-            const double c_int = compute_wave_speed(A_int, vid, a_d_local);
-
-            // Current face trace (from trace block of y)
-            double A_hat_cur = 0.0, U_hat_cur = 0.0;
-            get_face_trace(y, cell, f, A_hat_cur, U_hat_cur);
-            const double A_hat = std::max(A_hat_cur, 1e-10);
-            const double c_hat = compute_wave_speed(A_hat, vid, a_d_local);
-
-            double res_A = 0.0, res_U = 0.0;
-
-            if (outlet_type == "Dirichlet")
-              {
-                res_A = A_hat_cur - exact_solution.value(point, 0);
-                res_U = U_hat_cur - exact_solution.value(point, 1);
-              }
-            else if (bid == 0) // inflow
-              {
-                inflow_function.set_time(t);
-                const double Q_in   = (inflow_series.empty() ?
-                                         inflow_function.value(Point<1>(0.0)) :
-                                         inflow_series.value(t));
-                const double W2_int = U_int - 4.0 * (c_int - c0);
-
-                res_A = A_hat_cur * U_hat_cur - Q_in;
-                res_U = (U_hat_cur - 4.0 * (c_hat - c0)) - W2_int;
-              }
-            else if (outlet_type == "RCR" && rcr_map.count(bid) &&
-                     (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
-
-              {
-                const auto  &rcr = rcr_map.at(bid);
-                const double Q   = A_hat_cur * U_hat_cur;
-                if (rcr.C > 0.0)
-                  {
-                    // const double Pc =
-                    // terminal_Pc_storage.at(bid); res_A =
-                    //   compute_pressure_value(A_hat, vid,
-                    //   a_d_local) - (rcr.R1 * Q + Pc);
-                    const double Pc = y(rcr_pc_dof.at(bid));
-                    res_A           = compute_physical_pressure(
-                              A_hat, vid, a_d_local, t, point, cell->id()) -
-                            (rcr.R1 * Q + Pc);
-                  }
-                else
-                  { // C=0: the two resistances remain in series.
-                    res_A = compute_physical_pressure(
-                              A_hat, vid, a_d_local, t, point, cell->id()) -
-                            ((rcr.R1 + rcr.R2) * Q + rcr.P_out);
-                  }
-                const double W1_int = U_int + 4.0 * (c_int - c0);
-                res_U               = (U_hat_cur + 4.0 * (c_hat - c0)) - W1_int;
-              }
-            else // Reflection outlet
-              {
-                const double Rt     = reflection_coefficient;
-                const double W1_int = U_int + 4.0 * (c_int - c0);
-                const double W2_tgt = -Rt * W1_int;
-
-                res_A = (U_hat_cur + 4.0 * (c_hat - c0)) - W1_int;
-                res_U = (U_hat_cur - 4.0 * (c_hat - c0)) - W2_tgt;
-              }
-
-            // A boundary face has exactly one incident cell, so its rows are
-            // owned wherever that cell is owned.  Writing with `+=` into a
-            // zeroed vector gives the same value as `=` and keeps the whole
-            // residual on add semantics for a single compress().
-            const FaceTraceDof &td =
-              face_dof_map.at(canonical_face_key(cell, f));
-            Assert(locally_owned_dofs_.is_element(td.a_hat_dof),
-                   ExcInternalError());
-            F(td.a_hat_dof) += res_A;
-            F(td.u_hat_dof) += res_U;
+            continue;
           }
+
+        cell->get_dof_indices(ldofs);
+        y_cell.extract_subvector_to(ldofs, local_values);
+        fef[area_extractor].get_function_values_from_local_dof_values(
+          local_values, A_int_v);
+        fef[velocity_extractor].get_function_values_from_local_dof_values(
+          local_values, U_int_v);
+
+        const double A_int     = std::max(A_int_v[0], 1e-10);
+        const double U_int     = U_int_v[0];
+        const double a_d_local = compute_a_d_at_face(cell, f);
+        const double c0        = compute_wave_speed(a_d_local, vid, a_d_local);
+        const double c_int     = compute_wave_speed(A_int, vid, a_d_local);
+
+        // Current face trace (from trace block of y)
+        const double A_hat_cur = y(face.a_hat_dof);
+        const double U_hat_cur = y(face.u_hat_dof);
+        const double A_hat     = std::max(A_hat_cur, 1e-10);
+        const double c_hat     = compute_wave_speed(A_hat, vid, a_d_local);
+
+        double res_A = 0.0, res_U = 0.0;
+
+        if (outlet_type == "Dirichlet")
+          {
+            res_A = A_hat_cur - exact_solution.value(point, 0);
+            res_U = U_hat_cur - exact_solution.value(point, 1);
+          }
+        else if (bid == 0) // inflow
+          {
+            inflow_function.set_time(t);
+            const double Q_in =
+              (inflow_series.empty() ? inflow_function.value(Point<1>(0.0)) :
+                                       inflow_series.value(t));
+            const double W2_int = U_int - 4.0 * (c_int - c0);
+
+            res_A = A_hat_cur * U_hat_cur - Q_in;
+            res_U = (U_hat_cur - 4.0 * (c_hat - c0)) - W2_int;
+          }
+        else if (outlet_type == "RCR" && rcr_map.count(bid) &&
+                 (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
+
+          {
+            const auto  &rcr = rcr_map.at(bid);
+            const double Q   = A_hat_cur * U_hat_cur;
+            if (rcr.C > 0.0)
+              {
+                // const double Pc =
+                // terminal_Pc_storage.at(bid); res_A =
+                //   compute_pressure_value(A_hat, vid,
+                //   a_d_local) - (rcr.R1 * Q + Pc);
+                const double Pc = y(rcr_pc_dof.at(bid));
+                res_A           = compute_physical_pressure(
+                          A_hat, vid, a_d_local, t, point, cell->id()) -
+                        (rcr.R1 * Q + Pc);
+              }
+            else
+              { // C=0: the two resistances remain in series.
+                res_A = compute_physical_pressure(
+                          A_hat, vid, a_d_local, t, point, cell->id()) -
+                        ((rcr.R1 + rcr.R2) * Q + rcr.P_out);
+              }
+            const double W1_int = U_int + 4.0 * (c_int - c0);
+            res_U               = (U_hat_cur + 4.0 * (c_hat - c0)) - W1_int;
+          }
+        else // Reflection outlet
+          {
+            const double Rt     = reflection_coefficient;
+            const double W1_int = U_int + 4.0 * (c_int - c0);
+            const double W2_tgt = -Rt * W1_int;
+
+            res_A = (U_hat_cur + 4.0 * (c_hat - c0)) - W1_int;
+            res_U = (U_hat_cur - 4.0 * (c_hat - c0)) - W2_tgt;
+          }
+
+        // A boundary face has exactly one incident cell, so its rows are
+        // owned wherever that cell is owned.  Writing with `+=` into a
+        // zeroed vector gives the same value as `=` and keeps the whole
+        // residual on add semantics for a single compress().
+        Assert(locally_owned_dofs_.is_element(face.a_hat_dof),
+               ExcInternalError());
+        F(face.a_hat_dof) += res_A;
+        F(face.u_hat_dof) += res_U;
       }
   }
 
@@ -3306,37 +3302,29 @@ namespace MetricFlowX
                     MPI_SUM,
                     mpi_communicator_);
 
-    for (const auto &cell : dof_handler_.active_cell_iterators())
+    for (const auto &face : boundary_faces)
       {
-        if (!cell->is_locally_owned())
+        const auto        &cell = face.cell;
+        const unsigned int f    = face.face_no;
+        const auto         pit  = rcr_pc_dof.find(cell->face(f)->boundary_id());
+        if (pit == rcr_pc_dof.end())
           continue;
 
-        for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
-          {
-            if (!cell->face(f)->at_boundary())
-              continue;
-            if (is_junction_face(cell->id(), f))
-              continue;
-            const auto pit = rcr_pc_dof.find(cell->face(f)->boundary_id());
-            if (pit == rcr_pc_dof.end())
-              continue;
+        const types::global_dof_index pc_dof = pit->second;
+        const auto &rcr = rcr_map.at(cell->face(f)->boundary_id());
 
-            const types::global_dof_index pc_dof = pit->second;
-            const auto &rcr = rcr_map.at(cell->face(f)->boundary_id());
+        const double A_hat  = y(face.a_hat_dof);
+        const double U_hat  = y(face.u_hat_dof);
+        const double Q      = A_hat * U_hat;
+        const double Pc     = y(pc_dof);
+        const double Pc_dot = pc_dot_global[pc_dof - first_pc];
 
-            double A_hat = 0.0, U_hat = 0.0;
-            get_face_trace(y, cell, f, A_hat, U_hat);
-            const double Q      = A_hat * U_hat;
-            const double Pc     = y(pc_dof);
-            const double Pc_dot = pc_dot_global[pc_dof - first_pc];
-
-            // C*Ṗc - Q + (Pc - P_out)/R2 = 0
-            // Written from whichever rank owns the terminal's cell; the row
-            // itself may be owned by a *different* rank for PETSc's
-            // partitioning, and the off-owner add is routed there by the
-            // caller's compress(VectorOperation::add).
-            F(pc_dof) += rcr.C * Pc_dot - Q + (Pc - rcr.P_out) / rcr.R2;
-          }
+        // C*Ṗc - Q + (Pc - P_out)/R2 = 0
+        // Written from whichever rank owns the terminal's cell; the row
+        // itself may be owned by a *different* rank for PETSc's
+        // partitioning, and the off-owner add is routed there by the
+        // caller's compress(VectorOperation::add).
+        F(pc_dof) += rcr.C * Pc_dot - Q + (Pc - rcr.P_out) / rcr.R2;
       }
   }
 
@@ -4299,169 +4287,157 @@ namespace MetricFlowX
 
     (void)t;
 
-    for (const auto &cell : dof_handler_.active_cell_iterators())
+    for (const auto &face : boundary_faces)
       {
-        if (!cell->is_locally_owned())
-          continue;
+        const auto        &cell = face.cell;
+        const unsigned int f    = face.face_no;
 
-        for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+        const types::boundary_id bid = cell->face(f)->boundary_id();
+        const unsigned int       vid = cell->material_id();
+        // const auto              &vpp = vessel_map.at(vid);
+
+        fef.reinit(cell, f);
+        cell->get_dof_indices(ldofs);
+        y_cell.extract_subvector_to(ldofs, local_values);
+        fef[area_extractor].get_function_values_from_local_dof_values(
+          local_values, A_int_v);
+
+        const double A_int     = std::max(A_int_v[0], 1e-10);
+        const double a_d_local = compute_a_d_at_face(cell, f);
+        const double dc_int =
+          compute_wave_speed_derivative(A_int, vid, a_d_local);
+
+        const double A_hat_cur = y(face.a_hat_dof);
+        const double U_hat_cur = y(face.u_hat_dof);
+        const double A_hat     = std::max(A_hat_cur, 1e-10);
+        const double dc_hat =
+          compute_wave_speed_derivative(A_hat, vid, a_d_local);
+        const double dPdA_hat =
+          compute_pressure_derivative(A_hat, vid, a_d_local);
+
+        const types::global_dof_index a_row = face.a_hat_dof;
+        const types::global_dof_index u_row = face.u_hat_dof;
+
+        if (outlet_type == "Dirichlet")
           {
-            if (!cell->face(f)->at_boundary())
-              continue;
-            if (is_junction_face(cell->id(), f))
-              continue;
+            jacobian_matrix.add(a_row, a_row, 1.0);
+            jacobian_matrix.add(u_row, u_row, 1.0);
+          }
+        else if (bid == 0) // inflow
+          {
+            // R1 = A_hat * U_hat - Q_in(t)
+            // R2 = U_hat - 4(c_hat - c0) - W2_int
+            // where W2_int = U_int - 4(c_int - c0)
 
-            const types::boundary_id bid = cell->face(f)->boundary_id();
-            const unsigned int       vid = cell->material_id();
-            // const auto              &vpp = vessel_map.at(vid);
+            // \partialR1/ \partialA_hat, \partialR1/
+            // \partialU_hat
+            jacobian_matrix.add(a_row, a_row, U_hat_cur);
+            jacobian_matrix.add(a_row, u_row, A_hat);
 
-            fef.reinit(cell, f);
-            cell->get_dof_indices(ldofs);
-            y_cell.extract_subvector_to(ldofs, local_values);
-            fef[area_extractor].get_function_values_from_local_dof_values(
-              local_values, A_int_v);
+            // \partialR2/\partialA_hat,
+            // \partialR2/\partialU_hat
+            jacobian_matrix.add(u_row, a_row, -4.0 * dc_hat);
+            jacobian_matrix.add(u_row, u_row, 1.0);
 
-            const double A_int     = std::max(A_int_v[0], 1e-10);
-            const double a_d_local = compute_a_d_at_face(cell, f);
-            const double dc_int =
-              compute_wave_speed_derivative(A_int, vid, a_d_local);
-
-            double A_hat_cur = 0.0, U_hat_cur = 0.0;
-            get_face_trace(y, cell, f, A_hat_cur, U_hat_cur);
-            const double A_hat = std::max(A_hat_cur, 1e-10);
-            const double dc_hat =
-              compute_wave_speed_derivative(A_hat, vid, a_d_local);
-            const double dPdA_hat =
-              compute_pressure_derivative(A_hat, vid, a_d_local);
-
-            const auto                    key   = canonical_face_key(cell, f);
-            const auto                   &td    = face_dof_map.at(key);
-            const types::global_dof_index a_row = td.a_hat_dof;
-            const types::global_dof_index u_row = td.u_hat_dof;
-
-            if (outlet_type == "Dirichlet")
+            // \partialR2/\partial(A_int, U_int) — block (2,1)
+            for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
               {
-                jacobian_matrix.add(a_row, a_row, 1.0);
-                jacobian_matrix.add(u_row, u_row, 1.0);
+                const double phi_A = fef[area_extractor].value(j, 0);
+                const double phi_U = fef[velocity_extractor].value(j, 0);
+                // \partialW2_int/\partialw_int = phi_U -
+                // 4*dc_int*phi_A
+                jacobian_matrix.add(u_row,
+                                    ldofs[j],
+                                    -(phi_U - 4.0 * dc_int * phi_A));
               }
-            else if (bid == 0) // inflow
+          }
+        else if (outlet_type == "RCR" && rcr_map.count(bid) &&
+                 (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
+
+          {
+            const auto &rcr = rcr_map.at(bid);
+
+            if (rcr.C > 0.0)
               {
-                // R1 = A_hat * U_hat - Q_in(t)
-                // R2 = U_hat - 4(c_hat - c0) - W2_int
-                // where W2_int = U_int - 4(c_int - c0)
+                // ---- Full RCR
+                // -------------------------------------------------------
+                // res_A = P(A_hat) - R1*(A_hat*U_hat) - Pc
+                // res_U = U_hat + 4(c_hat - c0) - W1_int
+                // dres_A/dA_hat = dP/dA_hat - R1*U_hat
+                // dres_A/dU_hat = -R1*A_hat
+                jacobian_matrix.add(a_row,
+                                    a_row,
+                                    dPdA_hat - rcr.R1 * U_hat_cur);
+                jacobian_matrix.add(a_row, u_row, -rcr.R1 * A_hat);
 
-                // \partialR1/ \partialA_hat, \partialR1/
-                // \partialU_hat
-                jacobian_matrix.add(a_row, a_row, U_hat_cur);
-                jacobian_matrix.add(a_row, u_row, A_hat);
-
-                // \partialR2/\partialA_hat,
-                // \partialR2/\partialU_hat
-                jacobian_matrix.add(u_row, a_row, -4.0 * dc_hat);
+                // dres_U/dA_hat = 4*dc_hat
+                // dres_U/dU_hat = 1
+                jacobian_matrix.add(u_row, a_row, 4.0 * dc_hat);
                 jacobian_matrix.add(u_row, u_row, 1.0);
 
-                // \partialR2/\partial(A_int, U_int) — block (2,1)
+                // dres_U/d(A_int, U_int)
                 for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
                   {
                     const double phi_A = fef[area_extractor].value(j, 0);
                     const double phi_U = fef[velocity_extractor].value(j, 0);
-                    // \partialW2_int/\partialw_int = phi_U -
-                    // 4*dc_int*phi_A
                     jacobian_matrix.add(u_row,
                                         ldofs[j],
-                                        -(phi_U - 4.0 * dc_int * phi_A));
+                                        -(phi_U + 4.0 * dc_int * phi_A));
                   }
               }
-            else if (outlet_type == "RCR" && rcr_map.count(bid) &&
-                     (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
-
+            else
               {
-                const auto &rcr = rcr_map.at(bid);
+                // C=0: P = (R1 + R2)*Q + P_out; no capacitor unknown.
+                const double resistance = rcr.R1 + rcr.R2;
+                jacobian_matrix.add(a_row,
+                                    a_row,
+                                    dPdA_hat - resistance * U_hat_cur);
+                jacobian_matrix.add(a_row, u_row, -resistance * A_hat);
 
-                if (rcr.C > 0.0)
-                  {
-                    // ---- Full RCR
-                    // -------------------------------------------------------
-                    // res_A = P(A_hat) - R1*(A_hat*U_hat) - Pc
-                    // res_U = U_hat + 4(c_hat - c0) - W1_int
-                    // dres_A/dA_hat = dP/dA_hat - R1*U_hat
-                    // dres_A/dU_hat = -R1*A_hat
-                    jacobian_matrix.add(a_row,
-                                        a_row,
-                                        dPdA_hat - rcr.R1 * U_hat_cur);
-                    jacobian_matrix.add(a_row, u_row, -rcr.R1 * A_hat);
-
-                    // dres_U/dA_hat = 4*dc_hat
-                    // dres_U/dU_hat = 1
-                    jacobian_matrix.add(u_row, a_row, 4.0 * dc_hat);
-                    jacobian_matrix.add(u_row, u_row, 1.0);
-
-                    // dres_U/d(A_int, U_int)
-                    for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
-                      {
-                        const double phi_A = fef[area_extractor].value(j, 0);
-                        const double phi_U =
-                          fef[velocity_extractor].value(j, 0);
-                        jacobian_matrix.add(u_row,
-                                            ldofs[j],
-                                            -(phi_U + 4.0 * dc_int * phi_A));
-                      }
-                  }
-                else
-                  {
-                    // C=0: P = (R1 + R2)*Q + P_out; no capacitor unknown.
-                    const double resistance = rcr.R1 + rcr.R2;
-                    jacobian_matrix.add(a_row,
-                                        a_row,
-                                        dPdA_hat - resistance * U_hat_cur);
-                    jacobian_matrix.add(a_row, u_row, -resistance * A_hat);
-
-                    // dres_U/dA_hat = 4*dc_hat
-                    // dres_U/dU_hat = 1
-                    // (identical to RCR — res_U has no R
-                    // dependence)
-                    jacobian_matrix.add(u_row, a_row, 4.0 * dc_hat);
-                    jacobian_matrix.add(u_row, u_row, 1.0);
-
-                    // dres_U/d(A_int, U_int)
-                    for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
-                      {
-                        const double phi_A = fef[area_extractor].value(j, 0);
-                        const double phi_U =
-                          fef[velocity_extractor].value(j, 0);
-                        jacobian_matrix.add(u_row,
-                                            ldofs[j],
-                                            -(phi_U + 4.0 * dc_int * phi_A));
-                      }
-                  }
-              }
-            else // Reflection
-              {
-                const double Rt = reflection_coefficient;
-
-                // R1 = U_hat + 4(c_hat - c0) - W1_int
-                // R2 = U_hat - 4(c_hat - c0) - (-Rt * W1_int)
-
-                // \partialR1/\partialA_hat,
-                // \partialR1/\partialU_hat
-                jacobian_matrix.add(a_row, a_row, 4.0 * dc_hat);
-                jacobian_matrix.add(a_row, u_row, 1.0);
-
-                // \partialR2/\partialA_hat,
-                // \partialR2/\partialU_hat
-                jacobian_matrix.add(u_row, a_row, -4.0 * dc_hat);
+                // dres_U/dA_hat = 4*dc_hat
+                // dres_U/dU_hat = 1
+                // (identical to RCR — res_U has no R
+                // dependence)
+                jacobian_matrix.add(u_row, a_row, 4.0 * dc_hat);
                 jacobian_matrix.add(u_row, u_row, 1.0);
 
-                // \partialR1 and \partialR2 /\partial(A_int,U_int)
-                // via W1_int
+                // dres_U/d(A_int, U_int)
                 for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
                   {
                     const double phi_A = fef[area_extractor].value(j, 0);
                     const double phi_U = fef[velocity_extractor].value(j, 0);
-                    const double dW1   = phi_U + 4.0 * dc_int * phi_A;
-                    jacobian_matrix.add(a_row, ldofs[j], -dW1);
-                    jacobian_matrix.add(u_row, ldofs[j], Rt * dW1);
+                    jacobian_matrix.add(u_row,
+                                        ldofs[j],
+                                        -(phi_U + 4.0 * dc_int * phi_A));
                   }
+              }
+          }
+        else // Reflection
+          {
+            const double Rt = reflection_coefficient;
+
+            // R1 = U_hat + 4(c_hat - c0) - W1_int
+            // R2 = U_hat - 4(c_hat - c0) - (-Rt * W1_int)
+
+            // \partialR1/\partialA_hat,
+            // \partialR1/\partialU_hat
+            jacobian_matrix.add(a_row, a_row, 4.0 * dc_hat);
+            jacobian_matrix.add(a_row, u_row, 1.0);
+
+            // \partialR2/\partialA_hat,
+            // \partialR2/\partialU_hat
+            jacobian_matrix.add(u_row, a_row, -4.0 * dc_hat);
+            jacobian_matrix.add(u_row, u_row, 1.0);
+
+            // \partialR1 and \partialR2 /\partial(A_int,U_int)
+            // via W1_int
+            for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
+              {
+                const double phi_A = fef[area_extractor].value(j, 0);
+                const double phi_U = fef[velocity_extractor].value(j, 0);
+                const double dW1   = phi_U + 4.0 * dc_int * phi_A;
+                jacobian_matrix.add(a_row, ldofs[j], -dW1);
+                jacobian_matrix.add(u_row, ldofs[j], Rt * dW1);
               }
           }
       }
@@ -4475,36 +4451,27 @@ namespace MetricFlowX
     if (rcr_pc_dof.empty())
       return;
 
-    for (const auto &cell : dof_handler_.active_cell_iterators())
+    for (const auto &face : boundary_faces)
       {
-        if (!cell->is_locally_owned())
+        const auto        &cell = face.cell;
+        const unsigned int f    = face.face_no;
+        const auto         pit  = rcr_pc_dof.find(cell->face(f)->boundary_id());
+        if (pit == rcr_pc_dof.end())
           continue;
 
-        for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
-          {
-            if (!cell->face(f)->at_boundary())
-              continue;
-            if (is_junction_face(cell->id(), f))
-              continue;
-            const auto pit = rcr_pc_dof.find(cell->face(f)->boundary_id());
-            if (pit == rcr_pc_dof.end())
-              continue;
+        const types::global_dof_index pc_dof = pit->second;
+        const auto &rcr = rcr_map.at(cell->face(f)->boundary_id());
 
-            const types::global_dof_index pc_dof = pit->second;
-            const auto &rcr = rcr_map.at(cell->face(f)->boundary_id());
-            const auto &td  = face_dof_map.at(canonical_face_key(cell, f));
+        const double A_hat = y(face.a_hat_dof);
+        const double U_hat = y(face.u_hat_dof);
 
-            double A_hat = 0.0, U_hat = 0.0;
-            get_face_trace(y, cell, f, A_hat, U_hat);
+        // R_pc = A_hat*U_hat - (Pc - P_out)/R2
+        jacobian_matrix.add(pc_dof, face.a_hat_dof, U_hat);
+        jacobian_matrix.add(pc_dof, face.u_hat_dof, A_hat);
+        jacobian_matrix.add(pc_dof, pc_dof, -1.0 / rcr.R2);
 
-            // R_pc = A_hat*U_hat - (Pc - P_out)/R2
-            jacobian_matrix.add(pc_dof, td.a_hat_dof, U_hat);
-            jacobian_matrix.add(pc_dof, td.u_hat_dof, A_hat);
-            jacobian_matrix.add(pc_dof, pc_dof, -1.0 / rcr.R2);
-
-            // res_A = P(Â) - R1*Q - Pc  ->  d(res_A)/dPc = -1
-            jacobian_matrix.add(td.a_hat_dof, pc_dof, -1.0);
-          }
+        // res_A = P(Â) - R1*Q - Pc  ->  d(res_A)/dPc = -1
+        jacobian_matrix.add(face.a_hat_dof, pc_dof, -1.0);
       }
   }
 
