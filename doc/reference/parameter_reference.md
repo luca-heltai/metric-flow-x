@@ -10,7 +10,7 @@ This page is a compact reference for entries registered by the current `MetricFl
 | `Problem constants` | `ParsedTools::Constants` group. |
 | `Output filename` | Visualization output base name. |
 | `Output directory` | Output directory prefix. |
-| `Use direct solver` | Direct PETSc/MUMPS or Trilinos solver when true; GMRES+ILU when false. |
+| `Use direct solver` | Direct MUMPS, serial UMFPACK (PETSc without MUMPS), or Trilinos when true; GMRES+ILU when false. |
 | `Number of refinement cycles` | Number of cycles in the run loop. |
 | `Number of global refinement` | Initial global refinement count. |
 | `Theta (penalty parameter)` | Interior penalty parameter. |

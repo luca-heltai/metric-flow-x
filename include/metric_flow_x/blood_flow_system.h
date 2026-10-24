@@ -386,6 +386,30 @@ namespace MetricFlowX
     void
     initialize_state_derivative(VectorType &state_dot, const double t0) const;
 
+    /** Prepare and verify F(t0,state,state_dot)=0 before time integration.
+     * The optional rigid hydraulic graph is a warm start, followed by native
+     * algebraic correction and differential mass-block reconstruction.
+     */
+    void
+    initialize_consistent_state(VectorType  &state,
+                                VectorType  &state_dot,
+                                const double t0);
+
+    struct InitialStateDiagnostics
+    {
+      unsigned int trace_iterations    = 0;
+      unsigned int largest_trace_block = 0;
+      double       algebraic_defect    = 0.;
+      double       differential_defect = 0.;
+    };
+
+    const InitialStateDiagnostics &
+    initial_state_diagnostics() const
+    {
+      return initial_state_diagnostics_;
+    }
+
+
     parallel::fullydistributed::Triangulation<dim, spacedim> &
     triangulation();
 
@@ -979,8 +1003,8 @@ namespace MetricFlowX
     std::unique_ptr<dealii::TrilinosWrappers::SolverDirect> direct_solver;
 #endif
 
-    // The PETSc iterative path uses block Jacobi with a local ILU per rank.
-    // Local shifts handle zero DAE pivots without changing the system matrix.
+    // The PETSc wrapper owns a configurable PC. Parallel defaults overlap
+    // neighboring DAE rows; local ILU shifts leave the operator unchanged.
 #ifdef METRIC_FLOW_X_WITH_PETSC
     using IterativePreconditioner = PETScWrappers::PreconditionBlockJacobi;
 #else
@@ -1030,8 +1054,14 @@ namespace MetricFlowX
     // -----------------------------------------------------------------------
     // User parameters
     // -----------------------------------------------------------------------
-    unsigned int fe_degree              = 1;
-    std::string  constants              = "1.0";
+    unsigned int fe_degree                          = 1;
+    std::string  constants                          = "1.0";
+    std::string  initial_state_source               = "rest";
+    std::string  initial_condition_policy           = "native";
+    double       initial_consistency_tolerance      = 0.01;
+    unsigned int initial_consistency_max_iterations = 30;
+    bool         check_initial_jacobian             = false;
+
     std::string  output_filename        = "solution";
     bool         use_direct_solver      = true;
     bool         use_junction_mesh      = true;
@@ -1817,6 +1847,28 @@ namespace MetricFlowX
     // distribution. Geometry, labels and physical data are read during
     // assembly.
     std::vector<BoundaryFace> boundary_faces;
+
+
+    struct InitialGraphCell
+    {
+      unsigned int node0, node1, vessel_id;
+    };
+    std::vector<Point<spacedim>>                      initial_graph_points_;
+    std::map<types::coarse_cell_id, InitialGraphCell> initial_graph_cells_;
+    std::map<unsigned int, types::boundary_id>        initial_graph_boundaries_;
+    InitialStateDiagnostics initial_state_diagnostics_;
+    VectorType              initial_trace_weights_;
+
+    void
+    compute_steady_network_initial_solution(VectorType &, const double);
+    void
+    correct_initial_traces(VectorType &, const double);
+    void
+    reconstruct_initial_derivative(const VectorType &,
+                                   VectorType &,
+                                   const double);
+    void
+    verify_initial_pair(const VectorType &, const VectorType &, const double);
 
     friend void ::test();
   };

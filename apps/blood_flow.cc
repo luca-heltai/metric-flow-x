@@ -19,11 +19,15 @@
 #include <deal.II/base/timer.h>
 
 #include <metric_flow_x/blood_flow_system.h> // header exposing BloodFlowSystem
+#include <metric_flow_x/ida_error_guard.h>
+#include <metric_flow_x/serial_direct_solver.h>
+#include <metric_flow_x/tolerance_ramp.h>
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -47,10 +51,27 @@ namespace MetricFlowX
   public:
     using Problem    = BloodFlowSystem<dim, spacedim>;
     using VectorType = MetricFlowX::VectorType;
+    using RampSource = ToleranceRampSource<VectorType>;
+
+    explicit BloodFlowIDARunner(Problem &problem)
+    {
+      tolerance_ramp_.add_parameters(problem);
+      problem.add_parameter("Maximum IDA internal steps per output",
+                            maximum_ida_steps_per_output_,
+                            "Positive work limit for each IDASolve call.");
+    }
+
 
     void
     run(Problem &problem)
     {
+      AssertThrow(maximum_ida_steps_per_output_ > 0,
+                  ExcMessage(
+                    "Maximum IDA internal steps per output must be positive."));
+      tolerance_ramp_.validate(problem.ida_parameters.initial_time,
+                               problem.ida_parameters.final_time,
+                               problem.ida_parameters.output_period);
+
       problem.pcout << "=== Blood Flow HDG, polynomial degree p = "
                     << problem.fe_degree << ", running on "
                     << problem.n_mpi_processes << " MPI rank(s) ===\n";
@@ -77,10 +98,32 @@ namespace MetricFlowX
           // mass_conservation.csv and ida_step_history.csv, and resets the
           // IDA counters for this cycle.
           problem.open_output_files();
-          problem.initialize_state(problem.solution,
-                                   problem.ida_parameters.initial_time);
-          problem.initialize_state_derivative(
-            problem.solution_dot, problem.ida_parameters.initial_time);
+          const auto preparation_start = std::chrono::steady_clock::now();
+          const bool native_pair_verified =
+            problem.initial_condition_policy == "native" ||
+            problem.ida_parameters.ic_type ==
+              SUNDIALS::IDA<VectorType>::AdditionalData::none;
+          if (native_pair_verified)
+            problem.initialize_consistent_state(
+              problem.solution,
+              problem.solution_dot,
+              problem.ida_parameters.initial_time);
+          else
+            {
+              problem.initialize_state(problem.solution,
+                                       problem.ida_parameters.initial_time);
+              problem.initialize_state_derivative(
+                problem.solution_dot, problem.ida_parameters.initial_time);
+            }
+          const double preparation_wall =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                          preparation_start)
+              .count();
+          bool          initial_output_seen = false;
+          unsigned long ic_residual_calls = 0, ic_jacobian_setups = 0,
+                        ic_linear_solves = 0;
+          double ida_initialization_wall = 0., first_interval_wall = -1.;
+          std::chrono::steady_clock::time_point solve_start, integration_start;
           problem.time = problem.ida_parameters.initial_time;
 
           auto check_jacobian_fd = [&problem](const VectorType &y0) {
@@ -197,11 +240,14 @@ namespace MetricFlowX
                              "==========\n";
           };
 
-          if (problem.verbosity > 0)
+          if (problem.check_initial_jacobian)
             check_jacobian_fd(problem.solution);
 
-          problem.ida_parameters.ic_type =
-            SUNDIALS::IDA<VectorType>::AdditionalData::use_y_diff;
+          if (problem.initial_condition_policy == "native")
+            problem.ida_parameters.ic_type =
+              SUNDIALS::IDA<VectorType>::AdditionalData::none;
+          IDAErrorGuard::validate_setup(problem.ida_parameters);
+          IDAErrorGuard             ida_errors(problem.mpi_communicator_);
           SUNDIALS::IDA<VectorType> ida(problem.ida_parameters,
                                         problem.mpi_communicator_);
 
@@ -219,7 +265,18 @@ namespace MetricFlowX
               };
             }
 
-          ida.differential_components = [&problem]() -> IndexSet {
+          if (tolerance_ramp_.enabled && !problem.use_componentwise_tolerances)
+            absolute_tolerances = problem.ida_parameters.absolute_tolerance;
+          RampSource::attach(ida,
+                             tolerance_ramp_,
+                             problem.ida_parameters,
+                             absolute_tolerances);
+
+          ida.differential_components =
+            [this, &problem, &ida, &ida_errors]() -> IndexSet {
+            ida_errors.install(internal::native_ida_memory(ida),
+                               maximum_ida_steps_per_output_);
+            RampSource::register_weights(internal::native_ida_memory(ida), ida);
             IndexSet is(problem.n_total_dofs);
             is.add_indices(problem.cell_dofs_owned);
             is.add_indices(problem.rcr_dofs_owned);
@@ -227,19 +284,30 @@ namespace MetricFlowX
             return is;
           };
 
-          ida.residual = [&problem, &ida](const double      t,
-                                          const VectorType &y,
-                                          const VectorType &ydot,
-                                          VectorType       &res) -> int {
+          ida.residual = [&problem,
+                          &ida,
+                          &initial_output_seen,
+                          &ic_residual_calls](const double      t,
+                                              const VectorType &y,
+                                              const VectorType &ydot,
+                                              VectorType       &res) -> int {
+            if (!initial_output_seen)
+              ++ic_residual_calls;
             problem.poll_ida_internal_step(ida);
             problem.assemble_residual(t, y, ydot, res);
             return 0;
           };
 
-          ida.setup_jacobian = [&problem](const double      t,
-                                          const VectorType &y,
-                                          const VectorType &ydot,
-                                          const double      alpha) -> int {
+          std::unique_ptr<SerialDirectSolver> serial_direct;
+          ida.setup_jacobian = [&problem,
+                                &initial_output_seen,
+                                &ic_jacobian_setups,
+                                &serial_direct](const double      t,
+                                                const VectorType &y,
+                                                const VectorType &ydot,
+                                                const double alpha) -> int {
+            if (!initial_output_seen)
+              ++ic_jacobian_setups;
             TimerOutput::Scope ts(problem.computing_timer, "setup_jacobian");
             problem.assemble_jacobian(t, y, ydot, alpha);
             problem.linear_system_matrix.copy_from(problem.jacobian_matrix);
@@ -256,16 +324,16 @@ namespace MetricFlowX
                   problem.n_mpi_processes == 1,
                   ExcMessage(
                     "Parallel direct solves require PETSc with MUMPS. Set Use direct solver = false."));
-                problem.direct_lu =
-                  std::make_unique<PETScWrappers::PreconditionLU>(
-                    problem.linear_system_matrix);
-                // Inflow trace rows can have a zero diagonal at rest.
-                const PetscErrorCode error = PCFactorReorderForNonzeroDiagonal(
-                  problem.direct_lu->get_pc(),
-                  PETScWrappers::PreconditionLU::AdditionalData().zero_pivot);
-                AssertThrow(error == 0,
-                            ExcMessage(
-                              "Cannot reorder the native PETSc LU diagonal."));
+#    ifdef DEAL_II_WITH_UMFPACK
+                if (!serial_direct)
+                  serial_direct = std::make_unique<SerialDirectSolver>();
+                serial_direct->initialize(problem.linear_system_matrix);
+#    else
+                AssertThrow(
+                  false,
+                  ExcMessage(
+                    "Serial direct solves require deal.II with UMFPACK or PETSc with MUMPS. Set Use direct solver = false."));
+#    endif
 
 #  endif
 #else
@@ -285,9 +353,11 @@ namespace MetricFlowX
             return 0;
           };
 
-          ida.solve_with_jacobian = [&problem](const VectorType &r,
-                                               VectorType       &z,
-                                               const double /*tol*/) -> int {
+          ida.solve_with_jacobian =
+            [&problem, &initial_output_seen, &ic_linear_solves, &serial_direct](
+              const VectorType &r, VectorType &z, const double /*tol*/) -> int {
+            if (!initial_output_seen)
+              ++ic_linear_solves;
             TimerOutput::Scope ts(problem.computing_timer,
                                   "solve_with_jacobian");
 
@@ -299,7 +369,13 @@ namespace MetricFlowX
                                              z,
                                              r);
 #  else
-                problem.direct_lu->vmult(z, r);
+#    ifdef DEAL_II_WITH_UMFPACK
+                serial_direct->vmult(z, r);
+#    else
+                AssertThrow(false,
+                            ExcMessage(
+                              "Serial direct UMFPACK support is unavailable."));
+#    endif
 #  endif
 #else
                 problem.direct_solver->solve(z, r);
@@ -307,8 +383,12 @@ namespace MetricFlowX
               }
             else
               {
-                SolverControl   solver_control(1000, 1e-10 * r.l2_norm());
-                LA::SolverGMRES solver(solver_control);
+                SolverControl solver_control(1000, 1e-10 * r.l2_norm());
+                LA::SolverGMRES::AdditionalData solver_data;
+                // SolverControl uses the unpreconditioned RHS norm.
+                // Right preconditioning keeps the residual in those units.
+                solver_data.right_preconditioning = true;
+                LA::SolverGMRES solver(solver_control, solver_data);
                 solver.solve(problem.linear_system_matrix,
                              z,
                              r,
@@ -319,31 +399,74 @@ namespace MetricFlowX
 
           const double initial_output_time =
             problem.ida_parameters.initial_time;
-          const double final_output_time = problem.ida_parameters.final_time;
-          double       next_output_time  = initial_output_time;
-          unsigned int output_number     = 0;
+          const double final_output_time    = problem.ida_parameters.final_time;
+          double       next_output_time     = initial_output_time;
+          unsigned int output_number        = 0;
+          bool         final_output_written = false;
           ida.output_step =
             [&problem,
              &ida,
+             &ida_errors,
              initial_output_time,
              final_output_time,
              &next_output_time,
-             &output_number](const double      t,
-                             const VectorType &sol,
-                             const VectorType & /*ydot*/,
-                             const unsigned int /*step_number*/) {
+             &output_number,
+             &final_output_written,
+             &initial_output_seen,
+             &ida_initialization_wall,
+             &solve_start,
+             &integration_start,
+             &first_interval_wall](const double      callback_time,
+                                   const VectorType &sol,
+                                   const VectorType & /*ydot*/,
+                                   const unsigned int step_number) {
+              ida_errors.check();
+              RampSource::after_solve(ida);
+              // deal.II IDA reports zero for its initial output callback,
+              // including when integration starts at a nonzero time.
+              const double t =
+                step_number == 0 ? initial_output_time : callback_time;
+              if (step_number == 0)
+                {
+                  ida_initialization_wall =
+                    std::chrono::duration<double>(
+                      std::chrono::steady_clock::now() - solve_start)
+                      .count();
+                  initial_output_seen = true;
+                }
+              else if (first_interval_wall < 0.)
+                first_interval_wall =
+                  std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - integration_start)
+                    .count();
               problem.time = t;
+              // IDA accumulates its callback times by repeated addition.
+              // Use the callback grid only to select outputs; retain the
+              // physical callback time for every recorded value and timestamp.
+              const double schedule_time =
+                initial_output_time +
+                step_number * problem.ida_parameters.output_period;
               const double tolerance =
                 16.0 * std::numeric_limits<double>::epsilon() *
-                std::max(std::abs(t), std::abs(next_output_time));
+                std::max(std::abs(schedule_time), std::abs(next_output_time));
               const double final_time_tolerance =
                 16.0 * std::numeric_limits<double>::epsilon() *
                 std::max(std::abs(t), std::abs(final_output_time));
               problem.poll_ida_internal_step(ida, /*resync_time=*/true);
-              const bool output_due =
-                problem.time_interval == 0.0 || t >= next_output_time ||
-                next_output_time - t <= tolerance || t >= final_output_time ||
+              const bool at_final_time =
+                t >= final_output_time ||
                 final_output_time - t <= final_time_tolerance;
+              const bool nominal_final_time =
+                schedule_time >= final_output_time ||
+                final_output_time - schedule_time <= final_time_tolerance;
+              if (problem.time_interval > 0.0 &&
+                  (final_output_written ||
+                   (nominal_final_time && !at_final_time)))
+                return;
+              const bool output_due =
+                problem.time_interval == 0.0 ||
+                schedule_time >= next_output_time ||
+                next_output_time - schedule_time <= tolerance || at_final_time;
               if (!output_due)
                 return;
 
@@ -358,38 +481,102 @@ namespace MetricFlowX
               // HDG_IDA_Vessel_*.csv + mass_conservation.csv
               problem.write_output_step(t, sol);
               problem.report_flow_regime(sol, t);
+              final_output_written = at_final_time;
 
               if (problem.time_interval > 0.0)
                 {
                   const long double elapsed =
-                    (static_cast<long double>(t + tolerance) -
+                    (static_cast<long double>(schedule_time + tolerance) -
                      initial_output_time) /
                     problem.time_interval;
                   const long double intervals = std::floor(elapsed) + 1.0L;
                   next_output_time            = static_cast<double>(
                     static_cast<long double>(initial_output_time) +
                     intervals * problem.time_interval);
-                  if (next_output_time <= t)
+                  if (next_output_time <= schedule_time)
                     next_output_time =
-                      std::nextafter(t,
+                      std::nextafter(schedule_time,
                                      std::numeric_limits<double>::infinity());
                 }
+              if (step_number == 0)
+                integration_start = std::chrono::steady_clock::now();
             };
 
-          problem.solution_dot   = 0.0;
-          problem.time           = problem.ida_parameters.initial_time;
-          const auto solve_start = std::chrono::steady_clock::now();
+          problem.time = problem.ida_parameters.initial_time;
+          solve_start  = std::chrono::steady_clock::now();
           ida.solve_dae(problem.solution, problem.solution_dot);
+          ida_errors.check();
+          RampSource::after_solve(ida);
           const double solve_wall_time =
             std::chrono::duration<double>(std::chrono::steady_clock::now() -
                                           solve_start)
               .count();
+          if (problem.this_mpi_process == 0)
+            {
+              const std::string  folder = problem.output_directory.empty() ?
+                                            "." :
+                                            problem.output_directory;
+              std::ofstream      statistics(folder +
+                                       "/initialization_statistics.json");
+              const auto        &d = problem.initial_state_diagnostics();
+              std::ostringstream differential_defect;
+              if (native_pair_verified)
+                differential_defect << std::setprecision(17)
+                                    << d.differential_defect;
+              else
+                differential_defect << "null";
+
+              statistics
+                << std::setprecision(17) << "{\n  \"initial_state_source\": \""
+                << problem.initial_state_source << "\",\n"
+                << "  \"initial_condition_policy\": \""
+                << problem.initial_condition_policy << "\",\n"
+                << "  \"preparation_wall_s\": " << preparation_wall << ",\n"
+                << "  \"ida_setup_and_ic_wall_s\": " << ida_initialization_wall
+                << ",\n"
+                << "  \"first_ida_output_interval_wall_s\": "
+                << first_interval_wall << ",\n"
+                << "  \"ic_residual_calls\": " << ic_residual_calls << ",\n"
+                << "  \"ic_jacobian_setups\": " << ic_jacobian_setups << ",\n"
+                << "  \"ic_linear_solves\": " << ic_linear_solves << ",\n"
+                << "  \"trace_iterations\": " << d.trace_iterations << ",\n"
+                << "  \"largest_trace_block\": " << d.largest_trace_block
+                << ",\n"
+                << "  \"algebraic_defect\": " << d.algebraic_defect << ",\n"
+                << "  \"differential_defect\": " << differential_defect.str()
+                << ",\n  \"native_pair_verified\": "
+                << (native_pair_verified ? "true" : "false")
+                << ",\n  \"tolerance_ramp_enabled\": "
+                << (tolerance_ramp_.enabled ? "true" : "false");
+              if (tolerance_ramp_.enabled)
+                {
+                  const auto &r = RampSource::diagnostics(ida);
+                  statistics
+                    << ",\n  \"ramp_registrations\": " << r.registrations
+                    << ",\n  \"ramp_weight_evaluations\": "
+                    << r.weight_evaluations
+                    << ",\n  \"ramp_stop_arms\": " << r.stop_arms
+                    << ",\n  \"ramp_stop_releases\": " << r.stop_releases
+                    << ",\n  \"ramp_last_relative_factor\": "
+                    << r.last_scales.relative
+                    << ",\n  \"ramp_last_absolute_factor\": "
+                    << r.last_scales.absolute;
+                }
+              statistics << "\n}\n";
+              AssertThrow(statistics.good(),
+                          ExcMessage(
+                            "Cannot write initialization statistics."));
+            }
           problem.finalize_output(ida, solve_wall_time);
           problem.compute_pressure(problem.solution, problem.pressure_);
           problem.compute_errors(cycle);
         }
       problem.write_scaling_timings();
     }
+
+  private:
+    ToleranceRamp tolerance_ramp_;
+    long int      maximum_ida_steps_per_output_ = 500;
   };
 } // namespace MetricFlowX
 
@@ -414,8 +601,8 @@ main(int argc, char **argv)
       /* ------------------------- 3. Set up the problem ----------------------
        */
       BloodFlowSystem<1, 3> problem; // 1-dim geometry embedded in \mathbb{R}^3
+      BloodFlowIDARunner<1, 3> runner(problem);
       problem.initialize_params(par_name);
-      BloodFlowIDARunner<1, 3> runner;
       runner.run(problem);
 
       /* ------------------------ 4. Normal program exit ----------------------

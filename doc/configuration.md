@@ -13,7 +13,7 @@ The following entries are registered by `BloodFlowSystem` in `include/metric_flo
 | `Output filename` | Base name for generated visualization output. |
 | `Output directory` | Directory prefix for generated output; empty means the current working directory. |
 | `Output time interval` | Positive finite values set the interval between written outputs; zero writes at every IDA callback. Positive intervals must be representable at the configured time scale. |
-| `Use direct solver` | Select the direct PETSc/ MUMPS or Trilinos direct path; `false` selects GMRES+ILU. |
+| `Use direct solver` | Select MUMPS, serial UMFPACK for PETSc without MUMPS, or the Trilinos direct path; `false` selects GMRES+ILU. |
 | `Number of refinement cycles` | Number of solve/refinement cycles in `run()`. |
 | `Number of global refinement` | Initial global mesh refinement count. |
 | `Theta (penalty parameter)` | Interior penalty/stability parameter used by assembly. |
@@ -27,6 +27,12 @@ The following entries are registered by `BloodFlowSystem` in `include/metric_flo
 | `Vtk file path for mesh input` | Legacy VTK network mesh read during setup. |
 
 The `Metric Flow Parameters` group currently registers the source names `rho`, `mu`, `xi`, `m`, and `Rt`, displayed in parameter files as `Density (rho)`, `Viscosity coefficient (mu)`, `Profile constant for friction term (xi)`, `Tube law exponent (m)`, and `Reflection coefficient at outflow boundary (Rt)`.
+
+For PETSc builds without MUMPS, serial direct solves use deal.II's pivoting
+UMFPACK solver on a solver-owned copy of the assembled operator. Its ordinary
+factorization controls leave the original Jacobian, initial state and IDA error
+weights unchanged. This path requires deal.II with UMFPACK; otherwise select the
+iterative solver. Parallel direct solves still require PETSc with MUMPS.
 
 ## IDA parameters
 
