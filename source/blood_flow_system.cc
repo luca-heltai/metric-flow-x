@@ -3884,6 +3884,9 @@ namespace MetricFlowX
     std::vector<double> Ahat_q(fef.n_quadrature_points),
       Uhat_q(fef.n_quadrature_points);
     FullMatrix<double> cell_matrix(n_dofs, n_dofs);
+    const unsigned int n_trace_columns = 2 * GeometryInfo<dim>::faces_per_cell;
+    std::vector<types::global_dof_index> trace_columns(n_trace_columns);
+    FullMatrix<double>                   trace_matrix(n_dofs, n_trace_columns);
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
@@ -3903,7 +3906,8 @@ namespace MetricFlowX
         fev[velocity_extractor].get_function_values_from_local_dof_values(
           local_values, U_h);
 
-        cell_matrix = 0.0;
+        cell_matrix  = 0.0;
+        trace_matrix = 0.0;
 
         // ---- Block (1,1) volume - cell_matrix
         // -------------------------------
@@ -3976,6 +3980,8 @@ namespace MetricFlowX
             const auto [loc_a_hat_dof, loc_u_hat_dof] =
               face_trace_dofs(ldofs, f);
             const FaceTraceDof td{loc_a_hat_dof, loc_u_hat_dof};
+            trace_columns[2 * f]     = td.a_hat_dof;
+            trace_columns[2 * f + 1] = td.u_hat_dof;
 
             for (unsigned int q = 0; q < fef.n_quadrature_points; ++q)
               {
@@ -4019,10 +4025,12 @@ namespace MetricFlowX
                       }
                   }
 
-                // (1,2) -> jacobian_matrix (trace cols)
+                // (1,2) -> trace_matrix (trace cols)
                 for (const auto trace_col : {td.a_hat_dof, td.u_hat_dof})
                   {
-                    const bool   is_a   = (trace_col == td.a_hat_dof);
+                    const bool         is_a = (trace_col == td.a_hat_dof);
+                    const unsigned int local_trace_column =
+                      2 * f + (is_a ? 0 : 1);
                     const double dA_hat = is_a ? 1.0 : 0.0;
                     const double dU_hat = is_a ? 0.0 : 1.0;
 
@@ -4048,17 +4056,14 @@ namespace MetricFlowX
                         if (comp >= 2)
                           continue; // trace rows carry no cell flux
                         const double phi = fef.shape_value(i, q);
-                        jacobian_matrix.add(ldofs[i],
-                                            trace_col,
-                                            -(comp == 0 ? dFA : dFU) * phi *
-                                              JxW_f[q]);
+                        trace_matrix(i, local_trace_column) =
+                          -(comp == 0 ? dFA : dFU) * phi * JxW_f[q];
                       }
                   }
               }
           }
-        // Single scatter: volume + face cell-cell ->
-        // jacobian_matrix
-
+        // Scatter trace columns before volume + face cell-cell entries.
+        jacobian_matrix.add(ldofs, trace_columns, trace_matrix);
         jacobian_matrix.add(ldofs, cell_matrix);
       }
   }
