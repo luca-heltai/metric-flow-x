@@ -29,8 +29,7 @@ auto y     = flow.make_state();
 auto y_dot = flow.make_state();
 auto F     = flow.make_state();
 
-flow.initialize_state(y, 0.0);
-flow.initialize_state_derivative(y_dot, 0.0);
+flow.initialize_consistent_state(y, y_dot, 0.0);
 flow.assemble_residual(0.0, y, y_dot, F);
 flow.assemble_state_jacobian(0.0, y, y_dot);      // dF/dy
 flow.assemble_derivative_jacobian(0.0, y, y_dot); // dF/dy_dot
@@ -42,6 +41,9 @@ component DoFs, and area/velocity extractors expose the discretization needed
 by an external multiphysics application. Constitutive access is provided by
 `vessel_properties()`, `pressure()`, `pressure_derivative()`, and
 `wave_speed()`.
+
+See [initialization and startup tolerances](doc/initialization.md) for the static
+0D seed, verified initial derivatives and an optional tolerance ramp.
 
 Mesh/property owners can use `setup(mesh_initializer)` to prepare the mesh
 before native DoFs are distributed. The initializer receives the unrefined
@@ -371,14 +373,17 @@ their original names and units.
 The PETSc direct path uses MUMPS when available and native serial LU otherwise.
 Native serial LU reorders for a nonzero diagonal before factorization.
 Parallel direct runs require PETSc built with MUMPS. Set `Use direct solver = false`
-for parallel GMRES with block Jacobi; local ILU shifts address zero pivots in DAE
-subdomain blocks and can be overridden through PETSc options. This also applies
-to trace initialization. A missing PETSc MUMPS backend must never produce an
+for parallel GMRES with overlapping ASM subdomains and local ILU factors.
+One level of overlap covers cross-rank DAE couplings that can make rank-local
+blocks singular. Explicit PETSc options remain authoritative. Right
+preconditioning checks the original residual against the RHS-based tolerance.
+Native trace initialization instead solves independent face/junction blocks. A missing PETSc MUMPS backend must never produce an
 unchanged solution while reporting a successful direct solve.
 
 The Trilinos backend uses Amesos for direct solves and deal.II GMRES with Ifpack
-ILU for iterative solves. Its local ILU factors use an absolute diagonal shift
-of `1e-5` for algebraic DAE rows; the Jacobian itself is unchanged.
+ILU with one level of overlap for iterative solves. Its local ILU factors use
+an absolute diagonal shift of `1e-5` for algebraic DAE rows; the Jacobian itself
+is unchanged.
 
 Validation uses a synthetic triangular waveform at one and two ranks, compares
 CSV with the equivalent analytic inlet, checks nonzero prescribed flow, and

@@ -62,6 +62,7 @@ getting_started
 build_and_run
 containers
 math
+initialization
 results
 performance
 performance_campaign
