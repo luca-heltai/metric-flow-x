@@ -1,0 +1,40 @@
+subsection Metric Flow Parameters
+  set Viscosity coefficient (mu) = 0.004
+  set Profile constant for friction term (xi) = 2
+end
+
+subsection Functions
+  set Inflow function = 1e-6
+end
+
+subsection MetricFlowSystem<1, 3>
+  # Use "steady network" to export only the rigid resistive 0D solution.
+  set Run mode = steady HDG
+  set Initial state source = steady network
+  set Vtk file path for mesh input = @SOURCE_DIR@/parameters/single_vessel.vtk
+  set Finite element degree = 2
+  set Number of global refinement = 1
+  set Output directory = stationary_output
+  set Output filename = stationary
+  set Write terminal CSV files = true
+  set Outlet boundary condition type = RCR
+  set Terminal parameter source = Parameters
+  set Default terminal R1 = 1e7
+  set Default terminal R2 = 1e8
+  set Default terminal C = 1e-8
+  set Default terminal P_out = 1000
+  set Use componentwise absolute tolerances = true
+  set Area absolute tolerance fraction = 1e-8
+  set Velocity absolute tolerance = 1e-8
+  set Capacitor pressure absolute tolerance = 1e-3
+  subsection IDA parameters
+    set Initial time = 0
+    set Final time = 0
+    subsection Error control
+      set Relative error tolerance = 1e-6
+    end
+    subsection Initial condition correction parameters
+      set Maximum number of nonlinear iterations = 15
+    end
+  end
+end

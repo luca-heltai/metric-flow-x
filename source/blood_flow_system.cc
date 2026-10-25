@@ -45,6 +45,10 @@
 #include <metric_flow_x/blood_flow_system.h>
 #include <metric_flow_x/io/vtk_utils.h>
 
+#ifdef METRIC_FLOW_X_WITH_PETSC
+#  include <petscoptions.h>
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -150,6 +154,16 @@ namespace MetricFlowX
     }
   } // namespace internal_ida_access
 
+  namespace internal
+  {
+    // Shared with the runner's supported SUNDIALS tolerance-weight adapter.
+    void *
+    native_ida_memory(const SUNDIALS::IDA<VectorType> &ida)
+    {
+      return internal_ida_access::get_ida_mem(ida);
+    }
+  } // namespace internal
+
   // ==========================================================================
   // Constructor
   // ==========================================================================
@@ -195,6 +209,14 @@ namespace MetricFlowX
     add_parameter("Problem constants", constants);
     add_parameter("Output filename", output_filename);
     add_parameter("Use direct solver", use_direct_solver);
+    add_parameter("Initial state source", initial_state_source);
+    add_parameter("Initial condition policy", initial_condition_policy);
+    add_parameter("Initial consistency tolerance",
+                  initial_consistency_tolerance);
+    add_parameter("Initial consistency maximum iterations",
+                  initial_consistency_max_iterations);
+    add_parameter("Check Jacobian at startup", check_initial_jacobian);
+
     add_parameter("Use componentwise absolute tolerances",
                   use_componentwise_tolerances);
     add_parameter("Area absolute tolerance fraction",
@@ -300,6 +322,22 @@ namespace MetricFlowX
         terminal_parameters_csv_file.empty(),
       ExcMessage(
         "Terminal parameters CSV file requires Terminal parameter source = Parameters."));
+
+
+    AssertThrow(initial_state_source == "rest" ||
+                  initial_state_source == "steady network",
+                ExcMessage(
+                  "Initial state source must be rest or steady network."));
+    AssertThrow(initial_condition_policy == "native" ||
+                  initial_condition_policy == "IDA",
+                ExcMessage("Initial condition policy must be native or IDA."));
+    AssertThrow(
+      std::isfinite(initial_consistency_tolerance) &&
+        initial_consistency_tolerance > 0. &&
+        initial_consistency_tolerance < 1. &&
+        initial_consistency_max_iterations > 0,
+      ExcMessage(
+        "Initial consistency needs a tolerance in (0,1) and a positive iteration limit."));
 
     exact_solution.update_constants(par);
     rhs_function.update_constants(par);
@@ -482,16 +520,35 @@ namespace MetricFlowX
                   ExcMessage("PETSc preconditioner setup error " +
                              std::to_string(error)));
     };
-    const PC pc = preconditioner.get_pc();
-    PCType   type;
+    const PC     pc            = preconditioner.get_pc();
+    PetscBool    explicit_type = PETSC_FALSE;
+    const char  *prefix        = nullptr;
+    PetscOptions options       = nullptr;
+    check(
+      PetscObjectGetOptionsPrefix(reinterpret_cast<PetscObject>(pc), &prefix));
+    check(PetscObjectGetOptions(reinterpret_cast<PetscObject>(pc), &options));
+    check(PetscOptionsHasName(options, prefix, "-pc_type", &explicit_type));
+    if (!explicit_type && n_mpi_processes > 1)
+      {
+        // A rank-local DAE block can be singular even when the global
+        // Jacobian is invertible. Include neighboring equations before ILU.
+        check(PCSetType(pc, PCASM));
+        check(PCASMSetOverlap(pc, 1));
+        check(PCSetFromOptions(pc));
+      }
+    PCType type;
     check(PCGetType(pc, &type));
-    if (std::string(type) != PCBJACOBI)
+    const std::string name(type);
+    if (name != PCBJACOBI && name != PCASM)
       return; // Respect a different preconditioner explicitly selected by PETSc
               // options.
     check(PCSetUp(pc));
     PetscInt count;
     KSP     *subsolvers;
-    check(PCBJacobiGetSubKSP(pc, &count, nullptr, &subsolvers));
+    if (name == PCASM)
+      check(PCASMGetSubKSP(pc, &count, nullptr, &subsolvers));
+    else
+      check(PCBJacobiGetSubKSP(pc, &count, nullptr, &subsolvers));
     for (PetscInt i = 0; i < count; ++i)
       {
         PC subpc;
@@ -500,6 +557,10 @@ namespace MetricFlowX
         if (std::string(type) == PCILU || std::string(type) == PCLU)
           {
             check(PCFactorSetShiftType(subpc, MAT_SHIFT_NONZERO));
+            // The coupled vessel equations need fill beyond their original
+            // sparsity pattern for a useful local approximation.
+            if (n_mpi_processes > 1 && std::string(type) == PCILU)
+              check(PCFactorSetLevels(subpc, 1));
             check(PCSetFromOptions(subpc));
           }
       }
@@ -508,6 +569,8 @@ namespace MetricFlowX
     // diagonal entries even when the global Jacobian is invertible.
     typename IterativePreconditioner::AdditionalData data;
     data.ilu_atol = 1e-5;
+    data.ilu_fill = n_mpi_processes > 1 ? 1 : 0;
+    data.overlap  = 1;
     preconditioner.initialize(matrix, data);
 #endif
   }
@@ -869,6 +932,33 @@ namespace MetricFlowX
                 if (rcr.R2 > 0.0)
                   rcr_map[bid] = rcr;
               }
+      }
+
+
+    // Preserve the coarse hydraulic graph before refinement/partitioning.
+    // File vertex identities distinguish coincident, disconnected vertices.
+    initial_graph_points_.clear();
+    std::map<unsigned int, unsigned int> graph_vertex_number;
+    for (const auto &cell : serial_triangulation.active_cell_iterators())
+      for (const auto f : cell->vertex_indices())
+        if (graph_vertex_number
+              .emplace(cell->vertex_index(f), initial_graph_points_.size())
+              .second)
+          initial_graph_points_.push_back(cell->vertex(f));
+    initial_graph_cells_.clear();
+    initial_graph_boundaries_.clear();
+    for (const auto &cell : serial_triangulation.active_cell_iterators())
+      {
+        initial_graph_cells_.emplace(
+          cell->id().get_coarse_cell_id(),
+          InitialGraphCell{graph_vertex_number.at(cell->vertex_index(0)),
+                           graph_vertex_number.at(cell->vertex_index(1)),
+                           cell->material_id()});
+        for (const auto f : cell->face_indices())
+          if (vertex_degree[cell->vertex_index(f)] == 1)
+            initial_graph_boundaries_.emplace(graph_vertex_number.at(
+                                                cell->vertex_index(f)),
+                                              cell->face(f)->boundary_id());
       }
 
     vessel_terminals.clear();
@@ -1877,10 +1967,16 @@ namespace MetricFlowX
   // ============================================================================
   template <int dim, int spacedim>
   void
-  BloodFlowSystem<dim, spacedim>::compute_initial_solution(VectorType &dst,
-                                                           const double /*t*/)
+  BloodFlowSystem<dim, spacedim>::compute_initial_solution(VectorType  &dst,
+                                                           const double t)
   {
     TimerOutput::Scope timer(computing_timer, "compute_initial_solution");
+    if (initial_state_source == "steady network")
+      {
+        compute_steady_network_initial_solution(dst, t);
+        return;
+      }
+
 
     dst = 0.0;
 
@@ -1955,141 +2051,7 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::initialize_trace_unknowns(VectorType  &sol,
                                                             const double t)
   {
-    TimerOutput::Scope timer(computing_timer, "initialize_trace_unknowns");
-
-    const double       tol      = 1.0e-8;
-    const unsigned int max_iter = 50;
-    if (verbosity > 0)
-      pcout << "\n=== initialize_trace_unknowns (Newton) ===\n";
-
-    VectorType G(locally_owned_dofs_, mpi_communicator_);
-    VectorType rhs(locally_owned_dofs_, mpi_communicator_);
-    VectorType delta(locally_owned_dofs_, mpi_communicator_);
-
-    for (unsigned int iter = 0; iter < max_iter; ++iter)
-      {
-        update_ghosted_vectors(sol);
-
-        // ---- G(yhat) = F_trace(y_cell^0, yhat) ------------------------------
-        G = 0.0;
-        assemble_trace_interior_equations(t, y_relevant, G);
-        assemble_trace_boundary_equations(t, y_relevant, G);
-        assemble_trace_junction_equations(t, y_relevant, G);
-        assemble_trace_continuity_equations(y_relevant, G);
-        G.compress(VectorOperation::add);
-
-        // ---- convergence, over the algebraic rows only ----------------------
-        double gnorm_inf_local = 0.0;
-        for (const auto i : trace_dofs_owned)
-          gnorm_inf_local = std::max(gnorm_inf_local, std::abs(G(i)));
-
-        const double gnorm_inf =
-          Utilities::MPI::max(gnorm_inf_local, mpi_communicator_);
-        if (verbosity > 0)
-          pcout << "  iter " << std::setw(3) << iter
-                << "  ||G||_inf = " << std::scientific << std::setprecision(4)
-                << gnorm_inf << "\n";
-
-        if (gnorm_inf < tol)
-          {
-            if (verbosity > 0)
-              pcout << "  Converged in " << iter << " Newton iteration(s).\n";
-            break;
-          }
-
-        if (iter == max_iter - 1)
-          {
-            pcout << "WARNING: initialize_trace_unknowns did not converge.\n"
-                  << "         tol=" << tol << "  ||G||_inf=" << gnorm_inf
-                  << "  after " << max_iter << " iterations.\n";
-            break;
-          }
-
-        // ---- J_tt, with an identity on every non-trace row
-        // -------------------
-        jacobian_matrix = 0.0;
-        assemble_jacobian_trace_interior_block(y_relevant);
-        assemble_jacobian_trace_boundary_block(t, y_relevant);
-        assemble_jacobian_trace_junction_block(y_relevant);
-        assemble_jacobian_trace_continuity_block();
-        jacobian_matrix.compress(VectorOperation::add);
-
-        linear_system_matrix = 0.0;
-        for (const auto i : trace_dofs_owned)
-          for (auto it = jacobian_matrix.begin(i); it != jacobian_matrix.end(i);
-               ++it)
-            linear_system_matrix.set(i, it->column(), it->value());
-
-        for (const auto i : cell_dofs_owned)
-          linear_system_matrix.set(i, i, 1.0);
-        for (const auto i : rcr_dofs_owned)
-          linear_system_matrix.set(i, i, 1.0);
-        linear_system_matrix.compress(VectorOperation::insert);
-
-        // ---- b = -G on the trace rows, zero elsewhere
-        // ------------------------ The identity rows then return delta = 0
-        // there, so the cell values and the seeded capacitor pressures are left
-        // untouched.
-        rhs = 0.0;
-        for (const auto i : trace_dofs_owned)
-          rhs(i) = -G(i);
-        rhs.compress(VectorOperation::insert);
-
-        // ---- solve and update
-        // ------------------------------------------------
-        {
-          if (use_direct_solver)
-            {
-              SolverControl solver_control(1, 0.0);
-#ifdef METRIC_FLOW_X_WITH_PETSC
-#  ifdef DEAL_II_PETSC_WITH_MUMPS
-              PETScWrappers::SparseDirectMUMPS newton_solver(solver_control);
-              newton_solver.solve(linear_system_matrix, delta, rhs);
-#  else
-              AssertThrow(
-                n_mpi_processes == 1,
-                ExcMessage(
-                  "Parallel direct solves require PETSc with MUMPS. Set Use direct solver = false for GMRES with block Jacobi."));
-              PETScWrappers::PreconditionLU factorization(linear_system_matrix);
-              const PetscErrorCode error = PCFactorReorderForNonzeroDiagonal(
-                factorization.get_pc(),
-                PETScWrappers::PreconditionLU::AdditionalData().zero_pivot);
-              AssertThrow(error == 0,
-                          ExcMessage("Cannot reorder the trace LU diagonal."));
-              factorization.vmult(delta, rhs);
-#  endif
-#else
-              TrilinosWrappers::SolverDirect newton_solver(solver_control);
-              newton_solver.solve(linear_system_matrix, delta, rhs);
-#endif
-            }
-          else
-            {
-              SolverControl   solver_control(1000, 1e-12 * rhs.l2_norm());
-              LA::SolverGMRES newton_solver(solver_control);
-              IterativePreconditioner preconditioner;
-              initialize_iterative_preconditioner(preconditioner,
-                                                  linear_system_matrix);
-              newton_solver.solve(linear_system_matrix,
-                                  delta,
-                                  rhs,
-                                  preconditioner);
-            }
-        }
-
-        AssertThrow(std::isfinite(delta.l2_norm()),
-                    ExcMessage(
-                      "Trace linear solve returned a non-finite correction."));
-
-        for (const auto i : trace_dofs_owned)
-          sol(i) += delta(i);
-        sol.compress(VectorOperation::add);
-      }
-
-    jacobian_matrix      = 0.0;
-    linear_system_matrix = 0.0;
-    jacobian_matrix.compress(VectorOperation::insert);
-    linear_system_matrix.compress(VectorOperation::insert);
+    correct_initial_traces(sol, t);
   }
 
   // ============================================================================
@@ -2098,7 +2060,7 @@ namespace MetricFlowX
   // For every locally owned cell K:
   //   per_cell_mass     : M_K, used for the M*ydot term of the residual and the
   //                       alpha*M term of the Jacobian
-  //   per_cell_mass_inv : M_K^{-1}, diagnostic only
+  //   per_cell_mass_inv : M_K^{-1}, initial derivative reconstruction
   //
   // Indexed by cell->active_cell_index(): deal.II numbers the locally stored
   // active cells contiguously from zero, so the vectors are sized to the local
@@ -2154,8 +2116,8 @@ namespace MetricFlowX
 
         per_cell_mass[cell->active_cell_index()] = M;
 
-        // For the diagnostic inverse, put 1 on the trace diagonal so the dense
-        // inverse exists; that block is never applied.
+        // For the initial-state inverse, put 1 on the trace diagonal so the
+        // dense inverse exists; that block is never applied.
         FullMatrix<double> M_inv(M);
         for (unsigned int i = 0; i < n_dofs; ++i)
           if (fe_->system_to_component_index(i).first >= 2)

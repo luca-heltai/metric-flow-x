@@ -26,6 +26,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_assembly_comparison.py -v
       - name: Test solver-weighted inflow comparison
         run: python3 -m unittest discover -s tests -p test_inflow_trajectory_comparison.py -v
+      - name: Test startup ramp comparison tools
+        run: python3 -m unittest discover -s tests -p test_late_ramp_outputs.py -v
       - name: Test manufactured sources
         run: python3 -m unittest discover -s tests -p test_mms_tools.py -v
       - name: Test canonical paper runner
@@ -53,6 +55,12 @@ jobs:
           ctest --test-dir build -N
           ctest --test-dir build --no-tests=error --output-on-failure
           python3 tests/test_inflow_integration.py --executable build/blood_flow --mpi
+          python3 tests/test_initialization_mpi.py --build-dir build
+          python3 tests/test_iterative_bifurcation.py --executable build/blood_flow
+          python3 tests/test_iterative_adan.py --executable build/blood_flow
+          python3 tests/test_output_schedule.py --executable build/blood_flow
+          python3 tests/test_ida_work_limit.py --executable build/blood_flow
+          python3 tests/test_stationary_modes.py --executable build/blood_flow --mpi
       - name: Check dual-variant installation and downstream consumers
         if: matrix.build_type == 'DebugRelease'
         run: |

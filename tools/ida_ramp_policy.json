@@ -1,0 +1,78 @@
+{
+  "scope": "One unrefined degree-one ASCII single-vessel case; scalar global IDA weights; native0D initial state; no external pressure provider.",
+  "final_time": 10.0,
+  "initial_time": 0.0,
+  "late_window": [
+    9.0,
+    10.0
+  ],
+  "callback_interval": 0.05,
+  "file_interval": 0.05,
+  "waveform": "1e-6*(1+0.5*sin(2*3.141592653589793238462643383279502884*t))",
+  "base_atol": 1e-12,
+  "base_rtol": 1e-07,
+  "reference_atol": 1e-14,
+  "reference_rtol": 1e-09,
+  "ramp": {
+    "relative_factor": 1000.0,
+    "absolute_factor": 100.0,
+    "hold_duration": 0.1,
+    "end_time": 1.0
+  },
+  "physical": {
+    "rho": 1060.0,
+    "mu": 0.004,
+    "xi": 2.0,
+    "R1": 10000000.0,
+    "R2": 100000000.0,
+    "C": 1e-08,
+    "P_out": 1000.0
+  },
+  "initial_step_size": 0.0001,
+  "minimum_step_size": 1e-08,
+  "maximum_bdf_order": 2,
+  "runs_per_variant": 4,
+  "performance_order": [
+    "uniform-0",
+    "ramp-0",
+    "ramp-1",
+    "uniform-1",
+    "uniform-2",
+    "ramp-2",
+    "ramp-3",
+    "uniform-3"
+  ],
+  "reference_runs": 1,
+  "reference_excluded_from_timing_comparison": true,
+  "mpi_ranks": 1,
+  "map_by": "pe-list=8:ordered",
+  "bind_to": "core",
+  "preflight_maximum_busy_percent": 5.0,
+  "physical_gate": "Every one of the 13 late-window state/derived-output differences for every uniform/ramp pair must be strictly below its unchanged final solver-weight budget (normalized error<1). Tighter-run comparisons remain accuracy diagnostics, including failed metrics. All run validity, full output grids, finite data and physical-input checks remain mandatory.",
+  "physical_comparator_sha256": "91aa6d2eb3b84a76bba744c752961a5f75183c684d96a9709f1bb16382866f7b",
+  "diagnostics_only": [
+    "IDA adaptive internal times",
+    "IDA counters",
+    "relative mass imbalance"
+  ],
+  "all_raw_runs_retained": true,
+  "timeout_per_process_s": 1800,
+  "numerical_flux": "HLL_HDG",
+  "theta": 0.001,
+  "theta_boundary": 0.0,
+  "nominal_output_grid_roundoff_bound_s": 5.684341886080801e-13,
+  "pair_output_time_bound_s": 1e-14,
+  "description": "One-cell 10-second tolerance-ramp validation and balanced full-process benchmark; pilot timings are excluded from formal performance.",
+  "pilot": {
+    "measurement_kind": "correctness_only",
+    "actual_pair_count": 1,
+    "all_timings_excluded_from_formal_performance": true
+  },
+  "maximum_ida_internal_steps_per_output": 10000,
+  "protocol_version": 4,
+  "acceptance_target": "uniform_baseline_equivalence",
+  "mandatory_comparisons": "every_uniform_ramp_pair",
+  "diagnostic_comparisons": "each_production_run_vs_tighter_run",
+  "absolute_accuracy_certified": false,
+  "protocol_amendment": "After the failed v3 pilot and before fresh formal measurements, acceptance was narrowed to optimization equivalence against the unchanged uniform-tolerance baseline. The v3 pilot remains failed and its timings are excluded. No numerical bounds, grids, physical inputs or solver tolerances changed; no absolute trajectory-accuracy claim is made."
+}
