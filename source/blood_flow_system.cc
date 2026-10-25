@@ -224,6 +224,10 @@ namespace MetricFlowX
     add_parameter("Velocity absolute tolerance", velocity_absolute_tolerance);
     add_parameter("Capacitor pressure absolute tolerance",
                   capacitor_absolute_tolerance);
+    add_parameter(
+      "Print current statistics",
+      print_statistics,
+      "Print IDA progress at every output callback, independently of file cadence.");
     add_parameter("Write flow regime diagnostics",
                   write_flow_regime_diagnostics);
     add_parameter("Mach warning threshold", mach_warning_threshold);
@@ -5107,7 +5111,14 @@ namespace MetricFlowX
       }
 
     bdf_steps.fill(0);
-    bdf_prev_nst = 0;
+    bdf_prev_nst             = 0;
+    ida_jacobian_evaluations = ida_linear_solves = ida_linear_iterations = 0;
+    accepted_h_min                 = std::numeric_limits<double>::infinity();
+    accepted_h_max                 = 0.;
+    accepted_step_extrema_complete = true;
+    previous_console_statistics    = IDAOutputRecord{};
+    statistics_header_written      = false;
+    statistics_start               = std::chrono::steady_clock::now();
 
     ida_history.clear();
     prev_nni  = 0;
@@ -5130,7 +5141,10 @@ namespace MetricFlowX
              "nonlin_iters_interval,nonlin_iters_cumulative,"
              "nonlin_iters_per_step,nonlin_fails_interval,"
              "err_test_fails_interval,residual_evals_interval,"
-             "lin_setups_interval,last_step_size,last_order\n";
+             "lin_setups_interval,last_step_size,last_order,"
+             "nonlin_fails_cumulative,err_test_fails_cumulative,residual_evals_cumulative,"
+             "lin_setups_cumulative,jacobian_evals_cumulative,linear_solves_cumulative,"
+             "linear_iters_cumulative,min_step_size,max_step_size,step_extrema_available\n";
       }
 
     is_prev_nst = is_prev_nni = is_prev_ncfn = is_prev_netf = is_prev_nls = 0;
@@ -5153,7 +5167,8 @@ namespace MetricFlowX
   void
   BloodFlowSystem<dim, spacedim>::poll_ida_internal_step(
     const SUNDIALS::IDA<VectorType> &ida,
-    const bool                       resync_time)
+    const bool                       resync_time,
+    const bool                       require_consecutive_steps)
   {
     void *mem = internal_ida_access::get_ida_mem(ida);
     if (mem == nullptr)
@@ -5162,7 +5177,20 @@ namespace MetricFlowX
     long int nst = 0;
     IDAGetNumSteps(mem, &nst);
     if (nst == is_prev_nst)
-      return; // no new accepted step
+      {
+        if (resync_time)
+          AssertThrow(IDAGetCurrentTime(mem, &is_t_accepted) == 0,
+                      ExcMessage("Cannot resynchronize accepted IDA time."));
+        return; // no new accepted step
+      }
+    if (nst != is_prev_nst + 1)
+      {
+        AssertThrow(
+          !require_consecutive_steps,
+          ExcMessage(
+            "Accepted-step observation gap: poll IDA from every residual and output callback."));
+        accepted_step_extrema_complete = false;
+      }
 
     long int nni = 0, ncfn = 0, netf = 0, nls = 0;
     int      klast = 0;
@@ -5173,6 +5201,13 @@ namespace MetricFlowX
     IDAGetNumLinSolvSetups(mem, &nls);
     IDAGetLastOrder(mem, &klast);
     IDAGetLastStep(mem, &hlast);
+    const double accepted_h = std::abs(hlast);
+    AssertThrow(std::isfinite(accepted_h) && accepted_h > 0.,
+                ExcInternalError());
+    accepted_h_min = std::min(accepted_h_min, accepted_h);
+    accepted_h_max = std::max(accepted_h_max, accepted_h);
+    if (klast >= 1 && klast <= 5)
+      bdf_steps[klast] += nst - std::max(is_prev_nst, bdf_prev_nst);
 
     // Inside the residual, IDA's tn is the *trial* time, so accumulate t += h.
     // In output_step / after solve_dae, tn is exact -> resync.
@@ -5225,9 +5260,9 @@ namespace MetricFlowX
   //                           (including iterations of rejected attempts)
   //
   // The record is kept in ida_history and streamed to ida_step_history.csv.
-  // It also feeds the BDF-order histogram: every step accepted since the
-  // previous call is attributed to the order of the last accepted step, so
-  // the per-order counts sum exactly to the total number of steps.
+  // Per-residual polling attributes the runner's BDF histogram to each
+  // accepted step. Output-only library clients retain grouped attribution to
+  // the last accepted order; either path counts each step once.
   // ============================================================================
   template <int dim, int spacedim>
   void
@@ -5252,29 +5287,21 @@ namespace MetricFlowX
     if (mem == nullptr)
       return;
 
-    long int nst = 0, nni = 0, ncfn = 0, netf = 0, nre = 0, nls = 0;
-    int      klast = 0;
-    double   hlast = 0.0, tcur = t;
-    IDAGetNumSteps(mem, &nst);
-    IDAGetNumNonlinSolvIters(mem, &nni);
-    IDAGetNumNonlinSolvConvFails(mem, &ncfn);
-    IDAGetNumErrTestFails(mem, &netf);
-    IDAGetNumResEvals(mem, &nre);
-    IDAGetNumLinSolvSetups(mem, &nls);
-    IDAGetLastOrder(mem, &klast);
-    IDAGetLastStep(mem, &hlast);
-    IDAGetCurrentTime(mem, &tcur);
-
-    // ---- BDF-order histogram ------------------------------------------------
+    IDAOutputRecord rec = current_ida_statistics(ida, t);
+    const auto nst = rec.steps_cumulative, nni = rec.nonlin_iters_cumulative,
+               ncfn            = rec.nonlin_fails_cumulative,
+               netf            = rec.err_test_fails_cumulative,
+               nre             = rec.residual_evals_cumulative,
+               nls             = rec.lin_setups_cumulative;
     const long int delta_steps = nst - bdf_prev_nst;
-    if (klast >= 1 && klast <= 5 && delta_steps > 0)
-      bdf_steps[klast] += delta_steps;
+    // Preserve grouped output-only histories for library clients that do not
+    // poll each residual; the runner already attributed every accepted step.
+    if (nst > is_prev_nst && rec.last_order >= 1 && rec.last_order <= 5)
+      bdf_steps[rec.last_order] += nst - std::max(is_prev_nst, bdf_prev_nst);
     bdf_prev_nst = nst;
 
     // ---- per-output-time record ---------------------------------------------
-    IDAOutputRecord rec;
-    rec.output_time             = t;
-    rec.ida_time                = tcur;
+
     rec.steps_interval          = delta_steps;
     rec.steps_cumulative        = nst;
     rec.nonlin_iters_interval   = nni - prev_nni;
@@ -5283,8 +5310,6 @@ namespace MetricFlowX
     rec.err_test_fails_interval = netf - prev_netf;
     rec.residual_evals_interval = nre - prev_nre;
     rec.lin_setups_interval     = nls - prev_nls;
-    rec.last_step_size          = hlast;
-    rec.last_order              = klast;
     ida_history.push_back(rec);
 
     prev_nni  = nni;
@@ -5312,9 +5337,118 @@ namespace MetricFlowX
                         << rec.residual_evals_interval << ','
                         << rec.lin_setups_interval << ','
                         << std::setprecision(6) << rec.last_step_size << ','
-                        << rec.last_order << '\n';
+                        << rec.last_order << ',' << rec.nonlin_fails_cumulative
+                        << ',' << rec.err_test_fails_cumulative << ','
+                        << rec.residual_evals_cumulative << ','
+                        << rec.lin_setups_cumulative << ','
+                        << rec.jacobian_evals_cumulative << ','
+                        << rec.linear_solves_cumulative << ','
+                        << rec.linear_iters_cumulative << ','
+                        << rec.minimum_step_size << ',' << rec.maximum_step_size
+                        << ',' << rec.step_extrema_available << '\n';
         ida_history_log.flush();
       }
+  }
+
+  template <int dim, int spacedim>
+  typename BloodFlowSystem<dim, spacedim>::IDAOutputRecord
+  BloodFlowSystem<dim, spacedim>::current_ida_statistics(
+    const SUNDIALS::IDA<VectorType> &ida,
+    const double                     output_time) const
+  {
+    void *memory = internal_ida_access::get_ida_mem(ida);
+    AssertThrow(memory != nullptr,
+                ExcMessage("IDA statistics requested before setup."));
+    IDAOutputRecord record;
+    record.output_time = output_time;
+    AssertThrow(
+      IDAGetNumSteps(memory, &record.steps_cumulative) == 0 &&
+        IDAGetNumNonlinSolvIters(memory, &record.nonlin_iters_cumulative) ==
+          0 &&
+        IDAGetNumNonlinSolvConvFails(memory, &record.nonlin_fails_cumulative) ==
+          0 &&
+        IDAGetNumErrTestFails(memory, &record.err_test_fails_cumulative) == 0 &&
+        IDAGetNumResEvals(memory, &record.residual_evals_cumulative) == 0 &&
+        IDAGetNumLinSolvSetups(memory, &record.lin_setups_cumulative) == 0 &&
+        IDAGetCurrentTime(memory, &record.ida_time) == 0,
+      ExcMessage("Cannot read native IDA statistics."));
+    if (record.steps_cumulative > 0)
+      {
+        AssertThrow(IDAGetLastStep(memory, &record.last_step_size) == 0 &&
+                      IDAGetLastOrder(memory, &record.last_order) == 0,
+                    ExcInternalError());
+        record.step_extrema_available = accepted_step_extrema_complete &&
+                                        is_prev_nst == record.steps_cumulative;
+        if (record.step_extrema_available)
+          {
+            record.minimum_step_size = accepted_h_min;
+            record.maximum_step_size = accepted_h_max;
+          }
+      }
+    record.jacobian_evals_cumulative = ida_jacobian_evaluations;
+    record.linear_solves_cumulative  = ida_linear_solves;
+    record.linear_iters_cumulative   = ida_linear_iterations;
+    return record;
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::print_current_statistics(
+    const SUNDIALS::IDA<VectorType> &ida,
+    const double                     output_time)
+  {
+    if (!print_statistics || this_mpi_process != 0)
+      return;
+    const auto  current  = current_ida_statistics(ida, output_time);
+    const auto &previous = previous_console_statistics;
+    const auto  counts   = [](const long int now, const long int before) {
+      return std::to_string(now - before) + "/" + std::to_string(now);
+    };
+    const auto step = [&](const double value) {
+      if (current.steps_cumulative == 0 || value == 0.)
+        return std::string("-");
+      std::ostringstream text;
+      text << std::scientific << std::setprecision(3) << value;
+      return text.str();
+    };
+    std::ostringstream table;
+    if (!statistics_header_written)
+      {
+        table
+          << "IDA current statistics: d/t = since previous output / cumulative; h extrema = accepted steps\n"
+          << "|        t_output |           t_IDA |     h_last |      h_min |      h_max | q |   steps d/t |  Newton d/t |       J d/t |       R d/t |      LS d/t |  Krylov d/t |     err d/t |   Nfail d/t |     wall_s |\n";
+        statistics_header_written = true;
+      }
+    table << std::scientific << std::setprecision(9) << "| " << std::setw(15)
+          << current.output_time << " | " << std::setw(15) << current.ida_time
+          << " | " << std::setw(10) << step(current.last_step_size) << " | "
+          << std::setw(10) << step(current.minimum_step_size) << " | "
+          << std::setw(10) << step(current.maximum_step_size) << " | "
+          << std::setw(1) << current.last_order;
+    for (const auto &value :
+         {counts(current.steps_cumulative, previous.steps_cumulative),
+          counts(current.nonlin_iters_cumulative,
+                 previous.nonlin_iters_cumulative),
+          counts(current.jacobian_evals_cumulative,
+                 previous.jacobian_evals_cumulative),
+          counts(current.residual_evals_cumulative,
+                 previous.residual_evals_cumulative),
+          counts(current.linear_solves_cumulative,
+                 previous.linear_solves_cumulative),
+          counts(current.linear_iters_cumulative,
+                 previous.linear_iters_cumulative),
+          counts(current.err_test_fails_cumulative,
+                 previous.err_test_fails_cumulative),
+          counts(current.nonlin_fails_cumulative,
+                 previous.nonlin_fails_cumulative)})
+      table << " | " << std::setw(11) << value;
+    table << std::setprecision(3) << " | " << std::setw(10)
+          << std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                           statistics_start)
+               .count()
+          << " |\n";
+    pcout << table.str() << std::flush;
+    previous_console_statistics = current;
   }
 
   // ============================================================================

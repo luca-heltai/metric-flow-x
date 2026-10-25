@@ -20,6 +20,7 @@ The following entries are registered by `BloodFlowSystem` in `include/metric_flo
 | `Theta Boundary (stability parameter)` | Boundary stability parameter. |
 | `Gamma (Total pressure factor)` | Total-pressure factor used in junction coupling. |
 | `Verbosity (console depth)` | deal.II log depth; rank zero controls the visible log. |
+| `Print current statistics` | Print an aligned IDA progress row at every accepted output callback (default `true`), independently of file-output cadence. |
 | `Numerical flux type` | Exactly `HLL`, `HLL_HDG`, or `LAX_FRIEDRICHS`. Other strings are rejected. |
 | `Use Riemann Invariants` | Select the configured boundary treatment using Riemann invariants. |
 | `Outlet boundary condition type` | `RCR` or `Reflection` for characteristic boundaries; `Dirichlet` prescribes area and velocity from the first two `Exact solution` components at every physical endpoint, including the inlet, and allocates no capacitor unknowns. |
@@ -40,7 +41,31 @@ iterative solver. Parallel direct solves still require PETSc with MUMPS.
 
 - `Initial time`, `Final time`, and `Time interval between each output`;
 - `Error control/Absolute error tolerance` and `Relative error tolerance`;
-- `Running parameters/Initial step size`, `Minimum step size`, `Maximum number of nonlinear iterations`, and `Maximum order of BDF`.
+- `Running parameters/Initial step size`, `Minimum step size`, `Maximum step size`, `Maximum number of nonlinear iterations`, and `Maximum order of BDF`.
+
+The standalone driver applies `Minimum step size` and `Maximum step size`
+through native `IDASetMinStep` / `IDASetMaxStep` during every IDA setup, before
+initial-condition correction or integration. Both must be finite and nonnegative;
+zero disables the corresponding bound. A positive maximum must be at least the
+minimum. The existing deal.II minimum parameter is the single source of its
+value; `Maximum step size` is added by the executable in the same subsection.
+Previously the wrapper did not forward the minimum, so parameter files that
+relied on smaller automatic steps may now fail correctly. Set an appropriately
+small minimum, or zero to leave it unrestricted. IDA may truncate its last step
+below the minimum to reach a forced stop such as the final time or ramp cutoff.
+These integration bounds are not applied to either stationary mode.
+
+```text
+subsection MetricFlowSystem<1, 3>
+  set Print current statistics = true
+  subsection IDA parameters
+    subsection Running parameters
+      set Minimum step size = 0
+      set Maximum step size = 0.001
+    end
+  end
+end
+```
 
 Additional IDA entries may be accepted by the installed deal.II version. Consult the generated `last_used_parameters.prm` written after initialization and the matching deal.II API for the full backend-specific set. Do not copy the older `ARKOde parameters` subsection from historical sample files into a new IDA run without checking it: the current application constructs `SUNDIALS::IDA`.
 

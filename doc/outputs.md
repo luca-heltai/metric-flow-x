@@ -61,11 +61,61 @@ cadence. It writes one `ida_statistics.csv` summary per solve and the
 `scaling_timings.csv` section timings at the end of the run. MPI diagnostics
 are collective; rank zero writes the global files.
 
-IDA's accepted-step and iteration totals are cumulative solver counters.
-The BDF-order histogram attributes all steps between consecutive IDA output
-callbacks to the last observed order. Its total equals the accepted-step
-count, but the distribution is a sampled estimate when the order changes
-between callbacks. It does not provide a per-internal-step order trace.
+### Live IDA progress
+
+`print_current_statistics(ida, output_time)` prints an aligned row on rank zero
+at every accepted IDA output callback, including the initial state. This cadence
+is independent of `Output time interval`, which continues to throttle physical
+files and `ida_step_history.csv`. Set `Print current statistics = false` to
+suppress the console table without changing the CSV diagnostics or integration.
+
+The table shows requested output time and current internal IDA time separately
+(IDA can integrate past an output and interpolate back), last/minimum/maximum
+accepted timestep, last BDF order, and elapsed wall time since initialization
+preparation began. Times use enough digits to distinguish closely spaced output
+callbacks on long runs. Counter columns show **interval/cumulative** pairs:
+
+- `steps`: accepted internal time steps;
+- `Newton`: nonlinear iterations reported by IDA;
+- `J`: actual application Jacobian callback invocations;
+- `R`: native residual evaluations;
+- `LS`: actual application linear-solve callback invocations;
+- `Krylov`: inner GMRES iterations (zero for the direct solver);
+- `err` and `Nfail`: error-test and nonlinear-convergence failures.
+
+Cumulative counts include initial-condition correction work when IDA performs
+it. Rejected trial work contributes iterations/evaluations/failures, but not
+accepted-step counts or timestep extrema. The initial row shows `-` for all
+step sizes because no temporal step has been accepted, even if CalcIC used an
+artificial time scale. Wall time includes initialization and output overhead.
+
+The standalone runner observes each accepted step from its residual and output
+callbacks, checks consecutive step numbers, and computes exact accepted-step
+extrema and BDF-order counts. `ida_internal_steps.csv` retains the accepted-step
+trace. The existing columns of `ida_step_history.csv` retain their order and
+file-cadence interval semantics; new columns append cumulative work, min/max
+accepted step sizes and `step_extrema_available`. All native step and failure
+totals remain independently available in `ida_statistics.csv`.
+
+Library clients using only the original output helpers remain supported.
+Without a residual/output poll for every step, exact extrema cannot be recovered:
+`step_extrema_available` is false and its CSV extrema are zero (console `-`).
+Their BDF histogram keeps the previous grouped attribution to the last observed
+order. For exact progress, call
+`poll_ida_internal_step(ida, false, true)` from each residual and
+`poll_ida_internal_step(ida, true, true)` at each output before recording or
+printing. The final argument requests an error if an accepted-step observation
+is missing. `current_ida_statistics()` supplies the same native snapshot used
+by the console and CSV output.
+
+Regression checks compare console rows, callback work and accepted-step extrema
+with the native final counters and full step trace, exercise a cap that binds
+on an easy equilibrium, and verify that an excessive minimum causes a demanding
+startup to fail rather than silently stepping below it:
+
+```sh
+python3 tests/test_ida_progress.py --executable build/blood_flow
+```
 
 ## Logs and parameter receipt
 

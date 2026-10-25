@@ -62,6 +62,14 @@ namespace MetricFlowX
         "resistive 0D graph; steady HDG solves F(t0,y,0)=0 with IDACalcIC.",
         problem.prm,
         Patterns::Selection("transient|steady network|steady HDG"));
+      problem.enter_subsection("IDA parameters");
+      problem.enter_subsection("Running parameters");
+      problem.add_parameter(
+        "Maximum step size",
+        maximum_step_size_,
+        "Native IDA maximum step size; zero leaves it unlimited.");
+      problem.leave_subsection();
+      problem.leave_subsection();
       tolerance_ramp_.add_parameters(problem);
       problem.add_parameter("Maximum IDA internal steps per output",
                             maximum_ida_steps_per_output_,
@@ -82,6 +90,14 @@ namespace MetricFlowX
             maximum_ida_steps_per_output_ > 0,
             ExcMessage(
               "Maximum IDA internal steps per output must be positive."));
+          AssertThrow(
+            std::isfinite(problem.ida_parameters.minimum_step_size) &&
+              problem.ida_parameters.minimum_step_size >= 0. &&
+              std::isfinite(maximum_step_size_) && maximum_step_size_ >= 0. &&
+              (maximum_step_size_ == 0. ||
+               problem.ida_parameters.minimum_step_size <= maximum_step_size_),
+            ExcMessage(
+              "IDA step limits require 0 <= minimum <= maximum (maximum=0 is unlimited)."));
           tolerance_ramp_.validate(problem.ida_parameters.initial_time,
                                    problem.ida_parameters.final_time,
                                    problem.ida_parameters.output_period);
@@ -340,9 +356,19 @@ namespace MetricFlowX
 
           const long int maximum_steps =
             steady_hdg ? 500 : maximum_ida_steps_per_output_;
-          ida.differential_components =
-            [&problem, &ida, &ida_errors, maximum_steps]() -> IndexSet {
-            ida_errors.install(internal::native_ida_memory(ida), maximum_steps);
+          const double minimum_step =
+            steady_hdg ? 0. : ida_parameters.minimum_step_size;
+          const double maximum_step   = steady_hdg ? 0. : maximum_step_size_;
+          ida.differential_components = [&problem,
+                                         &ida,
+                                         &ida_errors,
+                                         maximum_steps,
+                                         minimum_step,
+                                         maximum_step]() -> IndexSet {
+            ida_errors.install(internal::native_ida_memory(ida),
+                               maximum_steps,
+                               minimum_step,
+                               maximum_step);
             RampSource::register_weights(internal::native_ida_memory(ida), ida);
             IndexSet is(problem.n_total_dofs);
             is.add_indices(problem.cell_dofs_owned);
@@ -360,7 +386,7 @@ namespace MetricFlowX
                                               VectorType       &res) -> int {
             if (!initial_output_seen)
               ++ic_residual_calls;
-            problem.poll_ida_internal_step(ida);
+            problem.poll_ida_internal_step(ida, false, true);
             problem.assemble_residual(t, y, ydot, res);
             return 0;
           };
@@ -375,6 +401,7 @@ namespace MetricFlowX
                                                 const double alpha) -> int {
             if (!initial_output_seen)
               ++ic_jacobian_setups;
+            ++problem.ida_jacobian_evaluations;
             TimerOutput::Scope ts(problem.computing_timer, "setup_jacobian");
             problem.assemble_jacobian(t, y, ydot, alpha);
             problem.linear_system_matrix.copy_from(problem.jacobian_matrix);
@@ -425,6 +452,7 @@ namespace MetricFlowX
               const VectorType &r, VectorType &z, const double /*tol*/) -> int {
             if (!initial_output_seen)
               ++ic_linear_solves;
+            ++problem.ida_linear_solves;
             TimerOutput::Scope ts(problem.computing_timer,
                                   "solve_with_jacobian");
 
@@ -460,6 +488,7 @@ namespace MetricFlowX
                              z,
                              r,
                              *problem.ilu_preconditioner);
+                problem.ida_linear_iterations += solver_control.last_step();
               }
             return 0;
           };
@@ -549,104 +578,108 @@ namespace MetricFlowX
 
           unsigned int output_number        = 0;
           bool         final_output_written = false;
-          ida.output_step =
-            [&problem,
-             &ida,
-             &ida_errors,
-             initial_output_time,
-             final_output_time,
-             &next_output_time,
-             &output_number,
-             &final_output_written,
-             &initial_output_seen,
-             &ida_initialization_wall,
-             &solve_start,
-             &integration_start,
-             &first_interval_wall](const double      callback_time,
-                                   const VectorType &sol,
-                                   const VectorType & /*ydot*/,
-                                   const unsigned int step_number) {
-              ida_errors.check();
-              RampSource::after_solve(ida);
-              // deal.II IDA reports zero for its initial output callback,
-              // including when integration starts at a nonzero time.
-              const double t =
-                step_number == 0 ? initial_output_time : callback_time;
-              if (step_number == 0)
-                {
-                  ida_initialization_wall =
-                    std::chrono::duration<double>(
-                      std::chrono::steady_clock::now() - solve_start)
-                      .count();
-                  initial_output_seen = true;
-                }
-              else if (first_interval_wall < 0.)
-                first_interval_wall =
+
+          ida.output_step = [&problem,
+                             &ida,
+                             &ida_errors,
+                             initial_output_time,
+                             final_output_time,
+                             &next_output_time,
+                             &output_number,
+                             &final_output_written,
+                             &initial_output_seen,
+                             &ida_initialization_wall,
+                             &solve_start,
+                             &integration_start,
+                             &first_interval_wall](
+                              const double      callback_time,
+                              const VectorType &sol,
+                              const VectorType & /*ydot*/,
+                              const unsigned int step_number) {
+            ida_errors.check();
+            RampSource::after_solve(ida);
+            // deal.II IDA reports zero for its initial output callback,
+            // including when integration starts at a nonzero time.
+            const double t =
+              step_number == 0 ? initial_output_time : callback_time;
+            if (step_number == 0)
+              {
+                ida_initialization_wall =
                   std::chrono::duration<double>(
-                    std::chrono::steady_clock::now() - integration_start)
+                    std::chrono::steady_clock::now() - solve_start)
                     .count();
-              problem.time = t;
-              // IDA accumulates its callback times by repeated addition.
-              // Use the callback grid only to select outputs; retain the
-              // physical callback time for every recorded value and timestamp.
-              const double schedule_time =
-                initial_output_time +
-                step_number * problem.ida_parameters.output_period;
-              const double tolerance =
-                16.0 * std::numeric_limits<double>::epsilon() *
-                std::max(std::abs(schedule_time), std::abs(next_output_time));
-              const double final_time_tolerance =
-                16.0 * std::numeric_limits<double>::epsilon() *
-                std::max(std::abs(t), std::abs(final_output_time));
-              problem.poll_ida_internal_step(ida, /*resync_time=*/true);
-              const bool at_final_time =
-                t >= final_output_time ||
-                final_output_time - t <= final_time_tolerance;
-              const bool nominal_final_time =
-                schedule_time >= final_output_time ||
-                final_output_time - schedule_time <= final_time_tolerance;
-              if (problem.time_interval > 0.0 &&
-                  (final_output_written ||
-                   (nominal_final_time && !at_final_time)))
-                return;
-              const bool output_due =
-                problem.time_interval == 0.0 ||
-                schedule_time >= next_output_time ||
-                next_output_time - schedule_time <= tolerance || at_final_time;
-              if (!output_due)
-                return;
+                initial_output_seen = true;
+              }
+            else if (first_interval_wall < 0.)
+              first_interval_wall =
+                std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                              integration_start)
+                  .count();
+            problem.time = t;
+            // IDA accumulates its callback times by repeated addition.
+            // Use the callback grid only to select outputs; retain the
+            // physical callback time for every recorded value and timestamp.
+            const double schedule_time =
+              initial_output_time +
+              step_number * problem.ida_parameters.output_period;
+            const double tolerance =
+              16.0 * std::numeric_limits<double>::epsilon() *
+              std::max(std::abs(schedule_time), std::abs(next_output_time));
+            const double final_time_tolerance =
+              16.0 * std::numeric_limits<double>::epsilon() *
+              std::max(std::abs(t), std::abs(final_output_time));
+            problem.poll_ida_internal_step(ida,
+                                           /*resync_time=*/true,
+                                           /*require_consecutive_steps=*/true);
+            problem.print_current_statistics(ida, t);
+            const bool at_final_time =
+              t >= final_output_time ||
+              final_output_time - t <= final_time_tolerance;
+            const bool nominal_final_time =
+              schedule_time >= final_output_time ||
+              final_output_time - schedule_time <= final_time_tolerance;
+            if (problem.time_interval > 0.0 &&
+                (final_output_written ||
+                 (nominal_final_time && !at_final_time)))
+              return;
+            const bool output_due =
+              problem.time_interval == 0.0 ||
+              schedule_time >= next_output_time ||
+              next_output_time - schedule_time <= tolerance || at_final_time;
+            if (!output_due)
+              return;
 
-              // IDA internal steps / nonlinear iterations taken since the
-              // previous *written* output -> ida_step_history.csv.  Recorded
-              // after the output_due check so each row spans one output
-              // interval set by "Output time interval".
-              problem.record_ida_step(ida, t);
+            // IDA internal steps / nonlinear iterations taken since the
+            // previous *written* output -> ida_step_history.csv.  Recorded
+            // after the output_due check so each row spans one output
+            // interval set by "Output time interval".
+            problem.record_ida_step(ida, t);
 
-              problem.compute_pressure(sol, problem.pressure_);
-              problem.output_results(sol, problem.pressure_, output_number++);
-              // HDG_IDA_Vessel_*.csv + mass_conservation.csv
-              problem.write_output_step(t, sol);
-              problem.report_flow_regime(sol, t);
-              final_output_written = at_final_time;
+            problem.compute_pressure(sol, problem.pressure_);
+            problem.output_results(sol, problem.pressure_, output_number++);
+            // HDG_IDA_Vessel_*.csv + mass_conservation.csv
+            problem.write_output_step(t, sol);
+            problem.report_flow_regime(sol, t);
+            final_output_written = at_final_time;
 
-              if (problem.time_interval > 0.0)
-                {
-                  const long double elapsed =
-                    (static_cast<long double>(schedule_time + tolerance) -
-                     initial_output_time) /
-                    problem.time_interval;
-                  const long double intervals = std::floor(elapsed) + 1.0L;
-                  next_output_time            = static_cast<double>(
-                    static_cast<long double>(initial_output_time) +
-                    intervals * problem.time_interval);
-                  if (next_output_time <= schedule_time)
-                    next_output_time =
-                      std::nextafter(schedule_time,
-                                     std::numeric_limits<double>::infinity());
-                }
-              if (step_number == 0)
-                integration_start = std::chrono::steady_clock::now();
-            };
+            if (problem.time_interval > 0.0)
+              {
+                const long double elapsed =
+                  (static_cast<long double>(schedule_time + tolerance) -
+                   initial_output_time) /
+                  problem.time_interval;
+                const long double intervals = std::floor(elapsed) + 1.0L;
+                next_output_time            = static_cast<double>(
+                  static_cast<long double>(initial_output_time) +
+                  intervals * problem.time_interval);
+                if (next_output_time <= schedule_time)
+                  next_output_time =
+                    std::nextafter(schedule_time,
+                                   std::numeric_limits<double>::infinity());
+              }
+            if (step_number == 0)
+              integration_start = std::chrono::steady_clock::now();
+          };
 
           problem.time = problem.ida_parameters.initial_time;
           solve_start  = std::chrono::steady_clock::now();
@@ -735,6 +768,7 @@ namespace MetricFlowX
     std::string   run_mode_ = "transient";
     ToleranceRamp tolerance_ramp_;
     long int      maximum_ida_steps_per_output_ = 500;
+    double        maximum_step_size_            = 0.;
   };
 } // namespace MetricFlowX
 

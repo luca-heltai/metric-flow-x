@@ -7,6 +7,7 @@
 #include <idas/idas.h>
 
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -45,6 +46,29 @@ namespace MetricFlowX
       const int limit_status = IDASetMaxNumSteps(memory, maximum_steps);
       if (limit_status < 0 && code == 0)
         capture(limit_status, "IDAS", "IDASetMaxNumSteps", nullptr, this);
+      check();
+    }
+
+    void
+    install(void          *memory,
+            const long int maximum_steps,
+            const double   minimum_step,
+            const double   maximum_step)
+    {
+      AssertThrow(std::isfinite(minimum_step) && minimum_step >= 0. &&
+                    std::isfinite(maximum_step) && maximum_step >= 0. &&
+                    (maximum_step == 0. || minimum_step <= maximum_step),
+                  dealii::ExcMessage("Invalid native IDA step bounds."));
+      install(memory, maximum_steps);
+      // deal.II's AdditionalData minimum is otherwise not passed to IDA.
+      const int minimum_status = IDASetMinStep(memory, minimum_step);
+      AssertThrow(minimum_status >= 0,
+                  dealii::ExcMessage("IDASetMinStep failed with status " +
+                                     std::to_string(minimum_status)));
+      const int maximum_status = IDASetMaxStep(memory, maximum_step);
+      AssertThrow(maximum_status >= 0,
+                  dealii::ExcMessage("IDASetMaxStep failed with status " +
+                                     std::to_string(maximum_status)));
       check();
     }
 
