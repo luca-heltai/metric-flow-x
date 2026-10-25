@@ -61,6 +61,7 @@ jobs:
           python3 tests/test_output_schedule.py --executable build/blood_flow
           python3 tests/test_ida_work_limit.py --executable build/blood_flow
           python3 tests/test_stationary_modes.py --executable build/blood_flow --mpi
+          python3 tests/test_ida_progress.py --executable build/blood_flow
       - name: Check dual-variant installation and downstream consumers
         if: matrix.build_type == 'DebugRelease'
         run: |

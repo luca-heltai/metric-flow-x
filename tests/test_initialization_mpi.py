@@ -23,6 +23,7 @@ def main():
     cases = {"consistent_initialization": (2, 4),
              "nonfinite_initialization": (2, 4),
              "ida_error_guard": (2,),
+             "ida_statistics": (2, 4),
              "tolerance_ramp_ida": (2, 4),
              "iterative_preconditioner": (2, 4)}
     count = 0
@@ -45,7 +46,7 @@ def main():
                     if result.returncode:
                         raise RuntimeError(f"{executable.name}, MPI{size}:\n" + log.read_text()[-12000:])
                     count += 1
-    print(f"Consistent-state, empty-rank, weight-callback and iterative MPI regressions: {count} passed")
+    print(f"Consistent-state, empty-rank, weight-callback, progress and iterative MPI regressions: {count} passed")
 
 
 if __name__ == "__main__":

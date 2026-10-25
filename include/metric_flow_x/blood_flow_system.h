@@ -59,9 +59,11 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <functional>
+#include <limits>
 #include <map>
 #include <memory>
 #include <set>
@@ -634,7 +636,31 @@ namespace MetricFlowX
       long int lin_setups_interval     = 0; // setup_jacobian calls
       double   last_step_size          = 0.0;
       int      last_order              = 0;
+
+      long int nonlin_fails_cumulative   = 0;
+      long int err_test_fails_cumulative = 0;
+      long int residual_evals_cumulative = 0;
+      long int lin_setups_cumulative     = 0;
+      long int jacobian_evals_cumulative = 0;
+      long int linear_solves_cumulative  = 0;
+      long int linear_iters_cumulative   = 0;
+      double   minimum_step_size         = 0.;
+      double   maximum_step_size         = 0.;
+      bool     step_extrema_available    = false;
     };
+
+    /** Snapshot of native IDA and actual application callback work.
+     * Accepted-step extrema are available only after observing every step.
+     */
+    IDAOutputRecord
+    current_ida_statistics(const SUNDIALS::IDA<VectorType> &ida,
+                           const double                     output_time) const;
+
+    /** Print one aligned row per accepted IDA output, independently of files.
+     */
+    void
+    print_current_statistics(const SUNDIALS::IDA<VectorType> &ida,
+                             const double                     output_time);
 
     void
     record_ida_step(const SUNDIALS::IDA<VectorType> &ida);
@@ -648,9 +674,14 @@ namespace MetricFlowX
       return ida_history;
     }
 
+    /** Observe accepted steps. For exact extrema, call from every residual
+     * and output callback and set require_consecutive_steps=true. Output-only
+     * clients remain supported but cannot recover skipped step extrema.
+     */
     void
     poll_ida_internal_step(const SUNDIALS::IDA<VectorType> &ida,
-                           const bool resync_time = false);
+                           const bool                       resync_time = false,
+                           const bool require_consecutive_steps = false);
 
     void
     finalize_output(const SUNDIALS::IDA<VectorType> &ida,
@@ -1118,26 +1149,37 @@ namespace MetricFlowX
     mutable bool          mass_initialized = false;
 
     // ida_statistics.csv state: bdf_steps[k] = accepted steps at BDF order k
-    // (k = 1..5), attributed at each output_step callback.
+    // (k = 1..5), exact with per-step polling, grouped by output otherwise.
     std::array<long int, 6> bdf_steps{};
     long int                bdf_prev_nst = 0;
 
     // ida_step_history.csv state: cumulative counters seen at the previous
     // output, so each record can store the per-interval differences.
-    std::vector<IDAOutputRecord> ida_history;
-    std::ofstream                ida_history_log;
-    long int                     prev_nni  = 0;
-    long int                     prev_ncfn = 0;
-    long int                     prev_netf = 0;
-    long int                     prev_nre  = 0;
-    long int                     prev_nls  = 0;
-    std::ofstream                ida_internal_log;
-    long int                     is_prev_nst   = 0;
-    long int                     is_prev_nni   = 0;
-    long int                     is_prev_ncfn  = 0;
-    long int                     is_prev_netf  = 0;
-    long int                     is_prev_nls   = 0;
-    double                       is_t_accepted = 0.0;
+    std::vector<IDAOutputRecord>          ida_history;
+    std::ofstream                         ida_history_log;
+    long int                              prev_nni                  = 0;
+    long int                              prev_ncfn                 = 0;
+    long int                              prev_netf                 = 0;
+    long int                              prev_nre                  = 0;
+    long int                              prev_nls                  = 0;
+    bool                                  print_statistics          = true;
+    bool                                  statistics_header_written = false;
+    IDAOutputRecord                       previous_console_statistics;
+    std::chrono::steady_clock::time_point statistics_start;
+    long int                              ida_jacobian_evaluations = 0;
+    long int                              ida_linear_solves        = 0;
+    long int                              ida_linear_iterations    = 0;
+    double        accepted_h_min = std::numeric_limits<double>::infinity();
+    double        accepted_h_max = 0.;
+    std::ofstream ida_internal_log;
+    long int      is_prev_nst   = 0;
+    long int      is_prev_nni   = 0;
+    long int      is_prev_ncfn  = 0;
+    long int      is_prev_netf  = 0;
+    long int      is_prev_nls   = 0;
+    double        is_t_accepted = 0.0;
+
+    bool accepted_step_extrema_complete = true;
 
     // -----------------------------------------------------------------------
     // Internal helpers — geometry
