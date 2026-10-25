@@ -1116,14 +1116,14 @@ namespace MetricFlowX
 
     SUNDIALS::IDA<VectorType>::AdditionalData ida_parameters;
 
-    ParsedTools::Function<spacedim>       rhs_function;
-    ParsedTools::Function<spacedim>       exact_solution;
-    ParsedTools::Function<1>              inflow_function;
-    InflowSeries                          inflow_series;
-    std::string                           inflow_csv_file;
-    double                                inflow_csv_period  = 0.;
-    bool                                  write_terminal_csv = false;
-    std::map<unsigned int, std::ofstream> csv_terminal;
+    ParsedTools::Function<spacedim> rhs_function;
+    ParsedTools::Function<spacedim> exact_solution;
+    ParsedTools::Function<1>        inflow_function;
+    InflowSeries                    inflow_series;
+    std::string                     inflow_csv_file;
+    double                          inflow_csv_period = 0.;
+    std::string                     output_terminal_csv_file;
+    std::ofstream                   csv_terminal;
 
     // -----------------------------------------------------------------------
     // CSV time-series output, one file per vessel.

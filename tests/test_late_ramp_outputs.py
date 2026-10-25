@@ -48,7 +48,8 @@ class LateRampOutputs(unittest.TestCase):
         folder.mkdir(exist_ok=True)
         output = folder / "output"
         output.mkdir(exist_ok=True)
-        (folder / "last_used_parameters.prm").write_text(self.bench.parameters(SOURCE, output, self.policy, variant))
+        (folder / "last_used_parameters.prm").write_text(self.bench.parameters(SOURCE, output, self.policy, variant).replace(
+            "Output terminal CSV file = terminals.csv", "Write terminal CSV files = true"))
         rows = [dict(time_s=t, P_dynpcm2=self.pressure * 10, Q_cm3ps=self.flow * 1e6,
                      A_cm2=self.area * 1e4, U_cmps=self.velocity * 100, boundary_1_label="boundary_1") for t in self.times]
         self.write_csv(output / "HDG_IDA_Vessel_0.csv", list(rows[0]), rows)
@@ -70,6 +71,22 @@ class LateRampOutputs(unittest.TestCase):
         value = self.velocity + factor * (self.policy["base_atol"] + self.policy["base_rtol"] * abs(self.velocity))
         rows[index]["U_cmps"], rows[index]["Q_cm3ps"] = str(value * 100), str(self.area * value * 1e6)
         self.write_csv(path, fields, rows)
+
+    def test_consolidated_terminals_match_historical_outputs(self):
+        output = self.actual / "output"
+        fields, inlet = self.physics.read_csv(output / "terminal_0.csv")
+        _, outlet = self.physics.read_csv(output / "terminal_1.csv")
+        rows = sorted(inlet + outlet, key=lambda row: (float(row["time_s"]), int(row["boundary_id"])))
+        for bid in (0, 1):
+            (output / f"terminal_{bid}.csv").unlink()
+        receipt = self.actual / "last_used_parameters.prm"
+        original = receipt.read_text()
+        for filename in ("terminals.csv", "custom_traces.csv"):
+            receipt.write_text(original.replace("Write terminal CSV files = true",
+                                                f"Output terminal CSV file = {filename}"))
+            self.write_csv(output / filename, fields, rows)
+            self.assertTrue(self.compare()["accepted"])
+            (output / filename).unlink()
 
     def test_campaign_sizes_and_balanced_order(self):
         self.assertEqual(self.bench.campaign_plan(self.policy, True), (["uniform-0", "ramp-0", "reference"], 1, "correctness_only"))

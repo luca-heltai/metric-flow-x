@@ -59,7 +59,7 @@ subsection MetricFlowSystem<1, 3>
   set Default terminal R2 = 1e8
   set Default terminal C = {capacitance}
   set Default terminal P_out = 1000
-  set Write terminal CSV files = true
+  set Output terminal CSV file = stationary_traces.csv
   set Use componentwise absolute tolerances = true
   set Area absolute tolerance fraction = 1e-10
   set Velocity absolute tolerance = 1e-10
@@ -104,8 +104,11 @@ end
         q = 1.17e-6
         outlet_pressure = 1000. + 1.1e8 * q
         resistance = 8. * .004 * .24137 * math.pi / 4.5239e-4**2
+        terminal_rows = rows(output / "stationary_traces.csv")
+        assert [int(row["boundary_id"]) for row in terminal_rows] == [0, 1]
+        assert not list(output.glob("terminal_*.csv"))
         for boundary in (0, 1):
-            terminal = rows(output / f"terminal_{boundary}.csv")
+            terminal = [row for row in terminal_rows if int(row["boundary_id"]) == boundary]
             assert len(terminal) == 1
             row = terminal[0]
             assert float(row["time_s"]) == .17

@@ -35,9 +35,10 @@ def checked_parameters(case, policy, physics):
         (FLOW, "Number of refinement cycles"): "1",
         (FLOW, "Outlet boundary condition type"): "RCR",
         (FLOW, "Terminal parameter source"): "Parameters",
-        (FLOW, "Write terminal CSV files"): "true",
         (FLOW, "Numerical flux type"): policy["numerical_flux"],
     }
+    if c["terminal_output_enabled"] is not True:
+        raise ValueError("Terminal output must be enabled")
     for key, expected_value in expected.items():
         if values[key] != expected_value:
             raise ValueError("Unsupported parameter " + "/".join(key))
@@ -99,6 +100,11 @@ def compare(before, after, policy, physics):
         "mass_conservation.csv": ["t", "total_volume", "dVdt", "net_flux", "imbalance", "rel_imbalance"],
         **{f"terminal_{bid}.csv": ["time_s", "pressure_Pa", "flow_m3_s", "boundary_id", "vessel_id", "label"] for bid in (0, 1)},
     }
+    for folder in (before/"output", after/"output"):
+        terminal_files = {name for name in physics.csv_output_files(folder)
+                          if name.startswith("terminal_")}
+        if terminal_files != {"terminal_0.csv", "terminal_1.csv"}:
+            raise ValueError("Unsupported terminal output set")
     tables = {}
     for name in sorted(physics.PHYSICAL):
         fb, left = physics.read_csv(before/"output"/name)

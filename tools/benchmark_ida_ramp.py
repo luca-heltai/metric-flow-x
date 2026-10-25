@@ -61,7 +61,7 @@ subsection MetricFlowSystem<1, 3>
  set Default terminal R2 = {p['R2']}
  set Default terminal C = {p['C']}
  set Default terminal P_out = {p['P_out']}
- set Write terminal CSV files = true
+ set Output terminal CSV file = terminals.csv
  set Output directory = {output}
  set Output time interval = {policy['file_interval']}
  set Verbosity (console depth) = 0

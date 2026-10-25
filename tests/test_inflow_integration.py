@@ -44,7 +44,7 @@ def validate(executable, destination, mpi, initial_time=0.0):
             text = source
             if ranks > 1:
                 text = text.replace("set Use direct solver            = true", "set Use direct solver            = false")
-            extra = f"  set Write terminal CSV files = true\n  set Output directory = {folder / 'output'}\n"
+            extra = f"  set Output terminal CSV file = terminals.csv\n  set Output directory = {folder / 'output'}\n"
             if kind == "csv":
                 extra += f"  set Inflow CSV file = {waveform}\n"
             text = text.replace("  set Output filename", extra + "  set Output filename")
@@ -87,19 +87,21 @@ def validate(executable, destination, mpi, initial_time=0.0):
             assert all(int(row["n_mpi_processes"]) == ranks for row in timings)
             assert all(math.isfinite(float(row["wall_time"])) and float(row["wall_time"]) >= 0
                        for row in timings)
-            files = sorted((folder / "output").glob("terminal_*.csv"))
-            assert [path.name for path in files] == ["terminal_0.csv", "terminal_1.csv"]
+            assert not list((folder / "output").glob("terminal_*.csv"))
+            with (folder / "output/terminals.csv").open(newline="") as stream:
+                terminal_rows = list(csv.DictReader(stream))
+            assert len(terminal_rows) == 22
+            assert [(float(row["time_s"]), int(row["boundary_id"])) for row in terminal_rows] == sorted(
+                (float(row["time_s"]), int(row["boundary_id"])) for row in terminal_rows)
             traces[kind, ranks] = {}
-            for path in files:
-                with path.open() as stream:
-                    rows = list(csv.DictReader(stream))
+            for boundary in (0, 1):
+                rows = [row for row in terminal_rows if int(row["boundary_id"]) == boundary]
                 assert len(rows) == 11
-                boundary = int(path.stem.removeprefix("terminal_"))
                 assert all(row["label"] == f"boundary_{boundary}" for row in rows)
                 numeric = [{key: float(value) for key, value in row.items() if key != "label"} for row in rows]
                 assert all(math.isfinite(value) for row in numeric for value in row.values())
                 assert abs(numeric[-1]["time_s"] - final_time) < 1e-14
-                traces[kind, ranks][path.name] = numeric
+                traces[kind, ranks][f"terminal_{boundary}.csv"] = numeric
             inlet = traces[kind, ranks]["terminal_0.csv"]
             error = max(abs(row["flow_m3_s"] + max(0, 1e-8 - 2e-6 * abs(row["time_s"] - peak_time))) for row in inlet)
             assert error < 5e-11, (kind, ranks, error)
@@ -117,13 +119,14 @@ def validate(executable, destination, mpi, initial_time=0.0):
     csv_path = bad / "short.csv"
     output_path = bad / "output"
     csv_path.write_text("time_s,flow_m3_s\n0,0\n0.005,1e-8\n")
-    extra = f"  set Inflow CSV file = {csv_path}\n  set Write terminal CSV files = true\n  set Output directory = {output_path}\n"
+    extra = f"  set Inflow CSV file = {csv_path}\n  set Output terminal CSV file = terminals.csv\n  set Output directory = {output_path}\n"
     (bad / "parameters.prm").write_text(source.replace("  set Output filename", extra + "  set Output filename"))
     result = subprocess.run([str(executable), "parameters.prm"], cwd=bad,
                             env=environment, capture_output=True, text=True, timeout=30)
     assert result.returncode != 0
     assert "extrapolation" in result.stdout + result.stderr
     assert not list(output_path.glob("terminal_*.csv"))
+    assert not (output_path / "terminals.csv").exists()
     print(f"Analytic/CSV inflow and terminal traces agree for MPI ranks {ranks_to_check}; inlet flow is nonzero.")
 
 

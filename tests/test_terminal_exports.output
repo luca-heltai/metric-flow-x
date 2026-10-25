@@ -1,2 +1,2 @@
 
-DEAL::Terminal trace values and unique MPI file ownership: PASSED
+DEAL::Consolidated terminal traces, ordering, labels and unique MPI writer: PASSED
