@@ -39,7 +39,7 @@ using namespace MetricFlowX;
 
 namespace MetricFlowX
 {
-  /** The standalone executable's IDA/time-stepping policy.
+  /** The standalone executable's stationary and IDA/time-stepping policy.
    *
    * BloodFlowSystem remains the mathematical Problem: it owns the mesh,
    * physics, residual, Jacobians, state, and observables.  This runner owns
@@ -55,6 +55,13 @@ namespace MetricFlowX
 
     explicit BloodFlowIDARunner(Problem &problem)
     {
+      problem.add_parameter(
+        "Run mode",
+        run_mode_,
+        "transient integrates the HDG model; steady network solves the rigid "
+        "resistive 0D graph; steady HDG solves F(t0,y,0)=0 with IDACalcIC.",
+        problem.prm,
+        Patterns::Selection("transient|steady network|steady HDG"));
       tolerance_ramp_.add_parameters(problem);
       problem.add_parameter("Maximum IDA internal steps per output",
                             maximum_ida_steps_per_output_,
@@ -65,12 +72,20 @@ namespace MetricFlowX
     void
     run(Problem &problem)
     {
-      AssertThrow(maximum_ida_steps_per_output_ > 0,
-                  ExcMessage(
-                    "Maximum IDA internal steps per output must be positive."));
-      tolerance_ramp_.validate(problem.ida_parameters.initial_time,
-                               problem.ida_parameters.final_time,
-                               problem.ida_parameters.output_period);
+      const bool steady_network_only = run_mode_ == "steady network";
+      const bool steady_hdg          = run_mode_ == "steady HDG";
+      AssertThrow(std::isfinite(problem.ida_parameters.initial_time),
+                  ExcMessage("Initial time must be finite."));
+      if (!steady_network_only && !steady_hdg)
+        {
+          AssertThrow(
+            maximum_ida_steps_per_output_ > 0,
+            ExcMessage(
+              "Maximum IDA internal steps per output must be positive."));
+          tolerance_ramp_.validate(problem.ida_parameters.initial_time,
+                                   problem.ida_parameters.final_time,
+                                   problem.ida_parameters.output_period);
+        }
 
       problem.pcout << "=== Blood Flow HDG, polynomial degree p = "
                     << problem.fe_degree << ", running on "
@@ -93,16 +108,31 @@ namespace MetricFlowX
               problem.build_per_cell_mass_inv();
             }
 
+          if (steady_network_only)
+            {
+              problem.pcout
+                << "Solving the stationary resistive 0D network at t = "
+                << problem.ida_parameters.initial_time << '\n';
+              problem.time = problem.ida_parameters.initial_time;
+              // Preserve the graph reconstruction: an HDG trace correction
+              // would change it without solving a stationary HDG problem.
+              problem.compute_steady_network_initial_solution(problem.solution,
+                                                              problem.time);
+              output_stationary(problem, cycle);
+              continue;
+            }
+
           // After setup_system(), so the vessel probe cells and DoF indices
           // belong to the current mesh.  Opens HDG_IDA_Vessel_*.csv,
           // mass_conservation.csv and ida_step_history.csv, and resets the
           // IDA counters for this cycle.
-          problem.open_output_files();
+          if (!steady_hdg)
+            problem.open_output_files();
           const auto preparation_start = std::chrono::steady_clock::now();
           const bool native_pair_verified =
-            problem.initial_condition_policy == "native" ||
-            problem.ida_parameters.ic_type ==
-              SUNDIALS::IDA<VectorType>::AdditionalData::none;
+            !steady_hdg && (problem.initial_condition_policy == "native" ||
+                            problem.ida_parameters.ic_type ==
+                              SUNDIALS::IDA<VectorType>::AdditionalData::none);
           if (native_pair_verified)
             problem.initialize_consistent_state(
               problem.solution,
@@ -243,12 +273,36 @@ namespace MetricFlowX
           if (problem.check_initial_jacobian)
             check_jacobian_fd(problem.solution);
 
-          if (problem.initial_condition_policy == "native")
-            problem.ida_parameters.ic_type =
+          auto ida_parameters = problem.ida_parameters;
+          if (steady_hdg)
+            {
+              ida_parameters.ic_type =
+                SUNDIALS::IDA<VectorType>::AdditionalData::use_y_dot;
+              // Trigger the wrapper's differential-component setup hook so
+              // the native error guard is installed before CalcIC. There is
+              // no integration error test in this mode.
+              ida_parameters.ignore_algebraic_terms_for_errors = true;
+              if (ida_parameters.initial_step_size == 0.)
+                ida_parameters.initial_step_size = 1.;
+              AssertThrow(
+                std::isfinite(ida_parameters.initial_step_size) &&
+                  ida_parameters.initial_step_size > 0.,
+                ExcMessage(
+                  "Steady HDG requires a finite positive IC time scale."));
+              ida_parameters.final_time =
+                ida_parameters.initial_time + ida_parameters.initial_step_size;
+              ida_parameters.output_period = ida_parameters.initial_step_size;
+              AssertThrow(
+                std::isfinite(ida_parameters.final_time) &&
+                  ida_parameters.final_time > ida_parameters.initial_time,
+                ExcMessage("Steady HDG IC time scale is not representable."));
+            }
+          else if (problem.initial_condition_policy == "native")
+            ida_parameters.ic_type =
               SUNDIALS::IDA<VectorType>::AdditionalData::none;
-          IDAErrorGuard::validate_setup(problem.ida_parameters);
+          IDAErrorGuard::validate_setup(ida_parameters);
           IDAErrorGuard             ida_errors(problem.mpi_communicator_);
-          SUNDIALS::IDA<VectorType> ida(problem.ida_parameters,
+          SUNDIALS::IDA<VectorType> ida(ida_parameters,
                                         problem.mpi_communicator_);
 
           ida.reinit_vector = [&problem](VectorType &v) {
@@ -265,17 +319,30 @@ namespace MetricFlowX
               };
             }
 
-          if (tolerance_ramp_.enabled && !problem.use_componentwise_tolerances)
-            absolute_tolerances = problem.ida_parameters.absolute_tolerance;
+          if ((tolerance_ramp_.enabled || steady_hdg) &&
+              !problem.use_componentwise_tolerances)
+            absolute_tolerances = ida_parameters.absolute_tolerance;
+          auto weight_policy = tolerance_ramp_;
+          if (steady_hdg)
+            {
+              // Keep final componentwise weights constant. The custom-weight
+              // path avoids the wrapper's SV minimum on empty MPI ranks.
+              weight_policy.enabled                 = true;
+              weight_policy.initial_relative_factor = 1.;
+              weight_policy.initial_absolute_factor = 1.;
+              weight_policy.hold_duration           = 0.;
+              weight_policy.end_time                = ida_parameters.final_time;
+            }
           RampSource::attach(ida,
-                             tolerance_ramp_,
-                             problem.ida_parameters,
+                             weight_policy,
+                             ida_parameters,
                              absolute_tolerances);
 
+          const long int maximum_steps =
+            steady_hdg ? 500 : maximum_ida_steps_per_output_;
           ida.differential_components =
-            [this, &problem, &ida, &ida_errors]() -> IndexSet {
-            ida_errors.install(internal::native_ida_memory(ida),
-                               maximum_ida_steps_per_output_);
+            [&problem, &ida, &ida_errors, maximum_steps]() -> IndexSet {
+            ida_errors.install(internal::native_ida_memory(ida), maximum_steps);
             RampSource::register_weights(internal::native_ida_memory(ida), ida);
             IndexSet is(problem.n_total_dofs);
             is.add_indices(problem.cell_dofs_owned);
@@ -399,8 +466,87 @@ namespace MetricFlowX
 
           const double initial_output_time =
             problem.ida_parameters.initial_time;
-          const double final_output_time    = problem.ida_parameters.final_time;
-          double       next_output_time     = initial_output_time;
+          const double final_output_time = problem.ida_parameters.final_time;
+          double       next_output_time  = initial_output_time;
+          if (steady_hdg)
+            {
+              problem.pcout
+                << "Solving stationary HDG equations with IDACalcIC(use_y_dot) at t = "
+                << problem.time << '\n';
+              // reset() performs CalcIC and retrieves the corrected pair;
+              // solve_dae() would additionally advance time.
+              ida.reset(problem.time,
+                        ida_parameters.initial_step_size,
+                        problem.solution,
+                        problem.solution_dot);
+              ida_errors.check();
+              long int steps        = -1;
+              double   current_time = 0.;
+              void    *memory       = internal::native_ida_memory(ida);
+              AssertThrow(
+                IDAGetNumSteps(memory, &steps) == 0 && steps == 0 &&
+                  IDAGetCurrentTime(memory, &current_time) == 0 &&
+                  current_time == problem.time &&
+                  problem.solution_dot.linfty_norm() == 0.,
+                ExcMessage(
+                  "Stationary CalcIC changed time or the prescribed zero derivative."));
+              auto residual   = problem.make_state(),
+                   correction = problem.make_state();
+              ida.residual(problem.time,
+                           problem.solution,
+                           problem.solution_dot,
+                           residual);
+              ida.setup_jacobian(problem.time,
+                                 problem.solution,
+                                 problem.solution_dot,
+                                 0.);
+              ida.solve_with_jacobian(residual, correction, 0.);
+              double       defect  = 0.;
+              unsigned int invalid = 0;
+              for (const auto i : problem.locally_owned_dofs_)
+                {
+                  const double weight =
+                    absolute_tolerances(i) + ida_parameters.relative_tolerance *
+                                               std::abs(problem.solution(i));
+                  const double scaled = std::abs(correction(i)) / weight;
+                  if (!std::isfinite(problem.solution(i)) ||
+                      !std::isfinite(residual(i)) || !std::isfinite(weight) ||
+                      weight <= 0. || !std::isfinite(scaled) ||
+                      ((problem.component_dofs_[0].is_element(i) ||
+                        problem.component_dofs_[2].is_element(i)) &&
+                       problem.solution(i) <= 0.))
+                    invalid = 1;
+                  else
+                    defect = std::max(defect, scaled);
+                }
+              defect = Utilities::MPI::max(defect, problem.mpi_communicator_);
+              AssertThrow(
+                Utilities::MPI::max(invalid, problem.mpi_communicator_) == 0 &&
+                  defect < 1.,
+                ExcMessage(
+                  "Stationary HDG residual needs a correction exceeding final tolerance weights: " +
+                  std::to_string(defect)));
+              output_stationary(problem, cycle);
+              if (problem.this_mpi_process == 0)
+                {
+                  const std::string folder = problem.output_directory.empty() ?
+                                               "." :
+                                               problem.output_directory;
+                  std::ofstream     statistics(folder +
+                                           "/stationary_statistics.json");
+                  statistics
+                    << std::setprecision(17)
+                    << "{\n  \"model\": \"steady HDG\",\n  \"time\": "
+                    << current_time << ",\n  \"ida_steps\": " << steps
+                    << ",\n  \"derivative_norm\": 0,\n  \"weighted_newton_defect\": "
+                    << defect << "\n}\n";
+                  AssertThrow(statistics.good(),
+                              ExcMessage(
+                                "Cannot write stationary statistics."));
+                }
+              continue;
+            }
+
           unsigned int output_number        = 0;
           bool         final_output_written = false;
           ida.output_step =
@@ -575,6 +721,18 @@ namespace MetricFlowX
     }
 
   private:
+    static void
+    output_stationary(Problem &problem, const unsigned int cycle)
+    {
+      problem.compute_pressure(problem.solution, problem.pressure_);
+      problem.open_csv_files();
+      problem.output_results(problem.solution, problem.pressure_, cycle);
+      problem.write_csv_row(problem.time, problem.solution);
+      problem.report_flow_regime(problem.solution, problem.time);
+      problem.close_csv_files();
+    }
+
+    std::string   run_mode_ = "transient";
     ToleranceRamp tolerance_ramp_;
     long int      maximum_ida_steps_per_output_ = 500;
   };

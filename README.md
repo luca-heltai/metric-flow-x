@@ -44,6 +44,8 @@ by an external multiphysics application. Constitutive access is provided by
 
 See [initialization and startup tolerances](doc/initialization.md) for the static
 0D seed, verified initial derivatives and an optional tolerance ramp.
+See [stationary calculations](doc/stationary.md) for graph-only and complete
+HDG equilibrium output with the same `blood_flow` executable.
 
 Mesh/property owners can use `setup(mesh_initializer)` to prepare the mesh
 before native DoFs are distributed. The initializer receives the unrefined

@@ -63,6 +63,7 @@ build_and_run
 containers
 math
 initialization
+stationary
 results
 performance
 performance_campaign
