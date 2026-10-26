@@ -677,6 +677,18 @@ namespace MetricFlowX
         check(PCGetType(subpc, &type));
         if (std::string(type) == PCILU || std::string(type) == PCLU)
           {
+            Mat      local_matrix;
+            PetscInt rows, columns;
+            check(KSPGetOperators(subsolvers[i], nullptr, &local_matrix));
+            check(MatGetSize(local_matrix, &rows, &columns));
+            if (rows == 0 && columns == 0)
+              {
+                // PETSc 3.19 ILU symbolic factorization divides by zero when
+                // computing fill ratios for empty subdomains. Their action is
+                // already empty: no factorization or shift is needed.
+                check(PCSetType(subpc, PCNONE));
+                continue;
+              }
             check(PCFactorSetShiftType(subpc, MAT_SHIFT_NONZERO));
             // The coupled vessel equations need fill beyond their original
             // sparsity pattern for a useful local approximation.
