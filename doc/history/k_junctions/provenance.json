@@ -1,0 +1,114 @@
+{
+  "original_branch": "K-branches",
+  "original_head": "161caa25447a0fe6f66d3d28546206f02ee7cdb8",
+  "original_incremental_base": "2c3775b994b3ca12dbe8baff48d2e4399957cf34",
+  "rebased_onto": "456e5bf906b6cc2ecc904b9354ff60b48297d2e4",
+  "original_commits": [
+    "f701814cfbff10196d86fc2a8982469db2258007 Generalize junction solver to arbitrary K-vessel junctions",
+    "2703065bd4dbf2424b7e4014352b6873591ef53f tex with general branches and rcr coupling",
+    "eb8ed29da5c4af3e2b86f7373d0babbacd2a9637 for verification of results",
+    "e37a654487dfb57df530f4392a9a9d36b75bdaa7 single vessel tests and generalized junctions",
+    "be3f306396bf1fe90a0db843f2333c796569fc22 Removed all warnings.",
+    "161caa25447a0fe6f66d3d28546206f02ee7cdb8 update parameters"
+  ],
+  "runtime_resolution": "The vector-based K-vessel junction state and generic junction solver already exist in include/metric_flow_x/junction_solver.h. Current assemble_trace_junction_equations and assemble_jacobian_trace_junction_block implement the mass, total-head and characteristic equations for K incident vessels. Replacing them with the historical DG driver would regress the current HDG/IDA API.",
+  "conflicts": [
+    "include/blood_flow_system.h",
+    "include/junction_solver.h",
+    "latex/blood_flow.tex",
+    "parameters/for_rcr_outlet/junction_0.prm",
+    "parameters/for_rcr_outlet/junction_1.prm",
+    "source/blood_flow_system.cc"
+  ],
+  "retained_files": [
+    {
+      "original_path": "latex/blood_flow.bib",
+      "path": "original/latex/blood_flow.bib",
+      "sha256": "d5a5ed95dc2d9d69cf9077e19233ebee444944666e81d6b9bb52791b36c26b81"
+    },
+    {
+      "original_path": "latex/blood_flow.tex",
+      "path": "original/latex/blood_flow.tex",
+      "sha256": "1f966448d78d5f07a3295b4b246fd376d0f9b57cfa2b1e390a0c53a14b178693"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/common_carotid_artery.prm",
+      "path": "original/parameters/benchmark_parameters/common_carotid_artery.prm",
+      "sha256": "46c0930ddfe36bd1331b0bfb1383f2bde1c322799c0cb861f2a40f7a587686c0"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/single-vessel(tpoint1).png",
+      "path": "original/parameters/benchmark_parameters/single_vessel_tpoint1_.png",
+      "sha256": "2b5aab49e8a708f987386ee2baf0f5ac77a7d0cbb32f2374b83ea4465acd3921"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/single-vessel(tpoint5).png",
+      "path": "original/parameters/benchmark_parameters/single_vessel_tpoint5_.png",
+      "sha256": "bea506a4dc228af6e81124f2e91c80f3539bf7ac06f1c2b3db5c16f4a5777c01"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/single-vessel(tpoint94).png",
+      "path": "original/parameters/benchmark_parameters/single_vessel_tpoint94_.png",
+      "sha256": "b064840ca7914b5723dbced5ecad444c61a7d023c2b9c640ea14a2c664d5c983"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/single-vessel-mu(t1point5).png",
+      "path": "original/parameters/benchmark_parameters/single_vessel_mu_t1point5_.png",
+      "sha256": "57f300a4bcdf1626e8e2df3e27776acf498cad3866d5458f83514132c3c5156a"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/single-vessel-mu(tpoint1).png",
+      "path": "original/parameters/benchmark_parameters/single_vessel_mu_tpoint1_.png",
+      "sha256": "28836cd0559fb41e06e6874b66dff17383590e7c7e626721722606e6bec66b67"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/single-vessel-mu.prm",
+      "path": "original/parameters/benchmark_parameters/single_vessel_mu.prm",
+      "sha256": "36b371375eab0ea98102d127e4e8e2daa543a69b69809c9ed84a3949e87ac44a"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/single-vessel.prm",
+      "path": "original/parameters/benchmark_parameters/single_vessel.prm",
+      "sha256": "2fd8cc2218f4b1395f764f64087db03becfa6caaec033557be39e7658e0d4e92"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/single_vessel.prm",
+      "path": "original/parameters/benchmark_parameters/single_vessel_dac0a41c.prm",
+      "sha256": "2fd8cc2218f4b1395f764f64087db03becfa6caaec033557be39e7658e0d4e92"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/single_vessel_mu.prm",
+      "path": "original/parameters/benchmark_parameters/single_vessel_mu_55b6b7c3.prm",
+      "sha256": "36b371375eab0ea98102d127e4e8e2daa543a69b69809c9ed84a3949e87ac44a"
+    },
+    {
+      "original_path": "parameters/for_rcr_outlet/junction_0.prm",
+      "path": "original/parameters/for_rcr_outlet/junction_0.prm",
+      "sha256": "3deccbfc28a9c23e83aadf4e93ba7efc6103dba68cc54c191b10ad4a9401d798"
+    },
+    {
+      "original_path": "parameters/for_rcr_outlet/junction_1.prm",
+      "path": "original/parameters/for_rcr_outlet/junction_1.prm",
+      "sha256": "ca4d44c6096eea2b9cdbe53da3c90ff13b8f736d747b963052a8e73a93cd8203"
+    },
+    {
+      "original_path": "parameters/for_rcr_outlet/junction_2.prm",
+      "path": "original/parameters/for_rcr_outlet/junction_2.prm",
+      "sha256": "c38ebc0025c6b94d2aae0f265bc5ce8c3001651762f34c3c70efbcded060e179"
+    }
+  ],
+  "superseded_paths": [
+    {
+      "path": "include/blood_flow_system.h",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "include/junction_solver.h",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "source/blood_flow_system.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    }
+  ]
+}

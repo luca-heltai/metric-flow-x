@@ -1,0 +1,1788 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{bm}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\newtheorem{theorem}{Theorem}
+\newtheorem{remark}[theorem]{Remark}
+\title{Implicit DG Discretization of One-Dimensional embedded Blood Flow with K-Branches}
+\author{}
+\date{}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\avg}[1]{\left\{\!\!\left\{#1\right\}\!\!\right\}}
+\newcommand{\jump}[1]{\left[\!\left[#1\right]\!\right]}
+\newcommand{\dt}{\Delta t}
+\newcommand{\Vh}{V_h}
+\newcommand{\Th}{\mathcal{T}_h}
+\newcommand{\Fh}{\mathcal{F}_h}
+\newcommand{\Kh}{K}
+\newcommand{\norm}[1]{\left\lVert #1\right\rVert}
+
+\begin{document}
+\maketitle
+
+
+\section{Model problem and geometry}
+
+We consider the one-dimensional blood flow equations embedded along a
+centerline $\Gamma\subset\R^{\text{spacedim}}$, parameterized by a unit tangent
+vector $\bm b(\bm x)$:
+\begin{align}
+  \partial_t A + \bm b\!\cdot\!\nabla (A U) &= 0,
+  && \text{(Area equation)}, \label{eq:area-eq}\\[2mm]
+  \partial_t U + \bm b\!\cdot\!\nabla\!\left(\frac{U^2}{2}\right)
+  + \frac{1}{\rho}\bm b\!\cdot\!\nabla P(A)
+  + c\,U &= 0,
+  && \text{(Momentum equation).} \label{eq:momentum-eq}
+\end{align}
+Here $A$ and $U$ denote the cross-sectional area and mean velocity,
+respectively.
+The direction vector of each 1D element is
+\[
+  \bm b = \frac{\bm x_1 - \bm x_0}{\lVert \bm x_1 - \bm x_0\rVert},
+  \qquad
+  \beta = \bm b\!\cdot\!\bm n
+\]
+is its projection on the outward normal $\bm n$.
+The pressure $P(A)$ is governed by a constitutive \emph{tube law},
+for example
+\[
+  P(A) = P_0 + \mu \!\left[\!\left(\frac{A}{A_0}\right)^m - 1\!\right],
+  \qquad
+  \frac{dP}{dA} = \mu \,m\,\frac{A^{m-1}}{A_0^m},
+\]
+and the wave speed is
+\[
+  c = \sqrt{\frac{A}{\rho}\frac{dP}{dA}}.
+\]
+
+The compact vector form of the system is
+\begin{equation}
+  \partial_t \mathbf{w} + \bm b\!\cdot\!\nabla \mathbf{F}(\mathbf{w})
+  = S(\mathbf{w}),
+  \qquad
+  \mathbf{w} =
+  \begin{pmatrix} A \\[1mm] U \end{pmatrix},
+  \quad
+  S(\mathbf{w}) = -
+  \begin{pmatrix} 0 \\[1mm] cU \end{pmatrix},
+  \label{eq:model-vector}
+\end{equation}
+with the physical flux
+\[
+  \mathbf{F}(\mathbf{w}) =
+  \begin{pmatrix}
+    A U \\[2mm]
+    \dfrac{U^2}{2} + \dfrac{1}{\rho} P(A)
+  \end{pmatrix}.
+\]
+
+
+\section{Discontinuous Galerkin weak formulation}
+
+
+Let $\Th$ denote a partition of $\Gamma$ into 1D elements $K$, and for
+polynomial degree $k\ge0$ define the discontinuous finite element space
+\[
+  \Vh = \{v\in L^2(\Gamma): v|_K \in \mathbb P_k(K),\ \forall K\in\Th\}.
+\]
+For an interior face $F\in\Fh^\circ$ with unit normal $\bm n$,
+the jump and average operators are
+\[
+  \jump{v}=v^- - v^+,
+  \qquad
+  \avg{v}=\tfrac12(v^-+v^+),
+\]
+and on boundary faces $F\subset\partial\Gamma$ we set
+$\avg{v}=v$ and $\jump{v}=v$
+
+DG weak form for \eqref{eq:model-vector} is 
+\begin{equation}{\label{semi-discrete-weak-form}}
+     \left( \partial_t \mathbf{w}_h , \phi \right)
+  - (\mathbf{F}(\mathbf{w}), \bm b\!\cdot\!\nabla \phi) + \langle \widehat{\mathbf{F}}(\mathbf{w}), \bm b.n \, \phi \rangle
+  - (S(\mathbf{w}_h), \phi) = 0,
+\end{equation}
+where $\widehat{\mathbf{F}}$ is numerical flux defined later.
+
+\section{Newton iteration in time}
+
+At each time step $t_{n+1}$, we must solve the nonlinear fully discrete DG system
+\eqref{semi-discrete-weak-form}.
+Using the backward Euler discretization, the discrete residual is defined as
+\begin{equation}\label{def:residual-vector}
+  \left(\mathcal{R}^{n+1}(\mathbf{w}_h^{n+1}), \phi\right)
+  :=
+  \left(\frac{\mathbf{w}_h^{n+1} - \mathbf{w}_h^n}{\dt}, \phi \right)
+  - (\mathbf{F}(\mathbf{w}_h^{n+1}), \bm b\!\cdot\!\nabla \phi) + \langle \widehat{\mathbf{F}}(\mathbf{w}_h^{n+1}), \bm b.n \, \phi \rangle
+  - (S(\mathbf{w}_h^{n+1}), \phi),
+\end{equation}
+and we seek $\mathbf{w}_h^{n+1}$ such that
+$\mathcal{R}^{n+1}(\mathbf{w}_h^{n+1}) = 0$ in the weak DG sense.
+
+\subsection*{Linearization by Newton’s method}
+
+Let $\mathbf{w}_h^{n+1,(k)}$ denote the current Newton iterate at time level $t_{n+1}$,
+and define the Newton correction
+\[
+  \delta\mathbf{w}_h^{n+1,(k)} :=
+  \mathbf{w}_h^{n+1,(k+1)} - \mathbf{w}_h^{n+1,(k)}.
+\]
+Then the first-order Taylor expansion of the residual at $t_{n+1}$ gives
+\begin{equation}\label{residual_vector}
+ \boxed{
+  \left(\mathcal{R}^{n+1}\!\left(\mathbf{w}_h^{n+1,(k)} + \delta\mathbf{w}_h^{n+1,(k)}\right), \phi\right)
+  \approx
+  \left( \mathcal{R}^{n+1}\!\left(\mathbf{w}_h^{n+1,(k)}\right), \phi \right)
+  +\left( \mathcal{J}^{(k)}\,\delta\mathbf{w}_h^{n+1,(k)}, \phi \right) .}
+\end{equation}
+The corresponding Newton correction equation reads
+\begin{equation}\label{main-equation}
+  \mathcal{J}^{(k)}\,\delta\mathbf{w}_h^{n+1,(k)}
+  = -\mathcal{R}^{n+1}\!\left(\mathbf{w}_h^{n+1,(k)}\right),
+\end{equation}
+followed by the update
+\[
+  \boxed{
+  \mathbf{w}_h^{n+1,(k+1)}
+  = \mathbf{w}_h^{n+1,(k)} + \omega\,\delta\mathbf{w}_h^{n+1,(k)},
+  \qquad 0 < \omega \le 1.}
+\]
+
+ Differentiating this residual with respect to $\mathbf{w}$ in the direction
+$\delta\mathbf{w}_h^{n+1,(k)}$ yields the weak form of the Jacobian action:
+\begin{equation}\label{jacobian_weak}
+\boxed{
+\begin{aligned}
+  \bigl(\mathcal{J}^{(k)}\delta\mathbf{w}_h^{n+1,(k)}, \phi\bigr)
+  &=
+  \int_{\Omega}
+    \frac{1}{\Delta t}\,
+    \delta\mathbf{w}_h^{n+1,(k)}\cdot\phi
+  \;dx
+  - \int_{\Omega}
+    \Big(
+      \mathbf{H}^{(k)}\,\delta\mathbf{w}_h^{n+1,(k)}
+    \Big)
+    \cdot(\bm b\!\cdot\!\nabla\phi)
+  \;dx \\[2mm]
+  &\quad
+  - \int_{\Omega}
+    \Big(
+      \frac{\partial S}{\partial\mathbf{w}}
+      (\mathbf{w}_h^{n+1,(k)})\,
+      \delta\mathbf{w}_h^{n+1,(k)}
+    \Big)\cdot\phi
+  \;dx
+  + \int_{\partial\Omega}
+    \Big(
+      \frac{\partial\widehat{\mathbf{F}}}{\partial\mathbf{w}}
+      (\mathbf{w}_h^{n+1,(k)})\,
+      \delta\mathbf{w}_h^{n+1,(k)}
+    \Big)\cdot\phi\,ds.
+\end{aligned}}
+\end{equation}
+The flux Jacobian matrix evaluated at the current iterate is
+\[
+  \mathbf{H}^{(k)}
+  = \frac{\partial\mathbf{F}}{\partial\mathbf{w}}(\mathbf{w}_h^{n+1,(k)})
+  =
+  \begin{pmatrix}
+    U_h^{n+1,(k)} & A_h^{n+1,(k)} \\[1mm]
+    \dfrac{\big(c_h^{n+1,(k)}\big)^{2}}{A_h^{n+1,(k)}} & U_h^{n+1,(k)}
+  \end{pmatrix},
+  \qquad
+  c_h^{n+1,(k)}
+  = \sqrt{\frac{A_h^{n+1,(k)}}{\rho}\frac{dP}{dA}\!\big(A_h^{n+1,(k)}\big)}.
+\]
+
+\paragraph{General definition of the flux derivative.}
+
+Let $\mathbf{F}:\R^m\to\R^m$ be a differentiable nonlinear flux
+depending on a vector of conservative variables
+$\mathbf{w}=(W_1,\ldots,W_m)^{\!\top}$.
+Its Fréchet derivative at $\mathbf{w}$ is the linear map
+\[
+  D\mathbf{F}(\mathbf{w}) : \R^m \to \R^m, \qquad
+  D\mathbf{F}(\mathbf{w})[\delta\mathbf{w}]
+  = \lim_{\varepsilon\to0}
+    \frac{\mathbf{F}(\mathbf{w}+\varepsilon\delta\mathbf{w})
+          -\mathbf{F}(\mathbf{w})}{\varepsilon}.
+\]
+In matrix notation, this linear map is represented by the
+\emph{flux Jacobian matrix}
+\[
+  \mathbf{H}(\mathbf{w})
+  = \frac{\partial\mathbf{F}}{\partial\mathbf{w}}
+  =
+  \begin{pmatrix}
+    \dfrac{\partial F_1}{\partial W_1} &
+    \dfrac{\partial F_1}{\partial W_2} & \cdots &
+    \dfrac{\partial F_1}{\partial W_m} \\[1mm]
+    \dfrac{\partial F_2}{\partial W_1} &
+    \dfrac{\partial F_2}{\partial W_2} & \cdots &
+    \dfrac{\partial F_2}{\partial W_m} \\[-1mm]
+    \vdots & \vdots & \ddots & \vdots \\[-1mm]
+    \dfrac{\partial F_m}{\partial W_1} &
+    \dfrac{\partial F_m}{\partial W_2} & \cdots &
+    \dfrac{\partial F_m}{\partial W_m}
+  \end{pmatrix}.
+\]
+For any perturbation $\delta\mathbf{w}$, the first-order variation of the flux
+is therefore
+\[
+  D\mathbf{F}(\mathbf{w})[\delta\mathbf{w}]
+  = \mathbf{H}(\mathbf{w})\,\delta\mathbf{w}.
+\]
+In particular, for a two-component state $\mathbf{w}=(A,U)^{\!\top}$,
+this gives the familiar $2\times2$ matrix form.
+
+\vspace{0.5em}
+
+
+\paragraph{Componentwise flux Jacobian for the blood-flow system.}
+
+For the physical flux
+\[
+  \mathbf{F}(\mathbf{w}) =
+  \begin{pmatrix}
+    F_1 \\[1mm] F_2
+  \end{pmatrix}
+  =
+  \begin{pmatrix}
+    A\,U \\[1mm]
+    \dfrac{U^2}{2} + \dfrac{1}{\rho}P(A)
+  \end{pmatrix},
+\]
+we have
+\[
+  \mathbf{H}(\mathbf{w})
+  = \frac{\partial\mathbf{F}}{\partial\mathbf{w}}
+  =
+  \begin{pmatrix}
+    \dfrac{\partial F_1}{\partial A} &
+    \dfrac{\partial F_1}{\partial U} \\[2mm]
+    \dfrac{\partial F_2}{\partial A} &
+    \dfrac{\partial F_2}{\partial U}
+  \end{pmatrix}
+  =
+  \begin{pmatrix}
+    U & A \\[2mm]
+    \dfrac{1}{\rho}\dfrac{dP}{dA}(A) & U
+  \end{pmatrix}
+  =
+  \begin{pmatrix}
+    U & A \\[2mm]
+    \dfrac{c^2}{A} & U
+  \end{pmatrix},
+\]
+where $c=\sqrt{A\rho^{-1}\frac{dP}{dA}}$ is the local wave speed.
+Hence the first-order variation of the physical flux is
+\[
+  \delta\mathbf{F}
+  = \mathbf{H}(\mathbf{w})\,\delta\mathbf{w}
+  =
+  \begin{pmatrix}
+   U\,\delta A + A\,\delta U \\[1mm]
+    \dfrac{c^2}{A}\,\delta A + U\,\delta U
+  \end{pmatrix}  = \begin{pmatrix}
+      \delta\mathbf{F}_A \\[1mm]
+      \delta\mathbf{F}_U
+  \end{pmatrix}
+\]
+
+\vspace{0.5em}
+
+\paragraph{Choices of Numerical Fluxes :}
+The numerical flux function $\widehat{\mathbf{F}}(\mathbf{w}^-,\mathbf{w}^+)$
+appearing on interior and boundary faces can be is chosen as the
+\emph{local Lax--Friedrichs (Rusanov) flux} \cite{breuss2004correct, houston2018automatic} or \emph{Harten-Lax-van Leer (HLL) flux} \cite{davis1988simplified}.
+
+\subsection{Lax--Friedrichs Flux}
+\begin{equation}\label{LF_flux}
+  \boxed{
+  \widehat{\mathbf{F}}(\mathbf{w}^-,\mathbf{w}^+;\bm n)
+  = 
+  \frac{1}{2}\Big(
+      \mathbf{F}(\mathbf{w}^-)(b \cdot n)^{-}
+    + \mathbf{F}(\mathbf{w}^+) (b \cdot n)^{+}
+  \Big)
+  \;-\;
+  \frac{1}{2}\,\alpha^{(k)}\,
+  (\mathbf{w}^+ - \mathbf{w}^-  ),
+  }
+\end{equation}
+where $\mathbf{w}^-$ and $\mathbf{w}^+$ denote the interior and exterior traces
+of the state vector across a face with unit normal $\bm n$. And $(b\cdot n)^{-} = b|_{K} \cdot \hat{n}_{k} = b|_{K} \cdot \hat{n}$, $(b\cdot n)^{+} =  b|_{K'} \cdot \hat{n}_{K'} = - b|_{K'} \cdot \hat{n}_{k}$ with $K$ and $K'$ are neighboring elements.
+The parameter $\alpha^{(k)}$ is a local estimate of the maximum wave speed,
+computed at the current Newton iterate as $|b \cdot n| =1$
+\[
+  \alpha^{(k)}
+  =
+  \max\!\Big(
+      \big|\lambda_1^{(k)}(\mathbf{w}^-)\big|,
+      \big|\lambda_2^{(k)}(\mathbf{w}^-)\big|,
+      \big|\lambda_1^{(k)}(\mathbf{w}^+)\big|,
+      \big|\lambda_2^{(k)}(\mathbf{w}^+)\big|
+  \Big),
+\]
+with the characteristic speeds
+\[
+  \lambda_{1,2}^{(k)}(\mathbf{w})
+  =
+  U_h^{n+1,(k)} \mp c_h^{n+1,(k)},
+  \qquad
+  c_h^{n+1,(k)} =
+  \sqrt{\frac{A_h^{n+1,(k)}}{\rho}\frac{dP}{dA}\!\big(A_h^{n+1,(k)}\big)}.
+\]
+Hence, on an interior face $e = K^-\cap K^+$, the weak flux term in
+\eqref{jacobian_weak} is expressed as
+\[
+  \int_{e}
+    \widehat{\mathbf{F}}(\mathbf{w}_h^{-,(k)},\mathbf{w}_h^{+,(k)};\bm n^-)
+    \cdot \big(\phi^+ - \phi^-\big)\, ds,
+\]
+while on a boundary face, the exterior state $\mathbf{w}^+$ is replaced
+by the prescribed boundary data $\mathbf{w}_b$.
+\begin{equation}\label{LF_flux_componentwise}
+\boxed{
+\begin{aligned}
+\widehat{F}_A(A^-,U^-;A^+,U^+)
+&=
+\frac{1}{2}\Big[
+    (A^- U^-)(b \cdot n)^{-}
+  + (A^+ U^+)(b \cdot n)^{+}
+\Big]
+-\frac{1}{2}\,\alpha^{(k)}\,
+  ( A^+ - A^- ), \\[2mm]
+\widehat{F}_U(A^-,U^-;A^+,U^+)
+&=
+\frac{1}{2}\Bigg[
+    \left(\frac{(U^-)^2}{2} + \frac{1}{\rho}P(A^-)\right)(b \cdot n)^{-}
+  + \left(\frac{(U^+)^2}{2} + \frac{1}{\rho}P(A^+)\right)(b \cdot n)^{+}
+\Bigg]  \\[2mm]
+&-\frac{1}{2}\,\alpha^{(k)}\,
+  ( U^+  - U^- ).
+\end{aligned}
+}
+\end{equation}
+
+\paragraph{Componentwise derivative of the Lax -Friedrichs numerical flux.}
+
+For the local Lax--Friedrichs flux
+\[
+  \widehat{\mathbf{F}}^{\mathrm{LF}}(\mathbf{w}^-,\mathbf{w}^+)
+  =
+  \tfrac{1}{2}\big(\mathbf{F}(\mathbf{w}^-)(b \cdot n)^{-}+\mathbf{F}(\mathbf{w}^+)(b \cdot n)^{+}\big)
+  -\tfrac{1}{2}\alpha^{(k)}(\mathbf{w}^+ - \mathbf{w}^-),
+\]
+the linearization at the current iterate is obtained by differentiating
+$\mathbf{F}(\mathbf{w}^\pm)$:
+\begin{equation}\label{eq:LF-derivative-component}
+  \boxed{
+  \delta\widehat{\mathbf{F}}^{(k)}
+  =
+  \tfrac{1}{2}
+  \big(
+    \mathbf{H}^-\,\delta\mathbf{w}^- (b \cdot n)^{-}
+    + \mathbf{H}^+\,\delta\mathbf{w}^+ (b \cdot n)^{+}
+  \big)
+  - \tfrac{1}{2}\alpha^{(k)}
+    (\delta\mathbf{w}^+ - \delta\mathbf{w}^-),
+  }
+\end{equation}
+where $\mathbf{H}^\pm=\tfrac{\partial\mathbf{F}}{\partial\mathbf{w}}(\mathbf{w}^\pm)$
+are the local flux Jacobians on the two sides of the face.
+
+Writing \eqref{eq:LF-derivative-component} componentwise for
+$\mathbf{w}=(A,U)^{\!\top}$ gives:
+\[
+\delta\widehat{\mathbf{F}}^{\mathrm{LF}}
+=
+\begin{pmatrix}
+\delta\widehat{F}_1^{\mathrm{LF}}\\[1mm]
+\delta\widehat{F}_2^{\mathrm{LF}}
+\end{pmatrix},
+\qquad
+\begin{cases}
+\displaystyle
+\delta\widehat{F}_1^{\mathrm{LF}}
+=
+\tfrac{1}{2}\Big[
+  (U^-\,\delta A^- + A^-\,\delta U^-)(b \cdot n)^{-}
+  + (U^+\,\delta A^+ + A^+\,\delta U^+)(b \cdot n)^{+}
+\Big] \\
+-\tfrac{1}{2}\alpha^{(k)}(\delta A^+ - \delta A^-),\\[3mm]
+\displaystyle
+\delta\widehat{F}_2^{\mathrm{LF}}
+=
+\tfrac{1}{2}\Big[
+  \Big(\tfrac{(c^-)^2}{A^-}\,\delta A^- + U^-\,\delta U^-\Big)(b \cdot n)^{-}
+  + \Big(\tfrac{(c^+)^2}{A^+}\,\delta A^+ + U^+\,\delta U^+\Big)(b \cdot n)^{+}
+\Big] \\
+-\tfrac{1}{2}\alpha^{(k)}(\delta U^+ - \delta U^-).
+\end{cases}
+\]
+These expressions provide the explicit componentwise form of the
+linearized numerical flux used in the weak Jacobian formulation.
+
+\subsection{HLL Flux}
+
+We employ the Harten--Lax--van Leer (HLL) approximate Riemann solver as numerical
+flux. Let $S_L$ and $S_R$ denote estimates of the minimal and maximal wave speeds
+across a face, defined at the current Newton iterate as
+\[
+S_L^{(k)} = \min\!\big(U^- - c^-,\, U^+ - c^+\big), \qquad
+S_R^{(k)} = \max\!\big(U^- + c^-,\, U^+ + c^+\big),
+\]
+where
+\[
+c^\pm
+=
+\sqrt{\frac{A^\pm}{\rho}\frac{dP}{dA}(A^\pm)} .
+\]
+
+The HLL numerical flux is defined as
+\begin{equation}\label{HLL_flux}
+\boxed{
+\widehat{\mathbf{F}}^{\mathrm{HLL}}(\mathbf{w}^-,\mathbf{w}^+;\bm n)
+=
+\begin{cases}
+\mathbf{F}(\mathbf{w}^-)(b\cdot n),
+& S_L^{(k)} \ge 0, \\[2mm]
+\dfrac{
+S_R^{(k)}\,\mathbf{F}(\mathbf{w}^-)
+-
+S_L^{(k)}\,\mathbf{F}(\mathbf{w}^+)
++
+S_L^{(k)} S_R^{(k)}(\mathbf{w}^+ - \mathbf{w}^-)
+}{
+S_R^{(k)} - S_L^{(k)}
+}\,(b\cdot n),
+& S_L^{(k)} < 0 < S_R^{(k)}, \\[4mm]
+\mathbf{F}(\mathbf{w}^+)(b\cdot n),
+& S_R^{(k)} \le 0 .
+\end{cases}
+}
+\end{equation}
+
+Here $\mathbf{w}^-$ and $\mathbf{w}^+$ denote the interior and exterior traces of
+the state vector across a face with unit normal $\bm n$.
+On boundary faces, the exterior state $\mathbf{w}^+$ is replaced by the prescribed
+boundary data $\mathbf{w}_b$.
+
+
+\paragraph{Componentwise HLL flux and its derivative.}
+
+For $\mathbf{w}=(A,U)^{\!\top}$, the HLL flux components in the intermediate case
+$S_L^{(k)} < 0 < S_R^{(k)}$ are given by
+\begin{equation}\label{HLL_flux_componentwise}
+\boxed{
+\begin{aligned}
+\widehat{F}_A^{\mathrm{HLL}}
+&=
+\frac{
+S_R^{(k)} A^- U^-
+-
+S_L^{(k)} A^+ U^+
++
+S_L^{(k)} S_R^{(k)}(A^+ - A^-)
+}{
+S_R^{(k)} - S_L^{(k)}
+}, \\[3mm]
+\widehat{F}_U^{\mathrm{HLL}}
+&=
+\frac{
+S_R^{(k)}\!\left(\dfrac{(U^-)^2}{2} + \dfrac{1}{\rho}P(A^-)\right)
+-
+S_L^{(k)}\!\left(\dfrac{(U^+)^2}{2} + \dfrac{1}{\rho}P(A^+)\right)
++
+S_L^{(k)} S_R^{(k)}(U^+ - U^-)
+}{
+S_R^{(k)} - S_L^{(k)}
+}.
+\end{aligned}
+}
+\end{equation}
+
+Writing derivative of \eqref{HLL_flux_componentwise} componentwise gives:
+\[
+\delta\widehat{\mathbf{F}}^{\mathrm{HLL}}
+=
+\begin{pmatrix}
+\delta\widehat{F}_1^{\mathrm{HLL}} \\[1mm]
+\delta\widehat{F}_2^{\mathrm{HLL}}
+\end{pmatrix},
+\]
+with
+\begin{align*}
+\delta\widehat{F}_1^{\mathrm{HLL}}
+&=
+\frac{
+S_R^{(k)}\!\left(U^-\,\delta A^- + A^-\,\delta U^-\right)
+-
+S_L^{(k)}\!\left(U^+\,\delta A^+ + A^+\,\delta U^+\right)
++
+S_L^{(k)} S_R^{(k)}(\delta A^+ - \delta A^-)
+}{
+S_R^{(k)} - S_L^{(k)}
+}, \\[3mm]
+\delta\widehat{F}_2^{\mathrm{HLL}}
+&=
+\frac{
+S_R^{(k)}\!\left(\dfrac{(c^-)^2}{A^-}\,\delta A^- + U^-\,\delta U^-\right)
+-
+S_L^{(k)}\!\left(\dfrac{(c^+)^2}{A^+}\,\delta A^+ + U^+\,\delta U^+\right)
++
+S_L^{(k)} S_R^{(k)}(\delta U^+ - \delta U^-)
+}{
+S_R^{(k)} - S_L^{(k)}
+}.
+\end{align*}
+
+\section{Weak form of the Newton correction with LF/HLL flux}
+
+Hence, at iteration $k$ and time level $t_{n+1}$, the linearized (Newton) problem with the help  of \eqref{jacobian_weak} reads:
+
+\begin{equation}\label{eq:newton-weak-final}
+\boxed{
+\begin{aligned}
+\sum_{K\in\Th}
+\Big[
+  &\int_K
+    \frac{1}{\Delta t}\,
+    \delta\mathbf{w}_h^{n+1,(k)}\!\cdot\!\bm\phi
+    \;-\;
+    \big(\mathbf{H}^{(k)}\,\delta\mathbf{w}_h^{n+1,(k)},\,\bm b\!\cdot\!\nabla\bm\phi\big)_K
+    \;-\;
+    \Big(
+      \frac{\partial S}{\partial\mathbf{w}}(\mathbf{w}_h^{n+1,(k)})\,\delta\mathbf{w}_h^{n+1,(k)},
+      \bm\phi
+    \Big)_K  \\[2mm]
+  &\qquad
+  +\;
+  \int_{\partial K}
+    \widehat{\big(\mathbf{H}^{(k)}\delta\mathbf{w}_h^{n+1,(k)}\big)}^{\mathrm{LF}/{\mathrm{HLL}}}
+    \!\!\jump{\phi}(\bm b\!\cdot\!\bm n)\,ds
+\Big]
+\\[2mm]
+&= -\!
+\sum_{K\in\Th}
+\Big[
+  \int_K
+  \Big(
+    \frac{\mathbf{w}_h^{n+1,(k)}-\mathbf{w}_h^n}{\Delta t}
+    - S(\mathbf{w}_h^{n+1,(k)})
+  \Big)\!\cdot\!\bm\phi
+  \;+\;
+  \big(\mathbf{F}(\mathbf{w}_h^{n+1,(k)}),\,\bm b\!\cdot\!\nabla\bm\phi\big)_K  \\[2mm]
+  &\qquad
+  -\;
+  \int_{\partial K}
+    \widehat{\mathbf{F}}^{\mathrm{LF}/{\mathrm{HLL}}}(\mathbf{w}_h^{n+1,(k)})\! \jump{\phi} \,(\bm b\!\cdot\!\bm n)\,ds
+\Big].
+\end{aligned}}
+\end{equation}
+
+Componentwise, since
+\[
+  \mathbf{H}^{(k)}\,\delta\mathbf{w}_h^{n+1,(k)}
+  =
+  \begin{pmatrix}
+    U_h^{n+1,(k)}\,\delta A_h^{n+1,(k)}
+    + A_h^{n+1,(k)}\,\delta U_h^{n+1,(k)} \\[2mm]
+    \dfrac{(c_h^{n+1,(k)})^{2}}{A_h^{n+1,(k)}}\,\delta A_h^{n+1,(k)}
+    + U_h^{n+1,(k)}\,\delta U_h^{n+1,(k)}
+  \end{pmatrix}.
+\]
+
+
+the two scalar weak equations become:
+
+\paragraph{(i) Area equation.}
+\begin{align}
+\int_K
+  \frac{\delta A_h^{n+1,(k)}}{\Delta t}\,\phi_A
+  &\;-\;
+  \int_K
+    \bm b\!\cdot\!
+    \delta\mathbf{F}_1
+    \nabla\phi_A\,dx
+  \;+\;
+  \int_{\partial K}
+   \widehat{ \delta \mathbf{F}}_1^{\mathrm{LF}/\mathrm{HLL}}\,
+    \phi_A^{-}\,
+    (\bm b\!\cdot\! n)\,ds
+  \nonumber\\[4pt]
+  &=
+  -\int_K
+    \frac{A_h^{n+1,(k)} - A_h^n}{\Delta t}\,\phi_A\,dx
+  \;+\;
+  \int_K
+    \bm b\!\cdot\!\nabla\phi_A\,
+   F_1 \,dx
+    \nonumber\\[4pt]
+ & \;-\; 
+ \int_{\partial K}
+    \widehat{\mathbf{F_1}}^{\mathrm{LF}/\mathrm{HLL}}\,
+    \phi_A^{-}\,
+    (\bm b\!\cdot\! n)\,ds.
+  \label{eq:newton-A-nk1}
+\end{align}
+
+\vspace{1em}
+
+\paragraph{(ii) Momentum equation.}
+
+\begin{align}
+\int_K
+  \frac{\delta U_h^{n+1,(k)}}{\Delta t}\,\phi_U
+  &\;-\;
+  \int_K
+    \bm b\!\cdot\!
+    \delta\mathbf{F}_2
+    \nabla\phi_U\,dx
+  \;+\;
+  \int_{\partial K}
+    \widehat{\delta\mathbf{F}_2}^{\mathrm{LF}/\mathrm{HLL}},
+    \phi_U^{-}\,
+    (\bm b\!\cdot\! n)\,ds  \nonumber\\[4pt]
+  &
+  \;+\;
+  \int_K c\,\delta U_h^{n+1,(k)}\,\phi_U\,dx
+  =
+  -\int_K
+    \frac{U_h^{n+1,(k)} - U_h^n}{\Delta t}\,\phi_U\,dx
+  \;+\;
+  \int_K
+    \bm b\!\cdot\!\nabla\phi_U\,
+    \mathbf{F}_2 \,dx \nonumber\\[4pt]
+  &
+  \;-\;
+  \int_{\partial K}
+     \widehat{\mathbf{F}_2}^{\mathrm{LF}/\mathrm{HLL}},\,
+    \phi_U^{-}\,
+    (\bm b\!\cdot\! n)\,ds
+  \;-\;
+  \int_K c\,U_h^{n+1,(k)}\,\phi_U\,dx.
+  \label{eq:newton-U-nk1}
+\end{align}
+
+\subsection{Boundary treatment in the Newton linearization}
+
+The boundary treatment follows a characteristic-based approach for hyperbolic
+systems, inspired by \textit{Guaily and Epstein}.
+At a boundary face $e \subset \partial\Omega$, the exterior trace
+$\mathbf{w}^+=(A^+,U^+)^{\!\top}$ entering the numerical flux is constructed from
+the prescribed boundary data and the interior state, depending on the direction
+of the characteristic waves.
+
+For the one-dimensional blood-flow system, the characteristic speeds are
+\[
+\lambda_{1,2} = U \mp c,
+\qquad
+c = \sqrt{\frac{A}{\rho}\frac{dP}{dA}(A)}.
+\]
+The number of incoming characteristics determines how many boundary conditions
+must be imposed.
+
+Let $(A^-,U^-)$ denote the interior state at the boundary quadrature point.
+We define the characteristic speeds
+\[
+\lambda_1^- = U^- - c^-, \qquad \lambda_2^- = U^- + c^-,
+\]
+and classify the boundary according to the number of incoming characteristics:
+\begin{itemize}
+  \item \emph{Subcritical flow:} exactly one incoming characteristic;
+  \item \emph{Supercritical inflow:} two incoming characteristics;
+  \item \emph{Supercritical outflow:} no incoming characteristics.
+\end{itemize}
+
+The exterior state $(A^+,U^+)$ used in the numerical flux is defined as follows.
+Subcritical flow is characterized by
+\[
+\lambda_1^- < 0 < \lambda_2^- .
+\]
+
+\paragraph{(a) Subcritical inlet.}
+If the incoming characteristic corresponds to $\lambda_1^-$, the area is
+prescribed at the boundary:
+\[
+A^+ = A_b, \qquad U^+ = U^-,
+\]
+which implies
+\[
+\delta A^+ = 0, \qquad \delta U^+ = \delta U^- .
+\]
+
+\paragraph{(b) Subcritical outlet.}
+If the incoming characteristic corresponds to $\lambda_2^-$, the velocity is
+prescribed:
+\[
+A^+ = A^-, \qquad U^+ = U_b,
+\]
+and therefore
+\[
+\delta A^+ = \delta A^-, \qquad \delta U^+ = 0 .
+\]
+In the supercritical inflow regime,
+\[
+\lambda_1^- < 0, \qquad \lambda_2^- < 0,
+\]
+both characteristics enter the domain and the full state must be prescribed:
+\[
+A^+ = A_b, \qquad U^+ = U_b.
+\]
+Hence,
+\[
+\delta A^+ = 0, \qquad \delta U^+ = 0 .
+\]
+
+When
+\[
+\lambda_1^- > 0, \qquad \lambda_2^- > 0,
+\]
+all characteristics leave the domain and no boundary condition is imposed.
+Thus,
+\[
+A^+ = A^-, \qquad U^+ = U^-,
+\qquad
+\delta A^+ = \delta A^-, \quad \delta U^+ = \delta U^- .
+\]
+
+Once the exterior state $(A^+,U^+)$ has been determined, the boundary contribution
+to the residual is computed using the HLL flux 
+Treating the interior state as the left state and the boundary state as the
+right state, the HLL flux reads
+\[
+\widehat{\mathbf{F}}^{\mathrm{HLL}}(\mathbf{w}^-,\mathbf{w}^+)
+=
+\begin{cases}
+\mathbf{F}(\mathbf{w}^-), & S_L \ge 0, \\[2mm]
+\dfrac{
+S_R \mathbf{F}(\mathbf{w}^-)
+-
+S_L \mathbf{F}(\mathbf{w}^+)
++
+S_L S_R (\mathbf{w}^+ - \mathbf{w}^-)
+}{
+S_R - S_L
+}, & S_L < 0 < S_R, \\[4mm]
+\mathbf{F}(\mathbf{w}^+), & S_R \le 0,
+\end{cases}
+\]
+with wave-speed estimates
+\[
+S_L = \min(U^- - c^-,\, U^+ - c^+),
+\qquad
+S_R = \max(U^- + c^-,\, U^+ + c^+).
+\]
+
+For the Newton linearization, the wave speeds $S_L$ and $S_R$ are frozen at the
+current iterate.
+Since the boundary state $\mathbf{w}^+$ is prescribed by the boundary conditions,
+only variations of the interior state contribute to the Jacobian.
+The linearized boundary flux therefore takes the form
+\[
+\delta\widehat{\mathbf{F}}^{(k)}
+=
+\frac{
+S_R^{(k)}\,\mathbf{H}^-\,\delta\mathbf{w}^-
+-
+S_L^{(k)}\,\mathbf{H}^+\,\delta\mathbf{w}^+
++
+S_L^{(k)} S_R^{(k)}(\delta\mathbf{w}^+ - \delta\mathbf{w}^-)
+}{
+S_R^{(k)} - S_L^{(k)}
+},
+\]
+where $\delta\mathbf{w}^+$ is determined according to the boundary regime.
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{c|c|c|c}
+\hline
+\textbf{Flow regime} & $A^+$ & $U^+$ & $(\delta A^+,\,\delta U^+)$ \\ \hline
+Subcritical inlet   & $A_b$  & $U^-$ & $(0,\ \delta U^-)$ \\[2mm]
+Subcritical outlet  & $A^-$  & $U_b$ & $(\delta A^-,\ 0)$ \\[2mm]
+Supercritical inflow & $A_b$ & $U_b$ & $(0,\ 0)$ \\[2mm]
+Supercritical outflow & $A^-$ & $U^-$ & $(\delta A^-,\ \delta U^-)$ \\
+\hline
+\end{tabular}
+\caption{Exterior state and Newton variation at boundaries for the HLL flux.}
+\label{tab:bd-newton-hll}
+\end{table}
+For the same type of boundary representation of LF flux see Appendix \ref{bd:Lf_flux}.
+% \subsection{Junction treatment and Newton coupling}
+
+% We consider a Y-shaped arterial junction connecting one parent vessel to two
+% daughter vessels, as illustrated in Figure~\ref{fig:arterial-tree}.
+% Within the discontinuous Galerkin framework, junctions correspond to
+% non-manifold points where three one-dimensional elements meet.
+
+% Let $(A_p,U_p)$ denote the solution traces in the parent vessel, and
+% $(A_{d_1},U_{d_1})$, $(A_{d_2},U_{d_2})$ those in the two daughter vessels,
+% all evaluated at the junction location.
+% \paragraph{Note.} Parent/daughter are decided purely by network topology. Exactly one vessel ends $->$ parent. Exactly two vessels starts $->$ daughters. 
+% \paragraph{Junction Detection}
+% Junctions are detected geometrically by identifying vertices shared by exactly
+% three active DG elements.
+% Each junction is characterized by one parent face and two daughter faces,
+% which are treated as internal boundaries in the DG formulation.
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{images/arterial_tree_bifurcation.png}
+%     \caption{
+% Schematic representation of a Y-shaped arterial junction.
+% Element $e$ denotes the parent vessel, while elements $e+1$ and $e+2$ correspond
+% to the two daughter vessels.
+% The junction point is treated as a non-manifold interface in the DG
+% discretization, where mass conservation, pressure continuity, and
+% characteristic compatibility conditions are enforced.
+% }
+% \label{fig:arterial-tree}
+% \end{figure}
+% \paragraph{Junction conditions}
+% At each junction, six algebraic conditions are imposed to determine the unknown
+% junction states $(A_p,U_p,A_{d_1},U_{d_1},A_{d_2},U_{d_2})$.
+% These conditions consist of mass conservation, total pressure continuity, and
+% characteristic compatibility.
+% \begin{itemize}
+%     \item Mass conservation 
+%     \begin{equation}\label{eq:junction-mass}
+% A_p U_p = A_{d_1} U_{d_1} + A_{d_2} U_{d_2}. 
+% \end{equation}
+% \item Pressure continuity (bernoulli equation)
+% \begin{align}
+% \frac{U_p^2}{2} + P(A_p)
+% &=
+% \frac{U_{d_1}^2}{2} + P(A_{d_1}),
+% \label{eq:junction-pressure1}\\
+% \frac{U_p^2}{2} + P(A_p)
+% &=
+% \frac{U_{d_2}^2}{2} + P(A_{d_2}).
+% \label{eq:junction-pressure2}
+% \end{align}
+% \item Characteristic Compatibility: 
+% To close the system, characteristic compatibility conditions are imposed using
+% incoming Riemann invariants.
+% Let
+% \[
+% c(A) = \sqrt{\frac{A}{\rho}\frac{dP}{dA}(A)}
+% \]
+% denote the local wave speed.
+% The characteristic invariants are frozen from the previous time level and read
+% \begin{align}
+% U_p - 4 c(A_p) &= W_p^-,
+% \label{eq:junction-char-parent}\\
+% U_{d_1} + 4 c(A_{d_1}) &= W_{d_1}^+,
+% \label{eq:junction-char-d1}\\
+% U_{d_2} + 4 c(A_{d_2}) &= W_{d_2}^+,
+% \label{eq:junction-char-d2}
+% \end{align}
+% where $W_p^-$, $W_{d_1}^+$, and $W_{d_2}^+$ are computed from the solution at the
+% previous time step.
+% \end{itemize}
+% \subsection{Nonlinear Jacobian system for junction}
+
+% Equations \eqref{eq:junction-mass}--\eqref{eq:junction-char-d2} define a nonlinear
+% system of six equations for the six unknown junction states.
+% This system is solved locally at each junction using a Newton iteration,
+% initialized with the DG traces at the current time level.\\
+% The Jacobian matrix is assembled analytically by differentiating the junction
+% residuals with respect to the junction unknowns.
+% This local Jacobian is used both in the Newton solve of the junction system and
+% to consistently inject the junction contribution into the global DG Jacobian.
+
+% \subsection{Jacobian of the junction residual}
+
+% At a Y-shaped arterial junction, we collect the unknown junction states into the
+% vector
+% \[
+% \mathbf{X}
+% =
+% \begin{pmatrix}
+% A_p & U_p & A_{d_1} & U_{d_1} & A_{d_2} & U_{d_2}
+% \end{pmatrix}^{\!\top},
+% \]
+% where $(A_p,U_p)$ denote the area and velocity in the parent vessel, and
+% $(A_{d_1},U_{d_1})$, $(A_{d_2},U_{d_2})$ those in the two daughter vessels.
+
+% %------------------------------------------------------------
+% \paragraph{Junction residual.}
+
+% The nonlinear residual vector $\mathbf{R}(\mathbf{X}) \in \mathbb{R}^6$ is defined
+% componentwise as
+% \begin{align}
+% R_1 &= A_p U_p - A_{d_1} U_{d_1} - A_{d_2} U_{d_2},
+% \label{eq:junction-R1}\\
+% R_2 &= \tfrac12 U_p^2 + P(A_p)
+%       - \tfrac12 U_{d_1}^2 - P(A_{d_1}),
+% \label{eq:junction-R2}\\
+% R_3 &= \tfrac12 U_p^2 + P(A_p)
+%       - \tfrac12 U_{d_2}^2 - P(A_{d_2}),
+% \label{eq:junction-R3}\\
+% R_4 &= U_p - 4\,c(A_p) - W_p^{-},
+% \label{eq:junction-R4}\\
+% R_5 &= U_{d_1} + 4\,c(A_{d_1}) - W_{d_1}^{+},
+% \label{eq:junction-R5}\\
+% R_6 &= U_{d_2} + 4\,c(A_{d_2}) - W_{d_2}^{+},
+% \label{eq:junction-R6}
+% \end{align}
+% where
+% \[
+% c(A) = \sqrt{\frac{A}{\rho}\frac{dP}{dA}(A)}
+% \]
+% is the local wave speed, and $W_p^{-}$, $W_{d_1}^{+}$, $W_{d_2}^{+}$ denote the
+% incoming characteristic invariants frozen from the previous time level.
+
+% %------------------------------------------------------------
+% \paragraph{Jacobian matrix.}
+
+% The Jacobian matrix required for the Newton iteration is given by
+% \[
+% \mathbf{J}
+% =
+% \frac{\partial \mathbf{R}}{\partial \mathbf{X}}
+% =
+% \left[
+% \frac{\partial R_i}{\partial X_j}
+% \right]_{i,j=1}^{6}.
+% \]
+% Using
+% \[
+% \frac{dc}{dA}
+% =
+% \frac{1}{2c(A)}\,\frac{dP}{dA}(A),
+% \]
+% the Jacobian can be written explicitly as
+% \begin{equation}\label{eq:junction-jacobian}
+% \boxed{
+% \mathbf{J}
+% =
+% \begin{pmatrix}
+% U_p & A_p & -U_{d_1} & -A_{d_1} & -U_{d_2} & -A_{d_2} \\[2mm]
+
+% \dfrac{dP}{dA}(A_p) & U_p
+% & -\dfrac{dP}{dA}(A_{d_1}) & -U_{d_1}
+% & 0 & 0 \\[3mm]
+
+% \dfrac{dP}{dA}(A_p) & U_p
+% & 0 & 0
+% & -\dfrac{dP}{dA}(A_{d_2}) & -U_{d_2} \\[3mm]
+
+% -\dfrac{2}{c_p}\dfrac{dP}{dA}(A_p) & 1
+% & 0 & 0
+% & 0 & 0 \\[3mm]
+
+% 0 & 0
+% & \dfrac{2}{c_{d_1}}\dfrac{dP}{dA}(A_{d_1}) & 1
+% & 0 & 0 \\[3mm]
+
+% 0 & 0
+% & 0 & 0
+% & \dfrac{2}{c_{d_2}}\dfrac{dP}{dA}(A_{d_2}) & 1
+% \end{pmatrix}
+% }
+% \end{equation}
+% where
+% \[
+% c_p = c(A_p), \qquad
+% c_{d_1} = c(A_{d_1}), \qquad
+% c_{d_2} = c(A_{d_2}).
+% \]
+
+% %------------------------------------------------------------
+\section{Boundary treatment by Riemann invariants}
+Before employing the Riemann invariants for the boundary treatment, we first derive their differential form \cite{kim2025one}.
+\subsection*{Derivation of Characteristic Variables}
+We know from previous sections, the Jacobian matrix of the flux is
+\[
+H = \frac{\partial F}{\partial \,\mathbf{w}}
+=
+\begin{pmatrix}
+U & A \\
+\dfrac{1}{\rho}\dfrac{\partial p}{\partial A} & U
+\end{pmatrix}.
+\]
+Using the definition of wave speed
+\[
+c(A) = \sqrt{\frac{A}{\rho}\frac{\partial p}{\partial A}},
+\]
+
+the Jacobian becomes
+
+\[
+H =
+\begin{pmatrix}
+U & A \\
+\dfrac{c^2}{A} & U
+\end{pmatrix}.
+\]
+
+The eigenvalues are obtained from
+
+\[
+\det(H-\lambda I)=0
+\]
+
+which yields
+
+\[
+\lambda_{1,2} = U \pm c .
+\]
+These correspond to the forward and backward propagating characteristic waves.
+
+\subsection*{Left Eigenvectors}
+
+The left eigenvectors satisfy
+
+\[
+L H = \Lambda L
+\]
+
+which gives
+
+\[
+L =
+\begin{pmatrix}
+\dfrac{c}{A} & 1 \\
+-\dfrac{c}{A} & 1
+\end{pmatrix}.
+\]
+
+\subsection*{Characteristic Variables}
+
+Let the characteristic variables be defined as
+
+\[
+W = L \mathbf{w} .
+\]
+
+Differentiating gives
+
+\[
+dW = L \, d\mathbf{w} .
+\]
+
+Thus
+
+\[
+\begin{pmatrix}
+dW_1 \\
+dW_2
+\end{pmatrix}
+=
+\begin{pmatrix}
+\dfrac{c}{A} & 1 \\
+-\dfrac{c}{A} & 1
+\end{pmatrix}
+\begin{pmatrix}
+dA \\
+dU
+\end{pmatrix}.
+\]
+
+Hence
+
+\begin{equation}\label{characteristics::1}
+\begin{aligned}
+  dW_1 &= \frac{c}{A} dA + dU, \\
+  dW_2 &= -\frac{c}{A} dA + dU.
+\end{aligned}
+\end{equation}
+Using the relation for the derivative of wave speed
+\[
+\frac{\partial c}{\partial A} = \frac{c}{4A},
+\]
+
+in expressions \eqref{characteristics::1} can be integrated to obtain the Riemann invariants
+\[
+W_1 = U + 4c,
+\]
+\[
+W_2 = U - 4c.
+\]
+
+\subsection*{Characteristic Form of the System}
+The system can therefore be written in characteristic form
+\[
+\frac{\partial W_1}{\partial t} + (U+c)\frac{\partial W_1}{\partial z} = 0,
+\]
+
+\[
+\frac{\partial W_2}{\partial t} + (U-c)\frac{\partial W_2}{\partial z} = 0.
+\]
+
+Thus \(W_1\) propagates along the characteristic curve with speed
+\(\lambda_1 = u+c\) and \(W_2\) propagates with speed
+\(\lambda_2 = u-c\).
+
+\subsection{Windkessel/RCR Boundary Conditions}
+To close the system, we implement boundary conditions using Riemann Invariants to ensure numerical stability and compatibility with the hyperbolic nature of the equations. We define the outgoing and incoming characteristics as:
+\begin{equation}
+W_{1,L} = U_L + 4(c_L - c_0), \quad W_{2,L} = U_L - 4(c_L - c_0)
+\end{equation}
+where $c = c(A) = \sqrt{\frac{A}{\rho}dp/dA}$ is the wave speed and $c_0 = c(A_0)$.
+
+\paragraph{Inflow Boundary Conditions}\cite{alastruey2012arterial}
+At the inlet boundary (identified by $\Gamma_{in}$), we prescribe a time-dependent flow rate $Q_{in}(t)$. The state $(A^*,U^*)$ at the boundary is found by solving the following nonlinear system for the incoming characteristic:
+\begin{align}
+ R_{B,1}=& A^* U^* - Q_{in}(t) = 0 \label{rb1} \\
+R_{B,2}=& U^* - 4(c^* -c_0) - W_{2, L} = 0  \label{rb2}  
+\end{align}
+where $W_{2,L}$ is the characteristic information reaching the inlet from the interior of the domain. From Eq.~\eqref{rb2} we obtain
+\[
+U^* = W_{2,L} + 4(c^* - c_0).
+\]
+Substituting this expression into Eq.~\eqref{rb1} yields the nonlinear equation
+\begin{equation}
+Q_{in} = A^* \left[ W_{2,L} + 4(c^* - c_0) \right],
+\label{rb}
+\end{equation}
+which is solved iteratively using the Newton iteration method with the initial guess $A^* = A_L$. Once $A^*$ is obtained, the velocity $U^*$ is computed from Eq.~\eqref{rb2}.
+Once the boundary Riemann state $(A^*,U^*)$ has been computed, the numerical flux at the boundary is evaluated using the interior state $(A_L,U_L)$ and the boundary state $(A^*,U^*)$.
+
+\paragraph{RCR (Windkessel) Outlet Conditions}
+
+For terminal boundaries, a three-parameter Windkessel (RCR) model is
+used to represent the resistance and compliance of the downstream
+vasculature. The model consists of a proximal resistance $R_1$, a
+compliance $C$, and a distal resistance $R_2$.
+
+The capacitor pressure $P_c$ is updated implicitly using a first-order
+time discretisation of the governing equation
+
+\[
+C \frac{dP_c}{dt} = Q^* - \frac{P_c - P_{out}}{R_2},
+\]
+
+where the boundary flow rate is
+
+\[
+Q^* = A^* U^* .
+\]
+
+Using a backward Euler discretisation yields
+
+\begin{equation}
+P_c^* =
+\frac{P_c^{old} + \frac{\Delta t}{C}
+\left( Q^* + \frac{P_{out}}{R_2} \right)}
+{1 + \frac{\Delta t}{C R_2}} .
+\end{equation}
+
+The boundary state $(A^*,U^*)$ must satisfy the pressure balance
+across the proximal resistance $R_1$,
+
+\begin{equation}
+R_1 (A^* U^*) - \left( P(A^*) - P_c^* \right) = 0 .
+\end{equation}
+
+To close the system we use the outgoing characteristic information
+from the interior domain,
+
+\[
+W_{1,L} = U_L + 4(c_L - c_0),
+\]
+
+which relates $U^*$ and $A^*$ through $W_{1, L} = W^{*}$ to obtain
+\begin{equation}
+U^* = W_{1,L} - 4(c^* - c_0) ,
+\end{equation}
+
+where $c^* = c(A^*)$.
+
+Substituting this relation into the pressure balance equation yields
+a nonlinear equation for $A^*$,
+
+\begin{equation}
+F(A^*) =
+R_1 A^* \left[ W_{1,L} - 4(c^* - c_0) \right]
+-
+\left( P(A^*) - P_c^* \right)
+= 0 .
+\end{equation}
+
+This nonlinear equation is solved using the Newton- method
+with the initial guess $A^* = A_L$. Once $A^*$ is obtained, the
+velocity is computed from the characteristic relation above.
+
+\subsection{Newton-Consistent Boundary Jacobian}
+
+To achieve quadratic convergence of the global Newton iteration,
+the sensitivity of the numerical flux with respect to the interior
+degrees of freedom must be included. The total derivative of the
+numerical flux with respect to the interior solution $w_h$ is
+obtained using the chain rule,
+
+\begin{equation}
+\frac{d \mathbf{F}_{HLL}}{d w_h}
+=
+\underbrace{
+\frac{\partial \mathbf{F}_{HLL}}{\partial \mathbf{w}_L}
+\frac{\partial \mathbf{w}_L}{\partial w_h}
+}_{\text{Direct contribution}}
++
+\underbrace{
+\frac{\partial \mathbf{F}_{HLL}}{\partial \mathbf{w}^*}
+\frac{\partial \mathbf{w}^*}{\partial w_h}
+}_{\text{Boundary sensitivity}} .
+\end{equation}
+
+\paragraph{Boundary Sensitivity}
+
+The sensitivity of the boundary star state $\mathbf{w}^* = (A^*,U^*)$
+with respect to the interior solution is obtained by differentiating
+the boundary residual
+
+\[
+R_b(\mathbf{w}^*, W_{in}(\mathbf{w}_L)) = 0 .
+\]
+
+Applying implicit differentiation yields
+
+\begin{equation}
+\frac{\partial \mathbf{w}^*}{\partial w_h}
+=
+-
+\left(
+\mathbf{J}_{boundary}
+\right)^{-1}
+\frac{\partial R_b}{\partial W_{in}}
+\frac{\partial W_{in}}{\partial \mathbf{w}_L}
+\frac{\partial \mathbf{w}_L}{\partial w_h},
+\end{equation}
+
+where $\mathbf{J}_{boundary}$ is the local $2\times2$ Jacobian
+matrix of the boundary system.
+
+In the numerical implementation this sensitivity is incorporated
+through the chain-rule contribution of the HLL flux Jacobian.
+
+\paragraph{Reflection Coefficient ($R_t$) Conditions}
+
+As an alternative simplified outlet model, a reflection coefficient
+$R_t \in [0, 1]$ may be prescribed. In this case the incoming characteristic
+is defined as a fraction of the outgoing characteristic,
+
+\begin{equation}
+W_{2,target} = - R_t W_{1,L}.
+\end{equation}
+
+The boundary state $(A^*,U^*)$ is then obtained by solving
+
+\begin{subequations}
+\begin{align}
+U^* + 4(c^* - c_0) - W_{1,L} &= 0, \\
+U^* - 4(c^* - c_0) - W_{2,target} &= 0.
+\end{align}
+\end{subequations}
+
+\subsection{Generalized $K$-Junction Treatment and Newton Coupling}
+
+Within the DG framework, a general junction corresponds to a non-manifold point where $K\ge 3$ one-dimensional elements meet. The distinction between splitting (bifurcation) and merging (anastomosis) is handled naturally by the signs of the velocities and the topological orientation.
+
+\paragraph{Topological Junction Detection}
+In a 1D arterial network, a junction is defined as a non-manifold point where $K$ vessel segments ($K \ge 3$) share a common spatial location. 
+
+For each detected junction $J$, we define the set $\mathcal{I}_J$ containing the indices of the $K$ participating vessels. To mathematically describe the flow interaction, we assign a \textit{topological orientation} $s_i$ to each vessel $i \in \mathcal{I}_J$:
+
+\begin{itemize}
+    \item $s_i = +1$ (\textbf{Inflowing vessel}): The vessel "ends" at the junction. Geometrically, the junction coincides with the vessel's downstream vertex (local face $1$).
+    \item $s_i = -1$ (\textbf{Outflowing vessel}): The vessel "starts" at the junction. Geometrically, the junction point coincides with the vessel's upstream vertex (local face $0$).
+\end{itemize}
+This orientation $s_i$ is a purely geometric property of the mesh discretization. It facilitates the formulation of conservation of fluxes in a generalized form. Specifically, the sign of $s_i$ correctly orients the velocity $U_i$ and the outward unit normal vector relative to the junction interface. This ensures that the global mass balance is consistently represented by:
+\begin{equation}
+    \sum_{i \in \mathcal{I}_J} s_i A_i U_i = 0,
+\end{equation}
+regardless of the junction's physiological function, whether it be a bifurcation ($1 \to K-1$) or an anastomosis ($K-1 \to 1$).
+
+\paragraph{Generalized Junction Conditions}
+For a junction with $K$ vessels, we have $2K$ unknowns: the junction states $(A_i,U_i)$ for $i=1,…,K.$ Determined by imposing $2K $nonlinear algebraic equations:
+\begin{itemize}
+\item \textbf{Mass Conservation (1 equation):}
+The net flux into the junction must be zero:
+\begin{equation}\label{junction:1}
+\sum_{i=1}^K s_i A_i U_i = 0.
+\end{equation}
+
+\item \textbf{Total Energy/Pressure Continuity ($K-1$ equations):}
+Assuming negligible minor losses, the total head is equal across all vessel interfaces:
+\begin{equation}\label{junction:2}
+\frac{1}{2}U_1^2 + \Psi(A_1) = \frac{1}{2}U_i^2 + \Psi(A_i), \quad \text{for } i=2, \dots, K,
+\end{equation}
+where $\Psi(A)= P(A)/\rho.$
+
+\item \textbf{Characteristic Compatibility ($K$ equations):}
+Information traveling from the interior of each vessel toward the junction is preserved. The corresponding Riemann invariant is
+\begin{equation}\label{junction:3}
+U_i + s_i 4c(A_i) = W_i^{in}, \qquad \text{for } i=1, \dots, K.
+\end{equation}
+Here $W_i^{in}$ denotes the invariant computed from the interior trace of vessel $i$.
+\end{itemize}
+
+\subsection{Jacobian of the Generalized Junction Residual}
+We collect the unknown states into the vector $X=[A_1,U_1,…,A_K,U_K]^T \in \mathbb{R}^{2K}$. The residual vector $R(X)$ is defined as:
+\begin{align}
+R_0 &= \sum_{i=1}^K s_i A_i U_i  \label{junction:4}\\
+R_i &= \frac{1}{2}U_1^2 + \Psi(A_1) - \frac{1}{2}U_j^2 - \Psi(A_j), \quad j=2, \dots, K \label{junction:5} \\
+R_{K+i} &= U_i + s_i 4c(A_i) - W_i^{in}, \quad i=1, \dots, K \label{junction:6}
+\end{align}
+
+The Jacobian matrix $J\in \mathbb{R}^{2K \times 2K}$ is computed by differentiating these residuals with respect to states $X$. Let $$\Psi'(A)= \frac{1}{\rho}\frac{dP}{dA}.$$ Using the relation $$\frac{dc}{dA}=\frac{1}{2c}\Psi'(A),$$the derivatives of the compatibility equations are
+
+\begin{equation}
+\frac{\partial R_{K+i}}{\partial A_i}
+=
+s_i 4\frac{dc}{dA},
+\qquad
+\frac{\partial R_{K+i}}{\partial U_i}
+=
+1 .
+\end{equation}
+
+The resulting Jacobian has the block structure
+
+\[
+J_J =
+\begin{pmatrix}
+M \\
+P \\
+C
+\end{pmatrix},
+\]
+
+where
+
+\begin{itemize}
+\item $M$ is the $1\times2K$ mass conservation row,
+\item $P$ is the $(K-1)\times2K$ pressure continuity block,
+\item $C$ is the $K\times2K$ characteristic compatibility block.
+\end{itemize}
+
+
+\subsection{Implicit Assembly and Global Coupling}
+To maintain quadratic convergence of the global Newton scheme, the junction variables $X^*$ must be coupled to the interior degrees of freedom $w_h$. Since $X^*$ is a function of the incoming invariants $W^{in}(w_h)$, we apply the chain rule:
+\begin{equation}
+\frac{\mathrm{d}{\mathbf{R}_{dg}}}{ \mathrm{d}\mathbf{w}_h} = \left. \frac{\partial \mathbf{R}_{dg}}{\partial \mathbf{w}_h} \right|_{\mathbf{X}^* \text{ fixed}} + \frac{\partial \mathbf{R}_{dg}}{\partial \mathbf{X}^*}\frac{\partial \mathbf{X}^*}{\partial \mathbf{w}_h}.
+\end{equation}
+The term $\frac{\partial \mathbf{X}^*}{\partial \mathbf{w}_{h}}$ is obtained by differentiating the junction system from \eqref{junction:4}-\eqref{junction:6} represented as $\mathbf{R}_{J}(\mathbf{X}^*, \mathbf{W}_{in}(w_h)) = 0$ , yields:
+\begin{equation}
+\frac{\partial \mathbf{X}^{*}}{\partial \mathbf{w}_{h}} = -[\mathbf{J}_J]^{-1} \frac{\partial \mathbf{R}_J}{\partial \mathbf{w}_{h}}.
+\end{equation}
+This allows for a consistent, fully implicit assembly of the junction terms into the global system.
+
+\paragraph{Compact Matrix Form of the Junction System}
+For a junction involving $K$ vessels, the unknown junction states are collected in the vector (this represented in the code \emph{junction\_solver.h})
+
+\[
+\mathbf{X} =
+[A_1,U_1,\dots,A_K,U_K]^T
+\in \mathbb{R}^{2K}.
+\]
+
+The nonlinear junction equations described in
+\eqref{junction:1}--\eqref{junction:3}
+can be written compactly as
+
+\begin{equation}
+\mathbf{R}_J(\mathbf{X}) = 0 ,
+\end{equation}
+
+where the residual vector
+
+\[
+\mathbf{R}_J(\mathbf{X}) =
+\begin{bmatrix}
+R_0 \\
+R_2 \\
+\vdots \\
+R_K \\
+R_{K+1} \\
+\vdots \\
+R_{2K}
+\end{bmatrix}
+\]
+
+contains contributions from
+
+\begin{itemize}
+
+\item the mass conservation equation,
+
+\[
+R_0 = \sum_{i=1}^{K} s_i A_i U_i ,
+\]
+
+\item the $(K-1)$ Bernoulli (total pressure) continuity conditions,
+
+\[
+R_i =
+\frac{1}{2}U_1^2 + \Psi(A_1)
+-
+\frac{1}{2}U_i^2 - \Psi(A_i),
+\qquad i=2,\dots,K,
+\]
+
+\item the $K$ characteristic compatibility equations,
+
+\[
+R_{K+i} =
+U_i + s_i 4c(A_i) - W_i^{in},
+\qquad i=1,\dots,K.
+\]
+
+\end{itemize}
+
+The nonlinear system is solved using a Newton iteration.
+Given an iterate $\mathbf{X}^{(k)}$, the Newton update is obtained
+from the linear system
+
+\begin{equation}
+\mathbf{J}_J(\mathbf{X}^{(k)})
+\,\delta \mathbf{X}^{(k)}
+=
+-
+\mathbf{R}_J(\mathbf{X}^{(k)}),
+\end{equation}
+
+where
+
+\[
+\mathbf{J}_J =
+\frac{\partial \mathbf{R}_J}{\partial \mathbf{X}}
+\]
+
+is the $2K\times2K$ junction Jacobian matrix.
+
+The updated junction state is then
+
+\begin{equation}
+\mathbf{X}^{(k+1)} =
+\mathbf{X}^{(k)} + \delta \mathbf{X}^{(k)} .
+\end{equation}
+
+The iteration is repeated until
+
+\[
+\|\delta \mathbf{X}^{(k)}\| < \varepsilon ,
+\]
+
+where $\varepsilon$ is a prescribed tolerance.
+
+Once the converged junction state $\mathbf{X}^*$ is obtained, the
+corresponding numerical fluxes are evaluated at each vessel interface
+adjacent to the junction and incorporated into the DG residual.
+% \paragraph{Remark.}
+
+% The Jacobian \eqref{eq:junction-jacobian} is assembled analytically and used both
+% to solve the local $6\times6$ nonlinear junction system and to inject the
+% junction contribution consistently into the global DG--Newton Jacobian matrix.
+
+\begin{remark}
+\begin{itemize}
+\item {Newton update.}
+Once the corrections $(\delta A_h^{n+1,(k)},\,\delta U_h^{n+1,(k)})$ are computed,
+the iterates are updated as
+\[
+  A_h^{n+1,(k+1)} = A_h^{n+1,(k)} + \delta A_h^{n+1,(k)}, 
+  \qquad
+  U_h^{n+1,(k+1)} = U_h^{n+1,(k)} + \delta U_h^{n+1,(k)}.
+\]
+The process is repeated until 
+$\|\delta\mathbf{W}_h^{n+1,(k)}\|$ falls below a prescribed tolerance.
+\item The increment $\delta\mathbf{W}_h^{n+1,(k)}$ represents the Newton correction at
+time level $t_{n+1}$ and iteration $k$, while the Jacobian
+$\mathcal{J}^{(k)}$ is obtained by differentiating the discrete residual
+$\mathcal{R}^{n+1}(\mathbf{W})$ with respect to $\mathbf{W}$.
+The term $\mathbf{H}^{(k)}\delta\mathbf{W}_h^{n+1,(k)}$ originates from the
+first-order Taylor expansion of the nonlinear flux
+$\mathbf{F}(\mathbf{W})$ about $\mathbf{W}_h^{n+1,(k)}$.
+\end{itemize}
+\end{remark}
+\bibliographystyle{plain}
+\bibliography{./blood_flow}
+
+\clearpage
+\section*{Appendix}
+\addcontentsline{toc}{section}{Appendix}
+\appendix
+\paragraph{From book: \textit{Nodal Discontinuous Galerkin Methods:
+Algorithms, Analysis, and Applications}}
+\begin{remark}
+\begin{itemize}
+   \item $\textbf{Page}~29$. An important lesson to learn from this is that a visually smoother solution
+is not necessarily a more accurate solution, although in the case considered
+here, the global errors are comparable.
+\item $\textbf{Page}~169$.  The dissipative nature of this flux will smear shocks in strongly supersonic $|u| > c$
+and transitional flows but will serve adequately for most subsonic $|u| < c$ and weakly
+supersonic flows ach number (\(M\)) is slightly greater than 1. The Mach number is the ratio of the flow speed (\(|u|\)) to the speed of sound (\(c\)), or \(M=|u|/c\).
+\item $\textbf{Page}~169$. We assume that the correct number
+of boundary conditions are available at all inflow points of the boundary, $\partial \Omega$
+(i.e., where the eigenvalues of the flux-Jacobian, $\hat{n} \cdot f u$, are negative along the
+outward-pointing normal,$\hat{n}$).
+\end{itemize}
+\end{remark}
+
+\section{Number of inlet and outlet boundary condtions}
+ $\textbf{Page}~33$. If we consider systems of conservation laws
+\begin{equation}
+    \frac{\partial u}{\partial t} + \frac{\partial f(u)}{\partial x} = 0,
+    \qquad x \in [L,R],
+    \label{eq:system-cons}
+\end{equation}
+with initial conditions
+\begin{equation}
+    u(x,0) = u_0(x),
+\end{equation}
+no essentially new component is introduced in order to obtain the
+semi-discrete schemes. In this case, the unknown is an $m$-vector
+\[
+    u = \bigl(U_1(x,t),\ldots,u_m(x,t)\bigr)^{T},
+\]
+and the flux is a vector-valued function $f:\mathbb{R}^m \to \mathbb{R}^m$.
+
+The question of boundary conditions---and, ultimately, the choice of
+the numerical flux---is more complicated for systems than for scalar
+problems. In general terms, the boundary conditions are written as
+\begin{align}
+    B_L\,u(L,t) &= g_1(t), \qquad \text{at } x = L, \\
+    B_R\,u(R,t) &= g_2(t), \qquad \text{at } x = R,
+\end{align}
+where the sum of the ranks of the boundary operators $B_L$ and $B_R$
+equals the required number of inflow conditions.
+\begin{itemize}
+\item For a one-dimensional hyperbolic system
+\[
+u_t + f(u)_x = 0,
+\]
+with Jacobian \(A(u) = f'(u)\) and eigenvalues
+\(\lambda_1(u),\dots,\lambda_m(u)\),
+the sign of the projected characteristic speeds
+\[
+\lambda_i\, n
+\]
+determines the admissible boundary conditions at a boundary with outward
+normal \(n\).
+\end{itemize}
+A characteristic field is \emph{incoming} if
+\[
+\lambda_i \, n < 0,
+\]
+and \emph{outgoing} if
+\[
+\lambda_i \, n > 0.
+\]
+
+Only the incoming fields require the prescription of boundary data.
+Therefore, the number of boundary conditions equals the number of incoming
+characteristics.  Equivalently, if \(B_L\) and \(B_R\) denote the boundary
+operators at the left and right boundaries, then
+\[
+\operatorname{rank}(B_L)+\operatorname{rank}(B_R)
+ = \text{number of incoming characteristic fields}.
+\]
+
+\section{Boundary treatment in the Newton linearization for LF flux}
+\label{bd:Lf_flux}
+This algorithm based on the paper \textit{Boundary conditions for hyperbolic systems of partial differentials equations} by \textit{Amr G. Guaily , Marcelo Epstein}.
+
+At a boundary face $e \subset \partial\Omega$, the Newton linearization of the
+Lax–Friedrichs flux requires replacing the exterior trace
+$\mathbf{W}^+$ by a boundary state $\mathbf{W}_b$.
+Because the blood–flow equations are hyperbolic, the number of boundary
+conditions that must be imposed depends on the signs of the characteristic
+speeds
+\[
+  \lambda_{1,2} = U \mp c , \qquad
+  c = \sqrt{\frac{A}{\rho}\frac{dP}{dA}(A)} .
+\]
+The linearized numerical flux is
+\[
+\delta\widehat{\mathbf{F}}^{(k)}
+=
+\tfrac12\!\left(
+\mathbf{H}^-\,\delta\mathbf{W}^- (b \cdot n)^{-} +
+\mathbf{H}^+\,\delta\mathbf{W}^+ (b \cdot n)^{+}
+\right)
+-\tfrac12\alpha^{(k)}\,
+  (\delta\mathbf{W}^+ - \delta\mathbf{W}^-),
+\]
+where the key question is how the boundary variation $\delta\mathbf{W}^+$ is
+assigned.  
+This depends on the flow regime and on whether the boundary is an inlet or
+outlet.  We distinguish the three physically relevant cases.
+
+% ===============================================================
+\subsubsection{Subcritical flow (one incoming characteristic)}
+
+Subcritical flow is characterised by one incoming and one outgoing
+characteristic:
+\[
+  \lambda_1 < 0 < \lambda_2 .
+\]
+Hence exactly one scalar boundary condition is required; the other component
+must be taken from the interior.
+
+\paragraph{(a) Subcritical inlet ($x=0$).}
+At an inlet, the incoming characteristic is associated with the area variable.
+Thus
+\[
+  A^+ = A_b, \qquad U^+ = U^-,
+\]
+and therefore
+\[
+  \delta A^+ = 0, \qquad
+  \delta U^+ = \delta U^- .
+\]
+Numerical Flux in residual becomes 
+\begin{align*}
+ \widehat{F}_A &= \tfrac{1}{2} (A^{+} U^{+}  + A^{-}U^{-})(b \cdot n) - \tfrac{\alpha}{2}(A^{+} - A^{-})\\
+ & = \frac{1}{2}(A_b U^{-} + A^{-}U^{-}) - \tfrac{\alpha}{2}(A_b -A^{-}).\\
+\widehat{F}_U &= \tfrac{1}{2} \left(\frac{(U^-)^2}{2} + \frac{1}{\rho}P(A^-) + \frac{(U^+)^2}{2} + \frac{1}{\rho}P(A^+)\right)(b \cdot n) -\tfrac{\alpha}{2}(U^+ - U^-) \\
+& = \frac{1}{2}\left( (U^{-})^2 +\frac{1}{\rho} P(A^-)  + \frac{1}{\rho} P(A_b)   \right).
+\end{align*}
+
+The linearized numerical flux components become:
+\[
+\delta\widehat{F}_A
+=
+\tfrac12\left(U^-\,\delta A^- +A_b\,\delta U^-\right)(b \cdot n)
++ \tfrac12\alpha\delta A^-,
+\]
+\begin{align*}
+\delta\widehat{F}_U
+& =
+\tfrac12\left(\frac{(c^-)^2}{A^-}\delta A^- + U^-\,\delta U^-\right)(b \cdot n) + \tfrac12\left(\frac{(c^+)^2}{A^+}\delta A^+ + U^+\,\delta U^+\right)(b \cdot n) - \tfrac\alpha2(\delta U^{+} - \delta U^{-}), \\
+& = \tfrac12\left(\frac{(c^-)^2}{A^-}\delta A^- + 2 U^-\,\delta U^-\right)(b \cdot n).
+\end{align*}
+
+\paragraph{(b) Subcritical outlet ($x=L$).}
+Here the incoming characteristic is associated with the momentum.
+Hence
+\[
+  A^+ = A^-, \qquad U^+ = U_b,
+\]
+and therefore
+\[
+  \delta A^+ = \delta A^-, \qquad
+  \delta U^+ = 0.
+\]
+Numerical Flux in residual becomes 
+\begin{align*}
+ \widehat{F}_A &= \tfrac{1}{2} (A^{+} U^{+}  + A^{-}U^{-})(b \cdot n) - \tfrac{\alpha}{2}(A^{+} - A^{-})\\
+ & = \frac{1}{2}(A^{-} U_b + A^{-}U^{-}) .\\
+\widehat{F}_U &= \tfrac{1}{2} \left(\frac{(U^-)^2}{2} + \frac{1}{\rho}P(A^-) + \frac{(U^+)^2}{2} + \frac{1}{\rho}P(A^+)\right)(b \cdot n) -\tfrac{\alpha}{2}(U^+ - U^-) \\
+& = \frac{1}{2}\left( \frac{(U^-)^2}{2} +2 \frac{1}{\rho} P(A^-) + \frac{(U_b)^2}{2}\right) (b\cdot n) - \tfrac{\alpha}{2}(U_b -U^{-})).
+\end{align*}
+
+The linearized flux becomes
+\begin{align*}
+\delta\widehat{F}_A
+&=
+\tfrac12\left(U^-\,\delta A^- + A^-\,\delta U^-\right)(b \cdot n) + \tfrac12\left(U^+\,\delta A^+ + A^+\,\delta U^+\right)(b \cdot n) - \tfrac\alpha2 ( \delta A^+ - \delta A^{-})\\
+& = \tfrac{1}{2}\left( U^-\,\delta A^- + A^-\,\delta U^- + U_b \delta A^-\right)(b\cdot n)
+\end{align*}
+\begin{align*}
+\delta\widehat{F}_U
+&=
+\tfrac12\left(\frac{(c^{-})^2}{A^-}\delta A^- + U^-\,\delta U^-\right)(b \cdot n)+\tfrac12\left(\frac{(c^{+})^2}{A^+}\delta A^+ + U^+\,\delta U^+\right)(b \cdot n)
+- \tfrac12\alpha\,(\delta U^+ - \delta U^{-}) ,\\
+& = \tfrac12\left( 2 \frac{(c^{-})^2}{A^-}\delta A^- +  U^-\,\delta U^-\right) + \tfrac{\alpha}{2}\delta U^{-}
+\end{align*}
+
+% ===============================================================
+\subsubsection{Supercritical inflow (two incoming characteristics)}
+
+In this regime
+\[
+  \lambda_1 < 0,\qquad \lambda_2 < 0,
+\]
+both characteristics enter the domain, so \emph{both} components of the
+boundary state must be prescribed:
+\[
+  A^+ = A_b, \qquad U^+ = U_b.
+\]
+Thus the variations vanish:
+\[
+  \delta A^+ = 0, \qquad \delta U^+ = 0.
+\]
+
+Numerical Flux in residual becomes 
+\begin{align*}
+ \widehat{F}_A &= \tfrac{1}{2} (A^{+} U^{+}  + A^{-}U^{-})(b \cdot n) - \tfrac{\alpha}{2}(A^{+} - A^{-})\\
+ & = \frac{1}{2}(A_b U_b + A^{-}U^{-}) - \tfrac{\alpha}{2}(A_b - A^{-}).\\
+\widehat{F}_U &= \tfrac{1}{2} \left(\frac{(U^-)^2}{2} + \frac{1}{\rho}P(A^-) + \frac{(U^+)^2}{2} + \frac{1}{\rho}P(A^+)\right)(b \cdot n) -\tfrac{\alpha}{2}(U^+ - U^-) \\
+& = \frac{1}{2}\left( \frac{(U^-)^2}{2} +\frac{1}{\rho} P(A^-) + \frac{(U_b)^2}{2} +\frac{1}{\rho} P(A_b)\right) (b\cdot n) - \tfrac{\alpha}{2}(U_b -U^{-})).
+\end{align*}
+
+Hence no boundary degrees of freedom contribute to the Jacobian at such a face,
+and
+\[
+\delta\widehat{F}_A
+=
+\tfrac12\left(U^-\,\delta A^- + A^-\,\delta U^-\right)
++ \tfrac12\alpha (\delta A^-),
+\qquad
+\delta\widehat{F}_U
+=
+\tfrac12\left(\frac{c^2}{A^-}\delta A^- + U^-\,\delta U^-\right)
++ \tfrac12\alpha (\delta U^-).
+\]
+
+% ===============================================================
+\subsubsection{Supercritical outflow (two outgoing characteristics)}
+
+Finally, when
+\[
+  \lambda_1 > 0,\qquad \lambda_2 > 0 ,
+\]
+all characteristics leave the domain, so no physical boundary condition is
+imposed.  Thus
+\[
+  A^+ = A^-,\qquad U^+ = U^-,
+\qquad\Longrightarrow\qquad
+  \delta A^+ = \delta A^-,\quad
+  \delta U^+ = \delta U^- .
+\]
+Numerical Flux in residual becomes 
+\begin{align*}
+ \widehat{F}_A &= \tfrac{1}{2} (A^{+} U^{+}  + A^{-}U^{-})(b \cdot n) - \tfrac{\alpha}{2}(A^{+} - A^{-})\\
+ & = \frac{1}{2}( 2 A^{-}U^{-}).\\
+\widehat{F}_U &= \tfrac{1}{2} \left(\frac{(U^-)^2}{2} + \frac{1}{\rho}P(A^-) + \frac{(U^+)^2}{2} + \frac{1}{\rho}P(A^+)\right)(b \cdot n) -\tfrac{\alpha}{2}(U^+ - U^-) \\
+& = \frac{1}{2}\left( 2 \frac{(U^-)^2}{2} + 2\frac{1}{\rho} P(A^-) \right) (b\cdot n).
+\end{align*}
+
+In this case, the Lax--Friedrichs dissipation vanishes because
+$\delta\mathbf{W}^+=\delta\mathbf{W}^-$, and the linearized flux reduces to
+\[
+\delta\widehat{\mathbf{F}}
+=
+\begin{pmatrix}
+U^-\,\delta A^- + A^-\,\delta U^- \\[1mm]
+\dfrac{c^2}{A^-}\,\delta A^- + U^-\,\delta U^-
+\end{pmatrix}.
+\]
+
+
+\paragraph{Summary.}
+The mapping for the exterior state and its Newton variation is summarised in
+Table~\ref{tab:bd-newton}.
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{c|c|c|c}
+\hline
+\textbf{Flow regime} & $A^+$ & $U^+$ & $(\delta A^+,\,\delta U^+)$ \\ \hline
+Subcritical inlet   & $A_b$  & $U^-$ & $(0,\ \delta U^-)$ \\[2mm]
+Subcritical outlet  & $A^-$  & $U_b$ & $(\delta A^-,\ 0)$ \\[2mm]
+Supercritical inflow & $A_b$ & $U_b$ & $(0,\ 0)$ \\[2mm]
+Supercritical outflow & $A^-$ & $U^-$ & $(\delta A^-,\ \delta U^-)$ \\
+\hline
+\end{tabular}
+\caption{Exterior state and Newton variation at boundaries.}
+\label{tab:bd-newton}
+\end{table}
+\end{document}
