@@ -47,11 +47,32 @@ file is absent or empty. Python tools use the Python CSV library.
 
 ## Terminal time series
 
-With `Write terminal CSV files = true`, `terminal_<boundary_id>.csv` records
+Set `Output terminal CSV file = terminals.csv` to write one terminal CSV with
 `time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id,label`. The optional input
 label is carried in each record; unnamed boundaries use `boundary_<id>`,
 including `boundary_0` at the inlet. Rapidcsv handles quoting and escaping.
-Numeric filenames and ID columns remain the stable keys.
+Each output appends one row per boundary, ordered by `boundary_id`; the inlet
+is included. All ranks evaluate their owned traces, including ranks with no
+local terminals, and gather the current snapshot to rank zero. Only rank zero
+opens the file, and each snapshot is flushed as one batch. Memory is bounded
+by the number of terminals, not by simulation duration. Terminal calculation
+and file-write failures are propagated collectively.
+
+`Output terminal CSV file` defaults to empty, disabling terminal output. Relative
+paths are resolved under `Output directory`; absolute paths are used directly.
+Parent directories are created as needed. The former `Write terminal CSV files`
+boolean is removed; replace it with the desired filename in existing inputs.
+Disabled output creates no terminal time-series file.
+`network_terminals.csv` remains the static outlet metadata table. Existing
+per-vessel probes are unchanged. Use a fresh output directory to avoid mixing
+new output with older `terminal_<boundary_id>.csv` files.
+
+The inflow and ramp comparison tools read both layouts, including comparisons
+between historical per-terminal files and a consolidated file. They reject
+mixed layouts and duplicate time/boundary rows. The current ramp policy pins
+the updated reader checksum; numerical tolerances, gates and stored historical
+benchmark results are unchanged. Comparison reports retain the logical table
+count and additionally report the actual CSV counts for each input run.
 
 ## Global diagnostics
 

@@ -39,6 +39,7 @@ test()
   flow.default_terminal_c           = 0;
   flow.default_terminal_p_out       = 321;
   flow.output_directory             = dir;
+  flow.output_terminal_csv_file     = "terminals.csv";
   flow.n_global_refinements         = 2;
   flow.setup();
   auto y = flow.make_state();
@@ -84,6 +85,14 @@ test()
               text.find("Name=\"vessel_id\"") != std::string::npos;
           }
       AssertThrow(visualization_has_vessel_id, ExcInternalError());
+      const auto traces = read("terminals.csv");
+      AssertThrow(traces.GetRowCount() == 6, ExcInternalError());
+      for (unsigned int row = 0; row < 6; ++row)
+        AssertThrow(
+          traces.GetCell<unsigned int>("boundary_id", row) == row % 3 &&
+            traces.GetCell<double>("time_s", row) == (row < 3 ? 0. : .125),
+          ExcMessage(
+            "Bifurcation terminal snapshots must be ordered and complete."));
       const auto terminals = read("network_terminals.csv");
       AssertThrow(terminals.GetRowCount() == 2, ExcInternalError());
       for (std::size_t row = 0; row < terminals.GetRowCount(); ++row)
@@ -98,6 +107,14 @@ test()
                         terminals.GetCell<double>("C", row) == 0 &&
                         terminals.GetCell<double>("P_out", row) == 321,
                       ExcInternalError());
+          for (unsigned int snapshot = 0; snapshot < 2; ++snapshot)
+            AssertThrow(
+              traces.GetCell<std::string>("label", snapshot * 3 + bid) ==
+                  expected &&
+                traces.GetCell<unsigned int>("vessel_id", snapshot * 3 + bid) ==
+                  vid,
+              ExcMessage(
+                "Consolidated traces must retain outlet labels and vessel ids."));
           const auto probe =
             read("HDG_IDA_Vessel_" + std::to_string(vid) + ".csv");
           AssertThrow(probe.GetRowCount() == 2 &&

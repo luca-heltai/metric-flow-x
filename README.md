@@ -362,14 +362,17 @@ matching endpoint flows. No cardiac period or flow-sign convention is inferred.
 Only inlet flow is prescribed. Any cardiac pressure history remains a comparison
 signal.
 
-Set `Write terminal CSV files = true` to export `terminal_<boundary_id>.csv` in
-the output directory. The fields are `time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id,label`.
+Set `Output terminal CSV file = terminals.csv` to export one CSV file in
+the output directory. The default is empty, disabling terminal output. Relative
+paths use the output directory; absolute paths are respected. The fields are
+`time_s,pressure_Pa,flow_m3_s,boundary_id,vessel_id,label`.
 `label` comes from the terminal parameter CSV and defaults to `boundary_<id>`;
 the inlet uses `boundary_0`. Rapidcsv quotes and escapes arbitrary label text.
 Pressure and velocity/area come from the boundary trace, including prescribed
 external pressure. Flow is outward: negative at a conventionally oriented inlet
 and positive at an outlet. Each boundary ID must identify exactly one terminal;
-only its owning MPI rank writes the file. Existing midpoint probe CSVs retain
+its owning MPI rank evaluates the trace, and rank zero writes all terminals,
+ordered by time and boundary ID. Existing midpoint probe CSVs retain
 their original names and units.
 
 The PETSc direct path uses MUMPS when available and deal.II's pivoted UMFPACK

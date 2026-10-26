@@ -81,8 +81,7 @@ def read_vtk(path):
     return material
 
 
-def read_parameters(case):
-    path = case / "last_used_parameters.prm"
+def parameter_values(path):
     stack, values = [], {}
     for raw in path.read_text().splitlines():
         line = raw.split("#", 1)[0].strip()
@@ -104,7 +103,24 @@ def read_parameters(case):
             raise ValueError("Unsupported effective parameter syntax")
     if stack:
         raise ValueError("Unbalanced parameter subsections")
+    return values
+
+
+def read_parameters(case):
+    path = case / "last_used_parameters.prm"
+    values = parameter_values(path)
     flow = "MetricFlowSystem<1, 3>"
+    # Output paths are not physical inputs. Preserve historical receipt support.
+    new_key, old_key = (flow, "Output terminal CSV file"), (flow, "Write terminal CSV files")
+    if new_key in values and old_key in values:
+        raise ValueError("Ambiguous terminal output parameters")
+    terminal_enabled = None
+    if new_key in values:
+        terminal_enabled = bool(values.pop(new_key))
+    elif old_key in values:
+        terminal_enabled = values.pop(old_key).lower() == "true"
+    if terminal_enabled is False:
+        raise ValueError("Terminal CSV output is disabled")
     if values[(flow, "Use componentwise absolute tolerances")].lower() != "false":
         raise ValueError("Componentwise IDA tolerances are unsupported")
     prefix = (flow, "IDA parameters")
@@ -120,7 +136,7 @@ def read_parameters(case):
     waveform_path = Path(waveform)
     if not waveform_path.is_absolute():
         waveform_path = case / waveform_path
-    return {"parameters": values, "inflow_sha256": file_sha(waveform_path) if waveform else None, "atol": atol, "rtol": rtol, "solver": solver, "material": read_vtk(mesh), "path": str(path), "sha256": file_sha(path)}
+    return {"parameters": values, "terminal_output_enabled": terminal_enabled, "inflow_sha256": file_sha(waveform_path) if waveform else None, "atol": atol, "rtol": rtol, "solver": solver, "material": read_vtk(mesh), "path": str(path), "sha256": file_sha(path)}
 
 
 def expected_output_times(solver):
@@ -136,7 +152,20 @@ def expected_output_times(solver):
     return [start+i*interval for i in range(count+1)]
 
 
-def read_csv(path):
+def terminal_csv_path(directory, require_existing=False):
+    receipt = directory.parent / "last_used_parameters.prm"
+    if receipt.is_file():
+        values = parameter_values(receipt)
+        key = ("MetricFlowSystem<1, 3>", "Output terminal CSV file")
+        if key in values:
+            path = directory / values[key] if values[key] else None
+            if require_existing and path is not None and not path.is_file():
+                raise ValueError("Configured terminal CSV is missing: " + str(path))
+            return path
+    return directory / "terminals.csv"
+
+
+def read_csv_data(path):
     with path.open(newline="") as stream:
         reader = csv.DictReader(stream)
         fields, rows = reader.fieldnames, list(reader)
@@ -149,6 +178,52 @@ def read_csv(path):
             if key != "label" and not key.endswith("_label"):
                 finite(value, str(path) + ":" + key)
     return fields, rows
+
+
+def read_terminal_csv(path):
+    fields, rows = read_csv_data(path)
+    if fields != ["time_s", "pressure_Pa", "flow_m3_s", "boundary_id", "vessel_id", "label"]:
+        raise ValueError("Unsupported consolidated terminal schema")
+    keys = [(float(row["time_s"]), float(row["boundary_id"])) for row in rows]
+    if any(bid < 0 or not bid.is_integer() for _, bid in keys):
+        raise ValueError("Invalid consolidated terminal boundary id")
+    if keys != sorted(set(keys)):
+        raise ValueError("Duplicate or unordered consolidated terminal rows")
+    return fields, rows
+
+
+def read_csv(path):
+    # Resolve historical logical tables from the configured consolidated file.
+    boundary = path.stem.removeprefix("terminal_")
+    consolidated = terminal_csv_path(path.parent)
+    if path.name.startswith("terminal_") and boundary.isdecimal() and consolidated and consolidated.exists():
+        fields, rows = read_terminal_csv(consolidated)
+        return fields, [row for row in rows if int(row["boundary_id"]) == int(boundary)]
+    if consolidated == path:
+        return read_terminal_csv(path)
+    return read_csv_data(path)
+
+
+def csv_output_files(directory):
+    """Canonical logical tables for either terminal layout; reject mixtures."""
+    files = {path.name for path in directory.glob("*.csv")}
+    consolidated = terminal_csv_path(directory, require_existing=True)
+    if consolidated and consolidated.exists():
+        if consolidated.parent.resolve() == directory.resolve():
+            files.discard(consolidated.name)
+        if any(name.startswith("terminal_") and Path(name).stem.removeprefix("terminal_").isdecimal() for name in files):
+            raise ValueError("Mixed consolidated and per-terminal CSV output")
+        _, rows = read_terminal_csv(consolidated)
+        files.update(f"terminal_{int(row['boundary_id'])}.csv" for row in rows)
+    return files
+
+
+def physical_csv_files(directory):
+    files = set(directory.glob("*.csv"))
+    consolidated = terminal_csv_path(directory)
+    if consolidated and consolidated.exists():
+        files.add(consolidated)
+    return {path for path in files if path.name != "scaling_timings.csv"}
 
 
 def state_bound(before, after, atol, rtol):
@@ -231,8 +306,8 @@ def compare_case(before, after):
         raise ValueError("Solver inputs or effective physical parameters differ")
     material, atol, rtol = cb["material"], cb["atol"], cb["rtol"]
     expected_times = expected_output_times(cb["solver"])
-    files_b = {p.name for p in (before/"output").glob("*.csv")} - {"scaling_timings.csv"}
-    files_a = {p.name for p in (after/"output").glob("*.csv")} - {"scaling_timings.csv"}
+    files_b = csv_output_files(before/"output") - {"scaling_timings.csv"}
+    files_a = csv_output_files(after/"output") - {"scaling_timings.csv"}
     if files_b != PHYSICAL | DIAGNOSTIC or files_a != files_b:
         raise ValueError("Unsupported physical/diagnostic CSV file set")
     tables, diagnostic = {}, {}
@@ -349,8 +424,9 @@ def compare_case(before, after):
 def compare(before, after):
     expected = {str(Path(case)/"output"/name) for case in CASES for name in PHYSICAL | DIAGNOSTIC}
     for root in (before, after):
-        observed = {str(p.relative_to(root)) for p in root.rglob("*.csv")
-                    if p.parent.name == "output" and p.name != "scaling_timings.csv"}
+        observed = {str(folder.relative_to(root) / name)
+                    for folder in root.rglob("output") if folder.is_dir()
+                    for name in csv_output_files(folder) if name != "scaling_timings.csv"}
         if observed != expected:
             raise ValueError("Incomplete or unexpected regression output set")
     cases = {case: compare_case(before/case, after/case) for case in CASES}
@@ -359,7 +435,9 @@ def compare(before, after):
         for name, row in result["metrics"].items():
             value = row["max_normalized_error"]
             maxima[name] = None if value is None or (name in maxima and maxima[name] is None) else max(maxima.get(name,0.),value)
-    return {"accepted": all(c["accepted"] for c in cases.values()), "policy": "Actual global IDA component weights and dimensionally propagated derived-output bounds; strict normalized error<1", "fixed_output_time_bound_s": TIME_BOUND, "compared_csv_files": 32, "excluded_execution_timing_csv": "scaling_timings.csv", "max_weighted_errors": maxima, "cases": cases}
+    return {"accepted": all(c["accepted"] for c in cases.values()), "policy": "Actual global IDA component weights and dimensionally propagated derived-output bounds; strict normalized error<1", "fixed_output_time_bound_s": TIME_BOUND, "compared_csv_files": 32, "physical_csv_file_counts": {
+        side: len({path.resolve() for directory in root.rglob("output") if directory.is_dir() for path in physical_csv_files(directory)})
+        for side, root in (("before", before), ("after", after))}, "excluded_execution_timing_csv": "scaling_timings.csv", "max_weighted_errors": maxima, "cases": cases}
 
 
 def main():

@@ -157,7 +157,7 @@ for case in a.cases:
                         overrides.update({'Absolute error tolerance': '1e-12', 'Relative error tolerance': '1e-7'})
                     for key, value in overrides.items():
                         prm = replace(prm, key, value)
-                    extra = f'  set Write terminal CSV files = true\n  set Output time interval = {file_interval}\n'
+                    extra = f'  set Output terminal CSV file = terminals.csv\n  set Output time interval = {file_interval}\n'
                     if policy != 'legacy':
                         extra += ('  set Initial condition policy = native\n  set Initial state source = ' + ('rest' if policy=='native_rest' else 'steady network') + '\n  set Check Jacobian at startup = false\n')
                     prm = prm.replace('subsection MetricFlowSystem<1, 3>\n', 'subsection MetricFlowSystem<1, 3>\n'+extra, 1)

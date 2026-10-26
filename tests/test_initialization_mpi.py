@@ -24,6 +24,7 @@ def main():
              "nonfinite_initialization": (2, 4),
              "ida_error_guard": (2,),
              "ida_statistics": (2, 4),
+             "terminal_exports": (2, 4),
              "tolerance_ramp_ida": (2, 4),
              "iterative_preconditioner": (2, 4)}
     count = 0

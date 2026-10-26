@@ -72,6 +72,61 @@ end
         r=m.compare_case(self.before,self.after)
         self.assertTrue(r['accepted'])
         self.assertTrue(all(v['max_normalized_error']==0 for v in r['metrics'].values()))
+    def consolidate(self, folder):
+        fields, rows = m.read_csv(folder/'output/terminal_0.csv')
+        _, outlet = m.read_csv(folder/'output/terminal_1.csv')
+        rows += outlet
+        rows.sort(key=lambda row: (float(row['time_s']), int(row['boundary_id'])))
+        self.write_csv(folder, 'terminals.csv', fields, [[row[key] for key in fields] for row in rows])
+        for bid in (0, 1):
+            (folder/'output'/f'terminal_{bid}.csv').unlink()
+
+    def test_consolidated_and_historical_layouts_agree(self):
+        old_files = m.csv_output_files(self.before/'output')
+        self.consolidate(self.after)
+        self.assertEqual(old_files, m.csv_output_files(self.after/'output'))
+        self.assertTrue(m.compare_case(self.before, self.after)['accepted'])
+        self.consolidate(self.before)
+        self.assertTrue(m.compare_case(self.before, self.after)['accepted'])
+
+    def test_configured_terminal_filename(self):
+        self.consolidate(self.after)
+        default = self.after/'output/terminals.csv'
+        data = default.read_text()
+        default.unlink()
+        receipt = self.after/'last_used_parameters.prm'
+        original = receipt.read_text()
+        for filename in ('renamed.csv', 'sub/renamed.csv', str(self.root/'external.csv'), 'terminal_1.csv'):
+            with self.subTest(filename=filename):
+                receipt.write_text(original.replace('subsection MetricFlowSystem<1, 3>\n',
+                    f'subsection MetricFlowSystem<1, 3>\nset Output terminal CSV file = {filename}\n'))
+                path = self.after/'output'/filename
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(data)
+                self.assertTrue(m.compare_case(self.before, self.after)['accepted'])
+                path.unlink()
+
+    def test_empty_terminal_filename_disables_output(self):
+        receipt = self.after/'last_used_parameters.prm'
+        receipt.write_text(receipt.read_text().replace('subsection MetricFlowSystem<1, 3>\n',
+            'subsection MetricFlowSystem<1, 3>\nset Output terminal CSV file =\n'))
+        with self.assertRaises(ValueError):
+            m.compare_case(self.before, self.after)
+
+    def test_mixed_terminal_layout_rejected(self):
+        self.consolidate(self.after)
+        (self.after/'output/terminal_0.csv').write_text('stale output')
+        with self.assertRaises(ValueError):
+            m.compare_case(self.before, self.after)
+
+    def test_duplicate_consolidated_row_rejected(self):
+        self.consolidate(self.after)
+        fields, rows = m.read_csv(self.after/'output/terminals.csv')
+        rows.insert(0, rows[0])
+        self.write_csv(self.after, 'terminals.csv', fields, [[row[key] for key in fields] for row in rows])
+        with self.assertRaises(ValueError):
+            m.compare_case(self.before, self.after)
+
     def test_small_subsolver_state_and_derived_changes(self):
         self.write_outputs(self.after,delta_a=1e-13,delta_u=1e-14)
         r=m.compare_case(self.before,self.after)

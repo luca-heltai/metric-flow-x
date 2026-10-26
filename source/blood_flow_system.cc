@@ -292,7 +292,10 @@ namespace MetricFlowX
 
     add_parameter("Inflow CSV file", inflow_csv_file);
     add_parameter("Inflow CSV period", inflow_csv_period);
-    add_parameter("Write terminal CSV files", write_terminal_csv);
+    add_parameter(
+      "Output terminal CSV file",
+      output_terminal_csv_file,
+      "CSV path relative to Output directory, or absolute; empty disables terminal output.");
 
     add_parameter(
       "Jacobian export file (Matrix Market)",
@@ -2186,8 +2189,7 @@ namespace MetricFlowX
     csv_vessel.clear();
     mach_warning_active.clear();
 
-    csv_terminal.clear();
-    if (write_terminal_csv)
+    if (!output_terminal_csv_file.empty())
       {
         std::vector<unsigned int> local_terminal_ids;
         for (const auto &cell : dof_handler_.active_cell_iterators())
@@ -2205,27 +2207,32 @@ namespace MetricFlowX
           AssertThrow(entry.second == 1,
                       ExcMessage(
                         "Terminal boundary ids must be globally unique"));
-        for (const auto &cell : dof_handler_.active_cell_iterators())
-          if (cell->is_locally_owned())
-            for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
-              if (cell->face(f)->at_boundary() &&
-                  !is_junction_face(cell->id(), f))
-                {
-                  const auto bid = cell->face(f)->boundary_id();
-                  auto      &os  = csv_terminal[bid];
-                  AssertThrow(!os.is_open(),
-                              ExcMessage("Duplicate terminal boundary id"));
-                  os.open(dir + "terminal_" + std::to_string(bid) + ".csv");
-                  AssertThrow(os.good(),
-                              ExcMessage("Cannot open terminal CSV"));
-                  csv_write_row(os,
-                                "time_s",
-                                "pressure_Pa",
-                                "flow_m3_s",
-                                "boundary_id",
-                                "vessel_id",
-                                "label");
-                }
+        std::string error;
+        if (this_mpi_process == 0)
+          try
+            {
+              const auto filename = std::filesystem::path(output_directory) /
+                                    output_terminal_csv_file;
+              if (filename.has_parent_path())
+                std::filesystem::create_directories(filename.parent_path());
+              csv_terminal.open(filename);
+              AssertThrow(csv_terminal.good(),
+                          ExcMessage("Cannot open terminal CSV file: " +
+                                     output_terminal_csv_file));
+              csv_write_row(csv_terminal,
+                            "time_s",
+                            "pressure_Pa",
+                            "flow_m3_s",
+                            "boundary_id",
+                            "vessel_id",
+                            "label");
+            }
+          catch (const std::exception &exception)
+            {
+              error = exception.what();
+            }
+        error = Utilities::MPI::broadcast(mpi_communicator_, error, 0);
+        AssertThrow(error.empty(), ExcMessage(error));
       }
     probe_targets.clear();
 
@@ -2329,38 +2336,82 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::write_csv_row(const double      t,
                                                 const VectorType &sol)
   {
-    if (write_terminal_csv)
+    if (!output_terminal_csv_file.empty())
       {
-        for (const auto &cell : dof_handler_.active_cell_iterators())
-          if (cell->is_locally_owned())
-            for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
-              if (cell->face(f)->at_boundary() &&
-                  !is_junction_face(cell->id(), f))
-                {
-                  const auto bid  = cell->face(f)->boundary_id();
-                  double     area = 0., velocity = 0.;
-                  get_face_trace(sol, cell, f, area, velocity);
-                  const auto   point = cell->face(f)->center();
-                  const double pressure =
-                    compute_physical_pressure(area,
-                                              cell->material_id(),
-                                              compute_a_d_at_face(cell, f),
-                                              t,
-                                              point,
-                                              cell->id());
-                  auto             &os  = csv_terminal.at(bid);
-                  const auto        rcr = rcr_map.find(bid);
-                  const std::string label =
-                    rcr == rcr_map.end() ? "boundary_" + std::to_string(bid) :
-                                           rcr->second.label;
-                  csv_write_row(os,
-                                t,
-                                pressure,
-                                (f == 0 ? -1. : 1.) * area * velocity,
-                                bid,
-                                cell->material_id(),
-                                label);
-                }
+        using Row = std::pair<unsigned int, std::vector<std::string>>;
+        std::vector<Row> local_rows;
+        std::string      error;
+        try
+          {
+            for (const auto &cell : dof_handler_.active_cell_iterators())
+              if (cell->is_locally_owned())
+                for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell;
+                     ++f)
+                  if (cell->face(f)->at_boundary() &&
+                      !is_junction_face(cell->id(), f))
+                    {
+                      const auto bid  = cell->face(f)->boundary_id();
+                      double     area = 0., velocity = 0.;
+                      get_face_trace(sol, cell, f, area, velocity);
+                      const double pressure =
+                        compute_physical_pressure(area,
+                                                  cell->material_id(),
+                                                  compute_a_d_at_face(cell, f),
+                                                  t,
+                                                  cell->face(f)->center(),
+                                                  cell->id());
+                      const auto        rcr = rcr_map.find(bid);
+                      const std::string label =
+                        rcr == rcr_map.end() ?
+                          "boundary_" + std::to_string(bid) :
+                          rcr->second.label;
+                      local_rows.emplace_back(
+                        bid,
+                        std::vector<std::string>{csv_cell(t),
+                                                 csv_cell(pressure),
+                                                 csv_cell((f == 0 ? -1. : 1.) *
+                                                          area * velocity),
+                                                 csv_cell(bid),
+                                                 csv_cell(cell->material_id()),
+                                                 label});
+                    }
+          }
+        catch (const std::exception &exception)
+          {
+            error = exception.what();
+          }
+        for (const auto &message :
+             Utilities::MPI::all_gather(mpi_communicator_, error))
+          AssertThrow(message.empty(), ExcMessage(message));
+        auto parts = Utilities::MPI::gather(mpi_communicator_, local_rows, 0);
+        if (this_mpi_process == 0)
+          try
+            {
+              std::vector<Row> rows;
+              for (auto &part : parts)
+                for (auto &row : part)
+                  rows.push_back(std::move(row));
+              std::sort(rows.begin(),
+                        rows.end(),
+                        [](const Row &left, const Row &right) {
+                          return left.first < right.first;
+                        });
+              // Buffer one snapshot, preserving CSV quoting/precision while
+              // avoiding a filesystem flush for each individual terminal.
+              std::ostringstream snapshot;
+              for (const auto &row : rows)
+                csv_write_record(snapshot, row.second);
+              csv_terminal << snapshot.str() << std::flush;
+              AssertThrow(csv_terminal.good(),
+                          ExcMessage("Cannot write terminal CSV file: " +
+                                     output_terminal_csv_file));
+            }
+          catch (const std::exception &exception)
+            {
+              error = exception.what();
+            }
+        error = Utilities::MPI::broadcast(mpi_communicator_, error, 0);
+        AssertThrow(error.empty(), ExcMessage(error));
       }
     const unsigned int dofs_per_cell = fe_->n_dofs_per_cell();
 
@@ -2424,9 +2475,8 @@ namespace MetricFlowX
     for (auto &kv : csv_vessel)
       if (kv.second.is_open())
         kv.second.close();
-    for (auto &kv : csv_terminal)
-      if (kv.second.is_open())
-        kv.second.close();
+    if (csv_terminal.is_open())
+      csv_terminal.close();
   }
 
   // ============================================================================

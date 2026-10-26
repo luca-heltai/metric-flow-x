@@ -49,7 +49,7 @@
   "bind_to": "core",
   "preflight_maximum_busy_percent": 5.0,
   "physical_gate": "Every one of the 13 late-window state/derived-output differences for every uniform/ramp pair must be strictly below its unchanged final solver-weight budget (normalized error<1). Tighter-run comparisons remain accuracy diagnostics, including failed metrics. All run validity, full output grids, finite data and physical-input checks remain mandatory.",
-  "physical_comparator_sha256": "91aa6d2eb3b84a76bba744c752961a5f75183c684d96a9709f1bb16382866f7b",
+  "physical_comparator_sha256": "ad9f27fcbae751ded6081c0781d32444e3c4db03135037a2d811505c888a41c5",
   "diagnostics_only": [
     "IDA adaptive internal times",
     "IDA counters",
