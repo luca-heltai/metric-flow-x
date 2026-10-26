@@ -12,6 +12,30 @@ At each IDA output callback, deal.II `DataOut` writes parallel visualization rec
 
 The visualization vectors include the FE-range solution and computed pressure fields, plus `vessel_id` cell data for joining with terminal metadata. The exact piece suffixes are produced by deal.II and include the output cycle and MPI rank.
 
+## CSV filenames
+
+The following CSV paths are configurable in `MetricFlowSystem<1, 3>`. An empty
+filename disables that file. Relative paths are resolved under
+`Output directory`; absolute paths are used directly. Missing parent directories are
+created automatically. Existing files are not removed when output is disabled.
+
+| Parameter | Default |
+| --- | --- |
+| `Output terminal CSV file` | empty (disabled) |
+| `Output network terminals CSV file` | `network_terminals.csv` |
+| `Output mass conservation CSV file` | `mass_conservation.csv` |
+| `Output IDA statistics CSV file` | `ida_statistics.csv` |
+| `Output IDA step history CSV file` | `ida_step_history.csv` |
+| `Output IDA internal steps CSV file` | `ida_internal_steps.csv` |
+| `Output scaling timings CSV file` | `scaling_timings.csv` |
+| `Output flow regime CSV file` | `flow_regime.csv` |
+
+Flow-regime output additionally requires
+`Write flow regime diagnostics = true`, as before; clearing its filename preserves console
+warnings while suppressing the CSV. Disabling diagnostics files does not disable
+IDA step accounting or the live statistics table. Statistics and timing summaries
+retain their append behavior; other files are overwritten for each solve.
+
 ## Vessel CSV probes
 
 At setup, the implementation opens one CSV file per vessel at its arc-length midpoint. The current filename pattern is:

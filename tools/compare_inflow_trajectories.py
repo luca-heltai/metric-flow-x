@@ -106,6 +106,33 @@ def parameter_values(path):
     return values
 
 
+# Canonical names keep historical comparison gates independent of output paths.
+CSV_DEFAULTS = {
+    "network terminals": "network_terminals.csv",
+    "mass conservation": "mass_conservation.csv",
+    "IDA statistics": "ida_statistics.csv",
+    "IDA step history": "ida_step_history.csv",
+    "IDA internal steps": "ida_internal_steps.csv",
+    "scaling timings": "scaling_timings.csv",
+    "flow regime": "flow_regime.csv",
+}
+
+
+def configured_csv_paths(directory):
+    receipt = directory.parent / "last_used_parameters.prm"
+    if not receipt.is_file():
+        return {}
+    values = parameter_values(receipt)
+    paths = {}
+    for key, default in CSV_DEFAULTS.items():
+        parameter = ("MetricFlowSystem<1, 3>", f"Output {key} CSV file")
+        if parameter not in values:
+            continue
+        name = values[parameter]
+        paths[default] = directory / name if name else None
+    return paths
+
+
 def read_parameters(case):
     path = case / "last_used_parameters.prm"
     values = parameter_values(path)
@@ -119,6 +146,8 @@ def read_parameters(case):
         terminal_enabled = bool(values.pop(new_key))
     elif old_key in values:
         terminal_enabled = values.pop(old_key).lower() == "true"
+    for key in CSV_DEFAULTS:
+        values.pop((flow, f"Output {key} CSV file"), None)
     if terminal_enabled is False:
         raise ValueError("Terminal CSV output is disabled")
     if values[(flow, "Use componentwise absolute tolerances")].lower() != "false":
@@ -201,6 +230,12 @@ def read_csv(path):
         return fields, [row for row in rows if int(row["boundary_id"]) == int(boundary)]
     if consolidated == path:
         return read_terminal_csv(path)
+    configured = configured_csv_paths(path.parent)
+    if path.name in configured:
+        actual = configured[path.name]
+        if actual is None:
+            raise ValueError("Required CSV output is disabled: " + path.name)
+        return read_csv_data(actual)
     return read_csv_data(path)
 
 
@@ -215,6 +250,12 @@ def csv_output_files(directory):
             raise ValueError("Mixed consolidated and per-terminal CSV output")
         _, rows = read_terminal_csv(consolidated)
         files.update(f"terminal_{int(row['boundary_id'])}.csv" for row in rows)
+    for canonical, actual in configured_csv_paths(directory).items():
+        files.discard(canonical)
+        if actual is not None and actual.is_file():
+            if actual.parent.resolve() == directory.resolve():
+                files.discard(actual.name)
+            files.add(canonical)
     return files
 
 
@@ -223,7 +264,12 @@ def physical_csv_files(directory):
     consolidated = terminal_csv_path(directory)
     if consolidated and consolidated.exists():
         files.add(consolidated)
-    return {path for path in files if path.name != "scaling_timings.csv"}
+    for canonical, actual in configured_csv_paths(directory).items():
+        files.discard(directory / canonical)
+        if actual is not None and actual.is_file():
+            files.add(actual)
+    timings = configured_csv_paths(directory).get("scaling_timings.csv", directory / "scaling_timings.csv")
+    return files - {timings}
 
 
 def state_bound(before, after, atol, rtol):

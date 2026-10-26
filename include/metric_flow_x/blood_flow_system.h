@@ -1123,7 +1123,14 @@ namespace MetricFlowX
     std::string                     inflow_csv_file;
     double                          inflow_csv_period = 0.;
     std::string                     output_terminal_csv_file;
-    std::ofstream                   csv_terminal;
+    std::string   output_network_terminals_csv_file  = "network_terminals.csv";
+    std::string   output_mass_conservation_csv_file  = "mass_conservation.csv";
+    std::string   output_ida_statistics_csv_file     = "ida_statistics.csv";
+    std::string   output_ida_step_history_csv_file   = "ida_step_history.csv";
+    std::string   output_ida_internal_steps_csv_file = "ida_internal_steps.csv";
+    std::string   output_scaling_timings_csv_file    = "scaling_timings.csv";
+    std::string   output_flow_regime_csv_file        = "flow_regime.csv";
+    std::ofstream csv_terminal;
 
     // -----------------------------------------------------------------------
     // CSV time-series output, one file per vessel.

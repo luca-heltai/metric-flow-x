@@ -150,6 +150,82 @@ test()
           ++probes;
       AssertThrow(probes == flow.vessel_map.size(), ExcInternalError());
     }
+
+  // Reuse the same state with nested relative and absolute filenames. The
+  // default-output checks above ensure existing parameter files are unchanged.
+  flow.output_directory                   = dir + "/custom";
+  flow.output_terminal_csv_file           = "traces/terminals.csv";
+  flow.output_network_terminals_csv_file  = "metadata/outlets.csv";
+  flow.output_mass_conservation_csv_file  = "diagnostics/mass.csv";
+  flow.output_ida_statistics_csv_file     = "diagnostics/statistics.csv";
+  flow.output_ida_step_history_csv_file   = "diagnostics/history.csv";
+  flow.output_ida_internal_steps_csv_file = "diagnostics/steps.csv";
+  flow.output_scaling_timings_csv_file    = "diagnostics/timings.csv";
+  flow.output_flow_regime_csv_file =
+    std::filesystem::absolute(dir + "/absolute/regime.csv").string();
+  flow.write_flow_regime_diagnostics = true;
+  flow.open_output_files();
+  flow.write_output_step(0., y);
+  flow.write_output_step(.125, y);
+  flow.report_flow_regime(y, .125);
+  flow.finalize_output(ida, 1.);
+  flow.write_scaling_timings();
+  if (rank == 0)
+    {
+      for (const auto &name : {"traces/terminals.csv",
+                               "metadata/outlets.csv",
+                               "diagnostics/mass.csv",
+                               "diagnostics/statistics.csv",
+                               "diagnostics/history.csv",
+                               "diagnostics/steps.csv",
+                               "diagnostics/timings.csv"})
+        AssertThrow(std::filesystem::is_regular_file(flow.output_directory +
+                                                     "/" + name),
+                    ExcMessage(name));
+      AssertThrow(std::filesystem::is_regular_file(
+                    flow.output_flow_regime_csv_file),
+                  ExcInternalError());
+    }
+
+  flow.output_directory = dir + "/disabled";
+  flow.output_terminal_csv_file.clear();
+  flow.output_network_terminals_csv_file.clear();
+  flow.output_mass_conservation_csv_file.clear();
+  flow.output_ida_statistics_csv_file.clear();
+  flow.output_ida_step_history_csv_file.clear();
+  flow.output_ida_internal_steps_csv_file.clear();
+  flow.output_scaling_timings_csv_file.clear();
+  flow.output_flow_regime_csv_file.clear();
+  flow.open_output_files();
+  flow.write_output_step(0., y);
+  flow.write_output_step(.125, y);
+  flow.report_flow_regime(y, .125);
+  flow.finalize_output(ida, 1.);
+  flow.write_scaling_timings();
+  if (rank == 0)
+    for (const auto &entry :
+         std::filesystem::directory_iterator(flow.output_directory))
+      AssertThrow(entry.path().filename().string().find("HDG_IDA_Vessel_") == 0,
+                  ExcMessage("Disabled diagnostics CSV was written."));
+
+  // Fail on the writer rank, then verify all ranks receive the exception.
+  flow.output_network_terminals_csv_file = "blocked/outlets.csv";
+  if (rank == 0)
+    {
+      std::filesystem::create_directories(flow.output_directory);
+      std::ofstream(flow.output_directory + "/blocked");
+    }
+  MPI_Barrier(MPI_COMM_WORLD);
+  bool rejected = false;
+  try
+    {
+      flow.open_output_files();
+    }
+  catch (const std::exception &)
+    {
+      rejected = true;
+    }
+  AssertThrow(rejected, ExcMessage("CSV open failure must reach every rank."));
   deallog.depth_file(10);
   deallog << "CSV labels, escaping, append and MPI probe ownership: PASSED"
           << std::endl;

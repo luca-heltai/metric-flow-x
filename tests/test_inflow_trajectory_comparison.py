@@ -81,6 +81,25 @@ end
         for bid in (0, 1):
             (folder/'output'/f'terminal_{bid}.csv').unlink()
 
+    def test_configured_diagnostic_filenames(self):
+        receipt = self.after/'last_used_parameters.prm'
+        controls = []
+        for key, default in m.CSV_DEFAULTS.items():
+            old = self.after/'output'/default
+            name = 'nested/' + default
+            target = self.after/'output'/name
+            target.parent.mkdir(exist_ok=True)
+            if old.exists():
+                old.rename(target)
+            controls.append(f'set Output {key} CSV file = {name}')
+        receipt.write_text(receipt.read_text().replace('set Output directory = output',
+                           'set Output directory = output\n' + '\n'.join(controls)))
+        self.assertTrue(m.compare_case(self.before, self.after)['accepted'])
+        receipt.write_text(receipt.read_text().replace('set Output mass conservation CSV file = nested/mass_conservation.csv',
+                                                      'set Output mass conservation CSV file ='))
+        with self.assertRaises(ValueError):
+            m.compare_case(self.before, self.after)
+
     def test_consolidated_and_historical_layouts_agree(self):
         old_files = m.csv_output_files(self.before/'output')
         self.consolidate(self.after)
