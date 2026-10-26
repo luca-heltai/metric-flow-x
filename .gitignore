@@ -64,3 +64,7 @@ doc/api/
 /notebooks/very_large_vascular_tree_physics.vtk
 /notebooks/cerebral_data/cco_parietal_hc_w_data.vtk
 /notebooks/cerebral_data/standard_cco.vtk
+
+# Generated ADAN inputs, source caches and Python bytecode
+/build/
+__pycache__/

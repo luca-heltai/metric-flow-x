@@ -69,6 +69,7 @@ performance
 performance_campaign
 tutorials
 reproducibility
+adan_complete
 api
 references
 ```

@@ -395,3 +395,11 @@ CSV with the equivalent analytic inlet, checks nonzero prescribed flow, and
 compares terminal pressure/flow within solver tolerance. It does not establish
 MOX pressure datum, valve sign, cardiac period, RCR compatibility or a complete
 physiological cardiac cycle.
+
+## Complete ADAN network
+
+The [complete ADAN workflow](doc/adan_complete.md) downloads the checksum-pinned
+ADAVN 2023 arterial table and reconstructs a MetricFlowX input. It documents
+source attribution, separate data/atlas licenses, exact metric reconstruction,
+wall-law coefficients and terminal approximations. The default uses a CSV-only,
+nonanatomical embedding; atlas-derived anatomy requires separate permission.
