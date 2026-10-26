@@ -9,7 +9,8 @@ using namespace MetricFlowX;
 void
 test()
 {
-  const auto comm = MPI_COMM_WORLD;
+  const auto   comm                        = MPI_COMM_WORLD;
+  unsigned int nonlocal_structural_columns = 0;
   for (const std::string model : {"arterial", "venous", "mixed"})
     for (const unsigned int degree : {1u, 2u})
       for (const bool direct : {true, false})
@@ -44,6 +45,32 @@ test()
           });
           flow.n_global_refinements = degree == 2 ? 1 : 0;
           flow.setup();
+          if (degree == 2)
+            {
+              // Sparse row graphs can contain structural-zero columns beyond
+              // the FE ghost layer, depending on partitioner/deal.II version.
+              // Force that case on this tiny fixture, independently of either.
+              DynamicSparsityPattern pattern(flow.n_total_dofs,
+                                             flow.n_total_dofs,
+                                             flow.locally_owned_dofs_);
+              for (const auto row : flow.locally_owned_dofs_)
+                for (types::global_dof_index column = 0;
+                     column < flow.n_total_dofs;
+                     ++column)
+                  {
+                    pattern.add(row, column);
+                    if (!flow.locally_relevant_dofs_.is_element(column))
+                      ++nonlocal_structural_columns;
+                  }
+              for (auto *matrix : {&flow.jacobian_matrix,
+                                   &flow.state_jacobian_matrix_,
+                                   &flow.derivative_jacobian_matrix_,
+                                   &flow.linear_system_matrix})
+                matrix->reinit(flow.locally_owned_dofs_,
+                               flow.locally_owned_dofs_,
+                               pattern,
+                               comm);
+            }
           auto state = flow.make_state(), rate = flow.make_state(),
                seed = flow.make_state(), residual = flow.make_state();
           flow.compute_initial_solution(seed, .1);
@@ -137,6 +164,11 @@ test()
                     << " defects=" << diagnostics.algebraic_defect << ","
                     << diagnostics.differential_defect << std::endl;
         }
+  if (Utilities::MPI::n_mpi_processes(comm) > 1)
+    AssertThrow(
+      Utilities::MPI::sum(nonlocal_structural_columns, comm) > 0,
+      ExcMessage(
+        "The MPI regression must exercise matrix columns beyond FE ghosts."));
   deallog.depth_file(10);
   deallog << "Native viscoelastic initialization: PASSED" << std::endl;
 }

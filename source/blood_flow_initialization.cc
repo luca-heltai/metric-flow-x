@@ -687,11 +687,6 @@ namespace MetricFlowX
     errors.compress(VectorOperation::insert);
     kinds.compress(VectorOperation::insert);
     VectorType relevant_scales, relevant_errors, relevant_kinds;
-    for (auto *v : {&relevant_scales, &relevant_errors, &relevant_kinds})
-      v->reinit(locally_owned_dofs_, locally_relevant_dofs_, mpi_communicator_);
-    relevant_scales = scales;
-    relevant_errors = errors;
-    relevant_kinds  = kinds;
     reinit_state(initial_trace_weights_);
     for (unsigned int iteration = 0;
          iteration < initial_consistency_max_iterations;
@@ -699,6 +694,26 @@ namespace MetricFlowX
       {
         assemble_state_jacobian(t, state, state_dot);
         assemble_derivative_jacobian(t, state, state_dot);
+        if (iteration == 0)
+          {
+            // The distributed matrix graph can contain columns beyond the FE
+            // ghost layer, including structural zeros from remote assembly.
+            // Import metadata for the complete row graph, not just FE ghosts.
+            IndexSet columns(locally_owned_dofs_);
+            for (const auto *matrix :
+                 {&state_jacobian_matrix_, &derivative_jacobian_matrix_})
+              for (const auto row : locally_owned_dofs_)
+                for (auto entry = matrix->begin(row); entry != matrix->end(row);
+                     ++entry)
+                  columns.add_index(entry->column());
+            columns.compress();
+            for (auto *v :
+                 {&relevant_scales, &relevant_errors, &relevant_kinds})
+              v->reinit(locally_owned_dofs_, columns, mpi_communicator_);
+            relevant_scales = scales;
+            relevant_errors = errors;
+            relevant_kinds  = kinds;
+          }
         linear_system_matrix     = 0.;
         initial_trace_weights_   = 0.;
         auto         row_weights = make_state();
