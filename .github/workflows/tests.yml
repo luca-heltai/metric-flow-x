@@ -12,6 +12,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dataset and manufactured-source test dependencies
         run: python3 -m pip install numpy sympy
+      - name: Test hepatic segmentation imports
+        run: |
+          python3 -m pip install -r tools/hepatic/requirements.txt
+          python3 -m unittest discover -s tests -p test_hepatic_tools.py -v
       - name: Test svVascularize SI conversion
         run: |
           python3 -m unittest discover -s tests -p test_svv_conversion.py -v

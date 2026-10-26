@@ -1,0 +1,49 @@
+{
+  "ircad01_case01": {
+    "title": "3D-IRCADb-01, patient 1",
+    "provider_page": "https://www.ircad.fr/research-and-development/data-sets/liver-segmentation-3d-ircadb-01/",
+    "url": "https://cloud.ircad.fr/index.php/s/JN3z7EynBiwYyjy/download?path=%2F3Dircadb1.1",
+    "license": "CC-BY-NC-ND-4.0 (provider page and bundled LICENSE.txt)",
+    "attribution": "Soler et al. (2010), 3D image reconstruction for comparison of algorithm database, IRCAD.",
+    "size_note": "About 41 MB compressed; timestamped outer ZIP, immutable contents pinned below.",
+    "member_sha256": {
+      "3Dircadb1.1/LABELLED_DICOM.zip": "88a83b387f6a9f69651cc55fce42ab42d54a8653e1ea2374c05d7562ab041064",
+      "3Dircadb1.1/LICENSE.txt": "38762e3777f4ec00a6f769062a7c3f704fb78ce08303ecff88558da4c49cf9ea",
+      "3Dircadb1.1/MASKS_DICOM.zip": "cb88edfa83e674f406feed66daf86fefe8cbd305dd8dee1cfaf96f70d196652e",
+      "3Dircadb1.1/MESHES_VTK.zip": "37160706cc3eff11b1f48ffe99b124fd43999743de36c47028a6857eee786ede",
+      "3Dircadb1.1/PATIENT_DICOM.zip": "6a25dfaf2f96d3ee9eeae405983364a8768e290125888700a9d0dd8845e56fb1",
+      "3Dircadb1.1/liver_01.jpg": "c75d4092e929175a471c9a67c0602dba8c480928b76c7a8f85de1753639a2104"
+    },
+    "nested_archives": [
+      "3Dircadb1.1/MASKS_DICOM.zip"
+    ],
+    "labels": {
+      "artery": "MASKS_DICOM/artery, foreground 255",
+      "portal": "MASKS_DICOM/portalvein, foreground 255",
+      "hepatic": "MASKS_DICOM/venoussystem, foreground 255"
+    }
+  },
+  "lircad": {
+    "title": "LIRCAD, version 1.0, 77 cases",
+    "provider_page": "https://zenodo.org/records/13897086",
+    "url": "https://zenodo.org/api/records/13897086/files/LIRCAD_SIMBIOTX.zip/content",
+    "checksum": "md5:9fe24ff9c4f0f5f3e0fa938bf4effd7b",
+    "license": "CC-BY-4.0",
+    "attribution": "Yassine Machta and Irene Vignon-Clementel, LIRCAD; Machta et al. (2024), arXiv:2411.15778.",
+    "size_note": "13,560,706,756 bytes compressed; opt-in download of the complete provider archive.",
+    "labels": {
+      "portal": 1,
+      "hepatic": 2
+    }
+  },
+  "vsnet": {
+    "title": "VSNet reannotated MSD Task08 masks",
+    "provider_page": "https://github.com/XXYZB/VSNet",
+    "url": "https://raw.githubusercontent.com/XXYZB/VSNet/e3cf051935e086f682241c1c2d223010c8c9ec9c/reannotated.zip",
+    "checksum": "sha256:bab21686eb0705b2a48d62d38ca52a57e179297c865ee32978912dfc9b75f555",
+    "license": "Repository MIT notice; original MSD images CC-BY-SA-4.0. Verify annotation reuse terms with the authors.",
+    "attribution": "Xu, Dong et al. (2025), VSNet, Medical Image Analysis, doi:10.1016/j.media.2025.103458; original MSD dataset also requires citation.",
+    "size_note": "9,523,089 bytes, masks only; no original CT scans.",
+    "labels_note": "Labels 1 and 2 are separate venous classes. The repository does not document their anatomical mapping; inspect before assigning --network-kind."
+  }
+}
