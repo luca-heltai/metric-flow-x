@@ -215,7 +215,11 @@ test()
             if (value.empty())
               text.erase(start, end - start + 1);
             else
-              text.replace(data, end - data, value + " " + value);
+              text.replace(data,
+                           end - data,
+                           value.find(' ') == std::string::npos ?
+                             value + " " + value :
+                             value);
             std::ofstream out("invalid_wall.vtk");
             out << text;
           }
@@ -261,6 +265,16 @@ test()
            "arterial moduli",
            "adavn_epsilon_r",
            "0");
+  rejected(PRM_DIR "wall_venous.prm",
+           "ADAVN venous",
+           "a_d differs",
+           "a_d",
+           "4e-4 5e-4");
+  rejected(PRM_DIR "wall_arterial.prm",
+           "ADAVN arterial",
+           "h_wall differs",
+           "h_wall",
+           "1e-3 2e-3");
   deallog.depth_file(10);
   deallog << "Wall models: PASSED" << std::endl;
 }

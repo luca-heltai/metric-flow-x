@@ -55,6 +55,8 @@ $\epsilon_r>0$; veins require $K>0$, $m>0$ and $n\leq0$.
 A nonpositive $A\,dp_{el}/dA$ is reported as a non-hyperbolic wall state.
 Arrays for the other tissue type may contain zero placeholders in a mixed file.
 Use a distinct vessel ID when wall properties change along a vessel.
+Reference area and arterial wall thickness must also agree on cells sharing an
+ID; use the supported taper arrays for a varying local reference area.
 
 Viscoelastic runs currently require IDA initial-condition correction:
 `Initial condition policy = IDA` and correction type other than `none`.

@@ -1032,6 +1032,26 @@ namespace MetricFlowX
             const auto [it, inserted] =
               first_cell.emplace(static_cast<unsigned int>(id), i);
             if (!inserted)
+              {
+                AssertThrow(
+                  cell_a_d[i] == cell_a_d[it->second],
+                  ExcMessage(
+                    context + "a_d differs between cells sharing vessel_id " +
+                    std::to_string(it->first) +
+                    "; split vessel IDs or use the supported taper arrays."));
+                const bool arterial =
+                  wall_input.count("adavn_wall_type") ?
+                    wall_input.at("adavn_wall_type")[i] == 1. :
+                    wall_model == "ADAVN arterial";
+                AssertThrow(
+                  !arterial || cell_h_wall[i] == cell_h_wall[it->second],
+                  ExcMessage(
+                    context +
+                    "h_wall differs between arterial cells sharing vessel_id " +
+                    std::to_string(it->first) +
+                    "; use distinct vessel IDs for distinct wall thickness."));
+              }
+            if (!inserted)
               for (const auto &[name, values] : wall_input)
                 AssertThrow(
                   values[i] == values[it->second],
