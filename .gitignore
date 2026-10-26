@@ -68,3 +68,6 @@ doc/api/
 # Generated ADAN inputs, source caches and Python bytecode
 /build/
 __pycache__/
+
+# Downloaded hepatic images, masks, meshes and generated line networks
+/datasets/hepatic/

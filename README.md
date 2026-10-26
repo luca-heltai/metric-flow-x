@@ -403,3 +403,10 @@ ADAVN 2023 arterial table and reconstructs a MetricFlowX input. It documents
 source attribution, separate data/atlas licenses, exact metric reconstruction,
 wall-law coefficients and terminal approximations. The default uses a CSV-only,
 nonanatomical embedding; atlas-derived anatomy requires separate permission.
+
+## Hepatic vascular datasets
+
+The [hepatic import workflow](doc/hepatic_datasets.md) downloads checked IRCAD,
+LIRCAD and VSNet sources and converts one segmented vascular class at a time to
+a MetricFlowX line-network VTK in SI units. Geometry-derived radii are kept
+separate from user-supplied wall and terminal coefficients.

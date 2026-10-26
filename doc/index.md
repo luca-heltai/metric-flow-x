@@ -73,6 +73,7 @@ performance_campaign
 tutorials
 reproducibility
 adan_complete
+hepatic_datasets
 api
 references
 ```

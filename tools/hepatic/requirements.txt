@@ -1,0 +1,5 @@
+numpy>=1.26
+scipy>=1.11
+scikit-image>=0.23
+nibabel>=5.2
+pydicom>=3.0
