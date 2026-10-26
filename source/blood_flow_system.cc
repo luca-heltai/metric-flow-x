@@ -105,6 +105,35 @@ namespace MetricFlowX
       csv_write_record(stream, {csv_cell(values)...});
     }
 
+    std::string
+    prepare_csv_path(const std::string &directory, const std::string &filename)
+    {
+      const auto path = std::filesystem::path(directory) / filename;
+      if (path.has_parent_path())
+        std::filesystem::create_directories(path.parent_path());
+      return path.string();
+    }
+
+    // The action must not contain collectives: all ranks report I/O failures
+    // before any caller can enter its next collective.
+    template <typename Action>
+    void
+    collective_csv_action(const MPI_Comm communicator, const Action &action)
+    {
+      std::string error;
+      try
+        {
+          action();
+        }
+      catch (const std::exception &exception)
+        {
+          error = exception.what();
+        }
+      for (const auto &message :
+           Utilities::MPI::all_gather(communicator, error))
+        AssertThrow(message.empty(), ExcMessage(message));
+    }
+
     std::ofstream
     csv_append(const std::string              &filename,
                const std::vector<std::string> &header)
@@ -296,6 +325,35 @@ namespace MetricFlowX
       "Output terminal CSV file",
       output_terminal_csv_file,
       "CSV path relative to Output directory, or absolute; empty disables terminal output.");
+
+    add_parameter(
+      "Output network terminals CSV file",
+      output_network_terminals_csv_file,
+      "CSV path relative to Output directory, or absolute; empty disables output.");
+    add_parameter(
+      "Output mass conservation CSV file",
+      output_mass_conservation_csv_file,
+      "CSV path relative to Output directory, or absolute; empty disables output.");
+    add_parameter(
+      "Output IDA statistics CSV file",
+      output_ida_statistics_csv_file,
+      "CSV path relative to Output directory, or absolute; empty disables output.");
+    add_parameter(
+      "Output IDA step history CSV file",
+      output_ida_step_history_csv_file,
+      "CSV path relative to Output directory, or absolute; empty disables output.");
+    add_parameter(
+      "Output IDA internal steps CSV file",
+      output_ida_internal_steps_csv_file,
+      "CSV path relative to Output directory, or absolute; empty disables output.");
+    add_parameter(
+      "Output scaling timings CSV file",
+      output_scaling_timings_csv_file,
+      "CSV path relative to Output directory, or absolute; empty disables output.");
+    add_parameter(
+      "Output flow regime CSV file",
+      output_flow_regime_csv_file,
+      "CSV path relative to Output directory, or absolute; empty disables output.");
 
     add_parameter(
       "Jacobian export file (Matrix Market)",
@@ -510,23 +568,31 @@ namespace MetricFlowX
     if (!write_flow_regime_diagnostics)
       return;
     const auto maxima = maximum_mach_numbers(state);
-    if (this_mpi_process == 0 && !flow_regime_log.is_open())
-      {
-        const std::string dir =
-          output_directory.empty() ? "." : output_directory;
-        std::filesystem::create_directories(dir);
-        flow_regime_log.open(dir + "/flow_regime.csv");
-        flow_regime_log << "time_s,vessel_id,max_abs_U_over_c\n";
-      }
-    const unsigned int writable =
-      this_mpi_process != 0 || flow_regime_log.good();
-    AssertThrow(Utilities::MPI::min(writable, mpi_communicator_) != 0,
-                ExcMessage("Cannot open flow_regime.csv"));
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process == 0 && !output_flow_regime_csv_file.empty())
+        {
+          if (!flow_regime_log.is_open())
+            {
+              flow_regime_log.open(
+                prepare_csv_path(output_directory,
+                                 output_flow_regime_csv_file));
+              AssertThrow(flow_regime_log,
+                          ExcMessage("Cannot open flow regime CSV."));
+              csv_write_row(flow_regime_log,
+                            "time_s",
+                            "vessel_id",
+                            "max_abs_U_over_c");
+            }
+          for (const auto &[id, peak] : maxima)
+            flow_regime_log << std::setprecision(17) << t << ',' << id << ','
+                            << peak << '\n';
+          flow_regime_log.flush();
+          AssertThrow(flow_regime_log.good(),
+                      ExcMessage("Cannot write flow regime CSV."));
+        }
+    });
     for (const auto &[id, peak] : maxima)
       {
-        if (this_mpi_process == 0)
-          flow_regime_log << std::setprecision(17) << t << ',' << id << ','
-                          << peak << '\n';
         if (peak >= mach_warning_threshold)
           {
             if (mach_warning_active.insert(id).second)
@@ -537,8 +603,6 @@ namespace MetricFlowX
         else
           mach_warning_active.erase(id);
       }
-    if (this_mpi_process == 0)
-      flow_regime_log.flush();
   }
 
   template <int dim, int spacedim>
@@ -2236,32 +2300,37 @@ namespace MetricFlowX
       }
     probe_targets.clear();
 
-    if (this_mpi_process == 0)
-      {
-        std::ofstream terminals(dir + "network_terminals.csv");
-        AssertThrow(terminals, ExcMessage("Cannot open network_terminals.csv"));
-        csv_write_row(terminals,
-                      "boundary_id",
-                      "vessel_id",
-                      "label",
-                      "R1",
-                      "R2",
-                      "C",
-                      "P_out");
-        for (const auto &[vid, ids] : vessel_terminals)
-          for (const auto id : ids)
-            {
-              const auto &rcr = rcr_map.at(id);
-              csv_write_row(terminals,
-                            id,
-                            vid,
-                            rcr.label,
-                            rcr.R1,
-                            rcr.R2,
-                            rcr.C,
-                            rcr.P_out);
-            }
-      }
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process == 0 && !output_network_terminals_csv_file.empty())
+        {
+          std::ofstream terminals(
+            prepare_csv_path(output_directory,
+                             output_network_terminals_csv_file));
+          AssertThrow(terminals,
+                      ExcMessage("Cannot open network terminal metadata CSV."));
+          csv_write_row(terminals,
+                        "boundary_id",
+                        "vessel_id",
+                        "label",
+                        "R1",
+                        "R2",
+                        "C",
+                        "P_out");
+          for (const auto &[vid, ids] : vessel_terminals)
+            for (const auto id : ids)
+              {
+                const auto &rcr = rcr_map.at(id);
+                csv_write_row(terminals,
+                              id,
+                              vid,
+                              rcr.label,
+                              rcr.R1,
+                              rcr.R2,
+                              rcr.C,
+                              rcr.P_out);
+              }
+        }
+    });
 
     for (const auto &[vid, vpp] : vessel_map)
       {
@@ -5171,23 +5240,24 @@ namespace MetricFlowX
 
     if (mass_log.is_open())
       mass_log.close();
-    if (this_mpi_process == 0)
-      {
-        const std::string dir =
-          output_directory.empty() ? "." : output_directory;
-        std::filesystem::create_directories(dir);
-        mass_log.open(dir + "/mass_conservation.csv", std::ios::trunc);
-        AssertThrow(mass_log,
-                    ExcMessage("Cannot open " + dir +
-                               "/mass_conservation.csv"));
-        csv_write_row(mass_log,
-                      "t",
-                      "total_volume",
-                      "dVdt",
-                      "net_flux",
-                      "imbalance",
-                      "rel_imbalance");
-      }
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process == 0 && !output_mass_conservation_csv_file.empty())
+        {
+          mass_log.open(prepare_csv_path(output_directory,
+                                         output_mass_conservation_csv_file),
+                        std::ios::trunc);
+          AssertThrow(mass_log,
+                      ExcMessage("Cannot open " +
+                                 output_mass_conservation_csv_file));
+          csv_write_row(mass_log,
+                        "t",
+                        "total_volume",
+                        "dVdt",
+                        "net_flux",
+                        "imbalance",
+                        "rel_imbalance");
+        }
+    });
 
     bdf_steps.fill(0);
     bdf_prev_nst             = 0;
@@ -5208,38 +5278,47 @@ namespace MetricFlowX
 
     if (ida_history_log.is_open())
       ida_history_log.close();
-    if (this_mpi_process == 0)
-      {
-        const std::string dir =
-          output_directory.empty() ? "." : output_directory;
-        ida_history_log.open(dir + "/ida_step_history.csv", std::ios::trunc);
-        AssertThrow(ida_history_log,
-                    ExcMessage("Cannot open " + dir + "/ida_step_history.csv"));
-        ida_history_log
-          << "output_time,ida_time,steps_interval,steps_cumulative,"
-             "nonlin_iters_interval,nonlin_iters_cumulative,"
-             "nonlin_iters_per_step,nonlin_fails_interval,"
-             "err_test_fails_interval,residual_evals_interval,"
-             "lin_setups_interval,last_step_size,last_order,"
-             "nonlin_fails_cumulative,err_test_fails_cumulative,residual_evals_cumulative,"
-             "lin_setups_cumulative,jacobian_evals_cumulative,linear_solves_cumulative,"
-             "linear_iters_cumulative,min_step_size,max_step_size,step_extrema_available\n";
-      }
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process == 0 && !output_ida_step_history_csv_file.empty())
+        {
+          ida_history_log.open(
+            prepare_csv_path(output_directory,
+                             output_ida_step_history_csv_file),
+            std::ios::trunc);
+          AssertThrow(ida_history_log,
+                      ExcMessage("Cannot open " +
+                                 output_ida_step_history_csv_file));
+          ida_history_log
+            << "output_time,ida_time,steps_interval,steps_cumulative,"
+               "nonlin_iters_interval,nonlin_iters_cumulative,"
+               "nonlin_iters_per_step,nonlin_fails_interval,"
+               "err_test_fails_interval,residual_evals_interval,"
+               "lin_setups_interval,last_step_size,last_order,"
+               "nonlin_fails_cumulative,err_test_fails_cumulative,residual_evals_cumulative,"
+               "lin_setups_cumulative,jacobian_evals_cumulative,linear_solves_cumulative,"
+               "linear_iters_cumulative,min_step_size,max_step_size,step_extrema_available\n";
+        }
+    });
 
     is_prev_nst = is_prev_nni = is_prev_ncfn = is_prev_netf = is_prev_nls = 0;
     is_t_accepted = ida_parameters.initial_time;
 
     if (ida_internal_log.is_open())
       ida_internal_log.close();
-    if (this_mpi_process == 0)
-      {
-        const std::string dir =
-          output_directory.empty() ? "." : output_directory;
-        ida_internal_log.open(dir + "/ida_internal_steps.csv", std::ios::trunc);
-        ida_internal_log
-          << "step,t,h,order,nonlin_iters,nonlin_iters_cumulative,"
-             "nonlin_conv_fails,err_test_fails,jacobian_setups\n";
-      }
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process == 0 && !output_ida_internal_steps_csv_file.empty())
+        {
+          ida_internal_log.open(
+            prepare_csv_path(output_directory,
+                             output_ida_internal_steps_csv_file),
+            std::ios::trunc);
+          AssertThrow(ida_internal_log,
+                      ExcMessage("Cannot open IDA internal steps CSV."));
+          ida_internal_log
+            << "step,t,h,order,nonlin_iters,nonlin_iters_cumulative,"
+               "nonlin_conv_fails,err_test_fails,jacobian_setups\n";
+        }
+    });
   }
 
   template <int dim, int spacedim>
@@ -5559,57 +5638,57 @@ namespace MetricFlowX
     const double wall_time =
       Utilities::MPI::max(solve_wall_time, mpi_communicator_);
 
-    if (this_mpi_process != 0)
-      return;
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process != 0 || output_ida_statistics_csv_file.empty())
+        return;
 
-    const std::string dir = output_directory.empty() ? "." : output_directory;
-    std::filesystem::create_directories(dir);
+      // Derived averages over the whole run.
+      const std::size_t n_outputs = ida_history.size();
+      const double      nonlin_iters_per_step =
+        nst > 0 ? static_cast<double>(nni) / static_cast<double>(nst) : 0.0;
+      const double steps_per_output =
+        n_outputs > 0 ?
+          static_cast<double>(nst) / static_cast<double>(n_outputs) :
+          0.0;
+      const double nonlin_iters_per_output =
+        n_outputs > 0 ?
+          static_cast<double>(nni) / static_cast<double>(n_outputs) :
+          0.0;
 
-    // Derived averages over the whole run.
-    const std::size_t n_outputs = ida_history.size();
-    const double      nonlin_iters_per_step =
-      nst > 0 ? static_cast<double>(nni) / static_cast<double>(nst) : 0.0;
-    const double steps_per_output =
-      n_outputs > 0 ?
-        static_cast<double>(nst) / static_cast<double>(n_outputs) :
-        0.0;
-    const double nonlin_iters_per_output =
-      n_outputs > 0 ?
-        static_cast<double>(nni) / static_cast<double>(n_outputs) :
-        0.0;
-
-    auto csv = csv_append(dir + "/ida_statistics.csv",
-                          {"max_order",
-                           "wall_time",
-                           "n_steps",
-                           "n_err_test_fails",
-                           "n_nonlin_iters",
-                           "n_nonlin_conv_fails",
-                           "bdf1_steps",
-                           "bdf2_steps",
-                           "bdf3_steps",
-                           "bdf4_steps",
-                           "bdf5_steps",
-                           "n_outputs",
-                           "nonlin_iters_per_step",
-                           "steps_per_output",
-                           "nonlin_iters_per_output"});
-    csv_write_row(csv,
-                  ida_parameters.maximum_order,
-                  wall_time,
-                  nst,
-                  netf,
-                  nni,
-                  ncfn,
-                  bdf_steps[1],
-                  bdf_steps[2],
-                  bdf_steps[3],
-                  bdf_steps[4],
-                  bdf_steps[5],
-                  n_outputs,
-                  nonlin_iters_per_step,
-                  steps_per_output,
-                  nonlin_iters_per_output);
+      auto csv = csv_append(prepare_csv_path(output_directory,
+                                             output_ida_statistics_csv_file),
+                            {"max_order",
+                             "wall_time",
+                             "n_steps",
+                             "n_err_test_fails",
+                             "n_nonlin_iters",
+                             "n_nonlin_conv_fails",
+                             "bdf1_steps",
+                             "bdf2_steps",
+                             "bdf3_steps",
+                             "bdf4_steps",
+                             "bdf5_steps",
+                             "n_outputs",
+                             "nonlin_iters_per_step",
+                             "steps_per_output",
+                             "nonlin_iters_per_output"});
+      csv_write_row(csv,
+                    ida_parameters.maximum_order,
+                    wall_time,
+                    nst,
+                    netf,
+                    nni,
+                    ncfn,
+                    bdf_steps[1],
+                    bdf_steps[2],
+                    bdf_steps[3],
+                    bdf_steps[4],
+                    bdf_steps[5],
+                    n_outputs,
+                    nonlin_iters_per_step,
+                    steps_per_output,
+                    nonlin_iters_per_output);
+    });
   }
 
   // ============================================================================
@@ -5646,16 +5725,16 @@ namespace MetricFlowX
     const auto summary = computing_timer.get_summary_data(
       TimerOutput::OutputData::total_wall_time);
 
-    if (this_mpi_process != 0)
-      return;
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process != 0 || output_scaling_timings_csv_file.empty())
+        return;
 
-    const std::string dir = output_directory.empty() ? "." : output_directory;
-    std::filesystem::create_directories(dir);
-
-    auto csv = csv_append(dir + "/scaling_timings.csv",
-                          {"n_mpi_processes", "section", "wall_time"});
-    for (const auto &entry : summary)
-      csv_write_row(csv, n_mpi_processes, entry.first, entry.second);
+      auto csv = csv_append(prepare_csv_path(output_directory,
+                                             output_scaling_timings_csv_file),
+                            {"n_mpi_processes", "section", "wall_time"});
+      for (const auto &entry : summary)
+        csv_write_row(csv, n_mpi_processes, entry.first, entry.second);
+    });
   }
 
   // Explicit instantiation
