@@ -35,7 +35,7 @@ run(const bool fail_ic, const long int limit, const int expected_code)
   ida.reinit_vector           = [&](VectorType &v) { v.reinit(owned, comm); };
   ida.differential_components = [&] {
     void *memory = MetricFlowX::internal::native_ida_memory(ida);
-    guard.install(memory, limit);
+    guard.install(ida, limit);
     void     *userdata = nullptr;
     const int status   = IDAGetUserData(memory, &userdata);
     AssertThrow(status >= 0 && userdata == &ida,

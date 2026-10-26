@@ -43,6 +43,7 @@
 
 #include <idas/idas.h>
 #include <metric_flow_x/blood_flow_system.h>
+#include <metric_flow_x/ida_access.h>
 #include <metric_flow_x/io/vtk_utils.h>
 
 #ifdef METRIC_FLOW_X_WITH_PETSC
@@ -147,6 +148,26 @@ namespace MetricFlowX
 
     template struct Planter<&dealii::SUNDIALS::IDA<VectorType>::ida_mem>;
 
+#if DEAL_II_SUNDIALS_VERSION_GTE(7, 0, 0)
+    struct IdaContextAccessor
+    {
+      using type = SUNContext dealii::SUNDIALS::IDA<VectorType>::*;
+      friend type             steal(IdaContextAccessor);
+    };
+
+    template <IdaContextAccessor::type M>
+    struct ContextPlanter
+    {
+      friend IdaContextAccessor::type
+      steal(IdaContextAccessor)
+      {
+        return M;
+      }
+    };
+
+    template struct ContextPlanter<&dealii::SUNDIALS::IDA<VectorType>::ida_ctx>;
+#endif
+
     inline void *
     get_ida_mem(const dealii::SUNDIALS::IDA<VectorType> &ida)
     {
@@ -162,6 +183,14 @@ namespace MetricFlowX
     {
       return internal_ida_access::get_ida_mem(ida);
     }
+
+#if DEAL_II_SUNDIALS_VERSION_GTE(7, 0, 0)
+    SUNContext
+    native_ida_context(const SUNDIALS::IDA<VectorType> &ida)
+    {
+      return ida.*steal(internal_ida_access::IdaContextAccessor{});
+    }
+#endif
   } // namespace internal
 
   // ==========================================================================

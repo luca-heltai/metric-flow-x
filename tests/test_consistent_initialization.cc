@@ -51,12 +51,12 @@ check_calc_ic(BloodFlowSystem<1, 3> &flow,
       data.output_period      = h;
       data.relative_tolerance = relative_tolerance;
       data.ic_type            = Integrator::AdditionalData::use_y_diff;
-      Integrator    ida(data, MPI_COMM_SELF);
       IDAErrorGuard errors(MPI_COMM_SELF);
+      Integrator    ida(data, MPI_COMM_SELF);
       ida.reinit_vector        = [&](VectorType &v) { v = flow.make_state(); };
       ida.get_local_tolerances = [&]() -> VectorType & { return absolute; };
       ida.differential_components = [&] {
-        errors.install(MetricFlowX::internal::native_ida_memory(ida), 500);
+        errors.install(ida, 500);
         return flow.differential_dofs();
       };
       ida.residual = [&](double            t,

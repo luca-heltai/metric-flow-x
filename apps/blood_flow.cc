@@ -365,10 +365,7 @@ namespace MetricFlowX
                                          maximum_steps,
                                          minimum_step,
                                          maximum_step]() -> IndexSet {
-            ida_errors.install(internal::native_ida_memory(ida),
-                               maximum_steps,
-                               minimum_step,
-                               maximum_step);
+            ida_errors.install(ida, maximum_steps, minimum_step, maximum_step);
             RampSource::register_weights(internal::native_ida_memory(ida), ida);
             IndexSet is(problem.n_total_dofs);
             is.add_indices(problem.cell_dofs_owned);

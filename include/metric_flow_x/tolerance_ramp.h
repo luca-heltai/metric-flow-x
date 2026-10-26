@@ -8,6 +8,7 @@
 #include <deal.II/sundials/n_vector.h>
 
 #include <metric_flow_x/config.h>
+#include <metric_flow_x/ida_access.h>
 #ifdef METRIC_FLOW_X_WITH_PETSC
 #  include <deal.II/lac/petsc_vector.h>
 #else
@@ -127,21 +128,6 @@ namespace MetricFlowX
               interpolate(initial_absolute_factor)};
     }
   };
-
-  namespace internal
-  {
-    // Defined beside the existing IDA statistics compatibility shim. This is
-    // not a public BloodFlowSystem interface or another private-member shim.
-#ifdef METRIC_FLOW_X_WITH_PETSC
-    void *
-    native_ida_memory(
-      const dealii::SUNDIALS::IDA<dealii::PETScWrappers::MPI::Vector> &ida);
-#else
-    void *
-    native_ida_memory(
-      const dealii::SUNDIALS::IDA<dealii::TrilinosWrappers::MPI::Vector> &ida);
-#endif
-  } // namespace internal
 
   /** Carry ramp state in a forwarding public vector-initializer callback.
    * The enabled ramp uses scalar setup, then installs its componentwise weight
