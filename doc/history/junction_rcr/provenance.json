@@ -1,0 +1,47 @@
+{
+  "original_branch": "junction-rcr",
+  "original_head": "2c3775b994b3ca12dbe8baff48d2e4399957cf34",
+  "original_incremental_base": "47ce48629b3dafe0422316084bc8c904624ddd14",
+  "rebased_onto": "456e5bf906b6cc2ecc904b9354ff60b48297d2e4",
+  "original_commits": [
+    "17857bf10b8d575f8c44759b701ef71e20bddc46 blood flow with RCR boundary conditions",
+    "2c3775b994b3ca12dbe8baff48d2e4399957cf34 Fix RCR parameter and add simulation outputs"
+  ],
+  "runtime_resolution": "Current RCR circuits are part of the coupled IDA residual, with capacitor states and a tested zero-capacitance limit. The old driver changes are superseded; their inputs and plots are retained as historical evidence, not copied into current configured examples.",
+  "conflicts": [
+    "include/blood_flow_system.h",
+    "source/blood_flow_system.cc"
+  ],
+  "retained_files": [
+    {
+      "original_path": "parameters/energy.png",
+      "path": "original/parameters/energy.png",
+      "sha256": "3987c38d9031b3718b83edcc9e9fef4ece39a5b1ff86257b165e5fd544e85747"
+    },
+    {
+      "original_path": "parameters/for_rcr_outlet/junction_0.prm",
+      "path": "original/parameters/for_rcr_outlet/junction_0.prm",
+      "sha256": "003a269d483c6a92884637abbc66f7d84f33e2c800ba453b667fe4c17d6dcec5"
+    },
+    {
+      "original_path": "parameters/for_rcr_outlet/junction_1.prm",
+      "path": "original/parameters/for_rcr_outlet/junction_1.prm",
+      "sha256": "367deae7399f41c4d3c8e0ed8075fb8952ba15af8a6692c2f97901ccb0149b1b"
+    },
+    {
+      "original_path": "parameters/mass_animation.mp4",
+      "path": "original/parameters/mass_animation.mp4",
+      "sha256": "4ffaa35119e0f15cb352699b6a2d20cc2ed3e7f0b4c64b588045b69d6549b559"
+    }
+  ],
+  "superseded_paths": [
+    {
+      "path": "include/blood_flow_system.h",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "source/blood_flow_system.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    }
+  ]
+}
