@@ -1,0 +1,59 @@
+{
+  "original_branch": "junction-arkode",
+  "original_head": "396ed2975925dc20a401d063b14304d9e5d3db3b",
+  "original_incremental_base": "c94747cc29d312027d2b3a059711e8dafc0c2407",
+  "rebased_onto": "456e5bf906b6cc2ecc904b9354ff60b48297d2e4",
+  "original_commits": [
+    "1524432b9837ba188b38ad3d4814af2ff507751e Correct results for single vessel",
+    "1b260e5993e509b5e005fc8e54ea22f20df51fff results for common carotid artery",
+    "396ed2975925dc20a401d063b14304d9e5d3db3b workling for single vessel"
+  ],
+  "runtime_resolution": "The source changes silence debug output, use the callback step number and replace solve_ode_incrementally with solve_ode in the old ARKode driver. That driver no longer exists: the current application uses IDA and its own tested output scheduler. These changes have no current ARKode call site to port. ARKode settings cannot be relabeled as IDA settings without a new numerical validation.",
+  "conflicts": [
+    "parameters/benchmark_parameters/common_carotid_artery/commom_carotid_artery.prm.in",
+    "parameters/benchmark_parameters/common_carotid_artery/pressure_at_Lby2.png",
+    "parameters/benchmark_parameters/common_carotid_artery/pressure_difference.csv",
+    "parameters/benchmark_parameters/common_carotid_artery/pressure_difference.png",
+    "parameters/benchmark_parameters/common_carotid_artery/radius_change_mm.png",
+    "parameters/benchmark_parameters/common_carotid_artery/volume_at_lby2.png",
+    "source/blood_flow_system.cc"
+  ],
+  "retained_files": [
+    {
+      "original_path": "parameters/benchmark-parameters/common-carotid-artery/commom_carotid_artery.prm",
+      "path": "original/parameters/benchmark_parameters/common_carotid_artery/commom_carotid_artery.prm",
+      "sha256": "faa8da237087d3c364611293974582c16de8fd1a6177da18fb3e6182c75da35f"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/common-carotid-artery/pressure_at_Lby2.png",
+      "path": "original/parameters/benchmark_parameters/common_carotid_artery/pressure_at_lby2.png",
+      "sha256": "0ad3511c7cc624126ef41e1fb651478de6434ab12e8980a123c1bcaff6a696e7"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/common-carotid-artery/pressure_difference.csv",
+      "path": "original/parameters/benchmark_parameters/common_carotid_artery/pressure_difference.csv",
+      "sha256": "6bacb5653da55acbb246c5c6c0bd01ebc036520efce9a59d1cc626a29b86ef19"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/common-carotid-artery/pressure_difference.png",
+      "path": "original/parameters/benchmark_parameters/common_carotid_artery/pressure_difference.png",
+      "sha256": "56de9222ecad54fbdd43d607ee5348163754588c8b74e14d5a2963237926e475"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/common-carotid-artery/radius_change_mm.png",
+      "path": "original/parameters/benchmark_parameters/common_carotid_artery/radius_change_mm.png",
+      "sha256": "7cd665d912c5173e37434321785aaebf756fd181c9ee3c7e49a58d6cd0ee7323"
+    },
+    {
+      "original_path": "parameters/benchmark-parameters/common-carotid-artery/volume_at_lby2.png",
+      "path": "original/parameters/benchmark_parameters/common_carotid_artery/volume_at_lby2.png",
+      "sha256": "c384fc31f3f261ab013e35afb57da4a509a470f2399636548f62c10940249921"
+    }
+  ],
+  "superseded_paths": [
+    {
+      "path": "source/blood_flow_system.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    }
+  ]
+}
