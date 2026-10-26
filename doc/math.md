@@ -196,3 +196,9 @@ not alter the tube-law wave speed or capacitor dynamics.
 contribution without replacing the installed provider. These interfaces
 support external multiphysics callers; the manuscript's standalone examples
 use zero prescribed surrounding pressure.
+
+## Optional nonlinear and viscoelastic walls
+
+The square-root law above is the default. See [ADAVN wall models](wall_models.md)
+for optional arterial, venous and dural-sinus laws, their Kelvin–Voigt terms,
+parameter selection and changes to the implicit operators.

@@ -589,9 +589,9 @@ namespace MetricFlowX
                              &solve_start,
                              &integration_start,
                              &first_interval_wall](
-                              const double      callback_time,
-                              const VectorType &sol,
-                              const VectorType & /*ydot*/,
+                              const double       callback_time,
+                              const VectorType  &sol,
+                              const VectorType  &ydot,
                               const unsigned int step_number) {
             ida_errors.check();
             RampSource::after_solve(ida);
@@ -652,10 +652,10 @@ namespace MetricFlowX
             // interval set by "Output time interval".
             problem.record_ida_step(ida, t);
 
-            problem.compute_pressure(sol, problem.pressure_);
+            problem.compute_pressure(sol, ydot, problem.pressure_, t);
             problem.output_results(sol, problem.pressure_, output_number++);
             // HDG_IDA_Vessel_*.csv + mass_conservation.csv
-            problem.write_output_step(t, sol);
+            problem.write_output_step(t, sol, &ydot);
             problem.report_flow_regime(sol, t);
             final_output_written = at_final_time;
 
@@ -744,7 +744,10 @@ namespace MetricFlowX
                             "Cannot write initialization statistics."));
             }
           problem.finalize_output(ida, solve_wall_time);
-          problem.compute_pressure(problem.solution, problem.pressure_);
+          problem.compute_pressure(problem.solution,
+                                   problem.solution_dot,
+                                   problem.pressure_,
+                                   problem.time);
           problem.compute_errors(cycle);
         }
       problem.write_scaling_timings();
@@ -754,10 +757,15 @@ namespace MetricFlowX
     static void
     output_stationary(Problem &problem, const unsigned int cycle)
     {
-      problem.compute_pressure(problem.solution, problem.pressure_);
+      problem.compute_pressure(problem.solution,
+                               problem.solution_dot,
+                               problem.pressure_,
+                               problem.time);
       problem.open_csv_files();
       problem.output_results(problem.solution, problem.pressure_, cycle);
-      problem.write_csv_row(problem.time, problem.solution);
+      problem.write_csv_row(problem.time,
+                            problem.solution,
+                            &problem.solution_dot);
       problem.report_flow_regime(problem.solution, problem.time);
       problem.close_csv_files();
     }

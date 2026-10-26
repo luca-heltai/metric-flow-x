@@ -31,6 +31,7 @@
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 
 #include <metric_flow_x/config.h>
+#include <metric_flow_x/wall_law.h>
 // Include only the backend selected when the library was built.
 #ifdef METRIC_FLOW_X_WITH_PETSC
 #  include <deal.II/lac/petsc_precondition.h>
@@ -330,16 +331,17 @@ namespace MetricFlowX
 
     struct VesselProperties
     {
-      double a0     = 0.0;
-      double r_d    = 0.0;
-      double a_d    = 0.0;
-      double E      = 0.0;
-      double h_wall = 0.0;
-      double p_d    = 0.0;
-      double p0     = 0.0;
-      double L      = 0.0;
-      double r_in   = 0.0;
-      double r_out  = 0.0;
+      double  a0     = 0.0;
+      double  r_d    = 0.0;
+      double  a_d    = 0.0;
+      double  E      = 0.0;
+      double  h_wall = 0.0;
+      double  p_d    = 0.0;
+      double  p0     = 0.0;
+      double  L      = 0.0;
+      double  r_in   = 0.0;
+      double  r_out  = 0.0;
+      WallLaw wall;
     };
 
     void
@@ -547,6 +549,13 @@ namespace MetricFlowX
     void
     compute_pressure(const VectorType &y, VectorType &pressure_vec) const;
 
+    /** Full pressure, including Kelvin--Voigt stress at the supplied rate. */
+    void
+    compute_pressure(const VectorType &y,
+                     const VectorType &ydot,
+                     VectorType       &pressure_vec,
+                     const double      t) const;
+
     void
     compute_pressure(const VectorType &y,
                      VectorType       &pressure_vec,
@@ -618,7 +627,9 @@ namespace MetricFlowX
     open_output_files();
 
     void
-    write_output_step(const double t, const VectorType &sol);
+    write_output_step(const double      t,
+                      const VectorType &sol,
+                      const VectorType *ydot = nullptr);
 
     // Per-output-time IDA bookkeeping.  Every field is identical on all ranks
     // because the time integration itself is global.
@@ -700,7 +711,9 @@ namespace MetricFlowX
     void
     open_csv_files();
     void
-    write_csv_row(const double t, const VectorType &sol);
+    write_csv_row(const double      t,
+                  const VectorType &sol,
+                  const VectorType *ydot = nullptr);
     void
     close_csv_files();
 
@@ -989,6 +1002,67 @@ namespace MetricFlowX
     // continuity  p_L(A) + rho/2 U^2 = p_R(A) + rho/2 U^2.  detect_junctions()
     // checks this and refuses to demote, with a warning, when the laws differ.
     // ----------------------------------------------------------------------
+    std::string                           wall_model        = "Square root";
+    bool                                  viscoelastic_wall = false;
+    std::map<std::string, Vector<double>> wall_input;
+
+    double
+    viscous_pressure(
+      const VectorType                                               &y,
+      const VectorType                                               &ydot,
+      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+      const Point<spacedim> &point) const
+    {
+      if (!viscoelastic_wall)
+        return 0.;
+      std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
+      cell->get_dof_indices(indices);
+      const auto delta = cell->vertex(1) - cell->vertex(0);
+      Point<dim> xi;
+      xi[0] =
+        std::clamp(((point - cell->vertex(0)) * delta) / delta.norm_square(),
+                   0.,
+                   1.);
+      double area = 0., rate = 0.;
+      for (unsigned int i = 0; i < indices.size(); ++i)
+        if (fe_->system_to_component_index(i).first == 0)
+          {
+            const double phi = fe_->shape_value(i, xi);
+            area += phi * y(indices[i]);
+            rate += phi * ydot(indices[i]);
+          }
+      return vessel_map.at(cell->material_id())
+               .wall.viscosity(area, compute_a_d_at_point(cell, point)) *
+             rate;
+    }
+
+    void
+    assemble_viscous_wall(const VectorType &y,
+                          const VectorType &ydot,
+                          VectorType       *residual,
+                          MatrixType       *matrix,
+                          const bool        derivative);
+
+    double
+    compute_invariant(const double       A,
+                      const unsigned int vid,
+                      const double       reference_area) const
+    {
+      const auto &vp = vessel_map.at(vid);
+      if (vp.wall.type == WallLaw::Type::square_root)
+        return 4. * (compute_wave_speed(A, vid, reference_area) -
+                     compute_wave_speed(reference_area, vid, reference_area));
+      return vp.wall.invariant(A, reference_area, vp.h_wall, density);
+    }
+
+    double
+    compute_invariant_derivative(const double       A,
+                                 const unsigned int vid,
+                                 const double       reference_area) const
+    {
+      return compute_wave_speed(A, vid, reference_area) / A;
+    }
+
     bool unify_two_way_junctions = false;
 
     // Do the two vessels share an identical pressure law?
@@ -1004,7 +1078,13 @@ namespace MetricFlowX
         return std::abs(x - y) <=
                1e-10 * std::max(1.0, std::max(std::abs(x), std::abs(y)));
       };
-      return eq(A.a0, B.a0) && eq(A.a_d, B.a_d) && eq(A.E, B.E) &&
+      return A.wall.type == B.wall.type && eq(A.wall.ee, B.wall.ee) &&
+             eq(A.wall.ec, B.wall.ec) && eq(A.wall.epsilon0, B.wall.epsilon0) &&
+             eq(A.wall.epsilonr, B.wall.epsilonr) &&
+             eq(A.wall.stiffness, B.wall.stiffness) && eq(A.wall.m, B.wall.m) &&
+             eq(A.wall.n, B.wall.n) && eq(A.wall.km, B.wall.km) &&
+             eq(A.wall.reference_pressure, B.wall.reference_pressure) &&
+             eq(A.a0, B.a0) && eq(A.a_d, B.a_d) && eq(A.E, B.E) &&
              eq(A.h_wall, B.h_wall) && eq(A.p0, B.p0) && eq(A.p_d, B.p_d) &&
              eq(A.r_in, B.r_in) && eq(A.r_out, B.r_out);
     }
@@ -1329,7 +1409,9 @@ namespace MetricFlowX
       // This is the vessel tube/transmural law supplied by the network data.
       // The physical pressure used by assembly is this value plus the
       // prescribed external pressure, through compute_physical_pressure().
-      const auto  &vpp  = vessel_map.at(vid);
+      const auto &vpp = vessel_map.at(vid);
+      if (vpp.wall.type != WallLaw::Type::square_root)
+        return vpp.wall.elastic(A, a_d_local, vpp.h_wall).pressure;
       const double beta = vpp.beta_p;
       return vpp.p0 + beta / a_d_local * (std::sqrt(A) - std::sqrt(a_d_local)) +
              vpp.p_d;
@@ -1340,7 +1422,9 @@ namespace MetricFlowX
                                 const unsigned int vid,
                                 const double       a_d_local) const
     {
-      const auto  &vpp    = vessel_map.at(vid);
+      const auto &vpp = vessel_map.at(vid);
+      if (vpp.wall.type != WallLaw::Type::square_root)
+        return vpp.wall.elastic(A, a_d_local, vpp.h_wall).first;
       const double beta_p = vpp.beta_p;
       return beta_p / (2.0 * a_d_local * std::sqrt(std::max(A, 1e-30)));
     }
@@ -1351,6 +1435,9 @@ namespace MetricFlowX
                        const double       a_d_local) const
     {
       const double A_safe = std::max(A, 1e-10);
+      const auto  &vp     = vessel_map.at(vid);
+      if (vp.wall.type != WallLaw::Type::square_root)
+        return vp.wall.wave_speed(A_safe, a_d_local, vp.h_wall, density);
       return std::sqrt(A_safe / density *
                        compute_pressure_derivative(A_safe, vid, a_d_local));
     }
@@ -1361,6 +1448,13 @@ namespace MetricFlowX
                                   const double       a_d_local) const
     {
       const double A_safe = std::max(A, 1e-10);
+      const auto  &vp     = vessel_map.at(vid);
+      if (vp.wall.type != WallLaw::Type::square_root)
+        {
+          const auto p = vp.wall.elastic(A_safe, a_d_local, vp.h_wall);
+          return (p.first + A_safe * p.second) /
+                 (2. * density * compute_wave_speed(A_safe, vid, a_d_local));
+        }
       // The square-root tube law gives c(A) proportional to A^(1/4).
       return compute_wave_speed(A_safe, vid, a_d_local) * 0.5 / (2.0 * A_safe);
     }

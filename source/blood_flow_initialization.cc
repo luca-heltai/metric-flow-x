@@ -160,6 +160,10 @@ namespace MetricFlowX
     VectorType  &state,
     const double t)
   {
+    AssertThrow(
+      wall_model == "Square root",
+      ExcMessage(
+        "Steady network reconstruction requires Wall model = Square root; ADAVN has no supported steady-network inverse."));
     TimerOutput::Scope timer(computing_timer, "initialize_steady_network");
     AssertThrow(
       outlet_type == "RCR",
@@ -625,6 +629,10 @@ namespace MetricFlowX
     VectorType  &state_dot,
     const double t)
   {
+    AssertThrow(
+      !viscoelastic_wall,
+      ExcMessage(
+        "Native consistent-state initialization does not support Viscoelastic wall; use IDA initial-condition correction."));
     TimerOutput::Scope timer(computing_timer, "initialize_consistent_state");
     initial_state_diagnostics_ = InitialStateDiagnostics{};
     reinit_state(state);
