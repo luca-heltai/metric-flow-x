@@ -1,0 +1,276 @@
+{
+  "original_branch": "blood_flow_model_with_junction",
+  "original_head": "47ce48629b3dafe0422316084bc8c904624ddd14",
+  "original_incremental_base": "93d8d36cb89e9ece7021d57461d75b3ff267f4af",
+  "rebased_onto": "456e5bf906b6cc2ecc904b9354ff60b48297d2e4",
+  "original_commits": [
+    "f92e9a688acfc33ea016ef1ba73a61cfb4960795 jacobian test",
+    "3cdf26a08d371e5455caf90a099117a15d8e8fba jacobian test",
+    "17714144c6663bb8dfcc8fe8019df4bbae78552d with junction detection",
+    "9eef0d1810ba013a16613f3020798dd7e736cf09 test improved",
+    "2d2a76443f4856c6cbff2ed03e85fde893557a2f failed junction implementation",
+    "1dc4851fa4147ce05a6d97ef8cf17750185805a7 Fixed jacobian test.",
+    "caf5f0c23528f1d60b1ef27df4075725962b138c Not compiling, illustrative changes.",
+    "58213bcd5b3c04647fd1d132915c27707feff069 changes in junction (not working)",
+    "93fea0643c00817990cec778220de6d1997ddceb with junction description",
+    "74b94d6201ba06c480a6e5b738c868200e5cfeaf junction solving in progress",
+    "e4e9e8dccb72c430710acf74e42f1eef2ae196f9 changes in junction jacobian",
+    "bb72791224d40226c90be341280370f23e53deae with updated latex and changes in junction (not working)",
+    "a293167d74ba2e164f37dff8d0d20a315831ee78 Stabilize junction assembly; working for small final time",
+    "71a7bf2c06f5ae1247b76300c7d1cf342c72945e with implicit junction jacobian",
+    "f22c15293cc5deb76114173faa7b2aa7bd261eb3 with improvements",
+    "87fe277cfa86d319c23dd62c9b4701f189ee92ad with correct relative error",
+    "08dd440c6ceba75a86b5b85256508ce159af4a20 jacobian finite difference test",
+    "fd113c8ffbcaa5e149fc9912fc25158bbf5a1606 jacobian fd test parameters",
+    "33e6b259c6a8372c894a608ae432f494fbec351e Working with 3 Y-junctions",
+    "d0579bb9c4262f636c94011ad1a7691ba7a9cc3b with Riemann Invariants boundary conditions",
+    "0964f4cb2fcd824a45e23d844843a559ea434982 switching between  characteristic (old) and Riemann Invariants boundary workers",
+    "3ea17bd9293730c9bc296d40691f4058c605f785 Add mesh toggle",
+    "a86ea8a8a7834a7cf73ba1de7cad5de9772b69a8 Cleanup.",
+    "47ce48629b3dafe0422316084bc8c904624ddd14 Clean tex."
+  ],
+  "runtime_resolution": "The current solver already assembles junction mass/head/characteristic equations in the global HDG/IDA system. Current cell, boundary, interior and junction Jacobian tests replace the old monolithic DG test. Replaying the earlier driver or its unqualified includes would remove current MPI, standalone-library and initialization support.",
+  "conflicts": [
+    ".gitignore",
+    "CMakeLists.txt",
+    "include/blood_flow_system.h",
+    "latex/blood_flow.tex",
+    "parameters/constant.prm",
+    "parameters/jacobian_const.prm",
+    "parameters/linear.prm",
+    "parameters/mass_integration.prm",
+    "parameters/mass_integration_velocity.prm",
+    "parameters/parameters_time.prm",
+    "parameters/quadratic.prm",
+    "parameters/working_parameters/Hll_parameters1.prm",
+    "parameters/working_parameters/Hll_parameters2.prm",
+    "parameters/working_parameters/hll_parameters3.prm",
+    "parameters/working_parameters/parameters_1.prm",
+    "parameters/working_parameters/parameters_2.prm",
+    "parameters/working_parameters/parameters_3.prm",
+    "parameters/working_parameters/parameters_4.prm",
+    "source/blood_flow_system.cc",
+    "source/main.cc",
+    "tests/test_constant.cc",
+    "tests/test_jacobian_const.cc",
+    "tests/test_linear_01.cc",
+    "tests/test_mass_integration.cc",
+    "tests/test_mass_integration_velocity.cc",
+    "tests/test_residual_quadratic.cc",
+    "tests/test_residual_with_time.cc"
+  ],
+  "retained_files": [
+    {
+      "original_path": "latex/arterial_tree_bifurcation.png",
+      "path": "original/latex/arterial_tree_bifurcation.png",
+      "sha256": "2d7cadbd291d4f763e9d808594fde688fdaaaa091512bc065bd1d31994b483d1"
+    },
+    {
+      "original_path": "latex/blood_flow.tex",
+      "path": "original/latex/blood_flow.tex",
+      "sha256": "257b5cdbefa94e818a05589e857365d06f50fb51590dc2750f58638b3601bdcd"
+    },
+    {
+      "original_path": "parameters/constant.prm",
+      "path": "original/parameters/constant.prm",
+      "sha256": "de06deb670c7170442c772b3c66317e830d01eb43f5070683e320e9afda64f9a"
+    },
+    {
+      "original_path": "parameters/jacobian_const.prm",
+      "path": "original/parameters/jacobian_const.prm",
+      "sha256": "14f96309e80ac315d426093ccf9cd323169a0442a51c20e8a0473b041650f77e"
+    },
+    {
+      "original_path": "parameters/jacobian_fd.prm",
+      "path": "original/parameters/jacobian_fd.prm",
+      "sha256": "285c7d337c80a76d76f2e1d4bbc661e2f246ce873648deb2c834987a9fe858e9"
+    },
+    {
+      "original_path": "parameters/linear.prm",
+      "path": "original/parameters/linear.prm",
+      "sha256": "b4feb1e4d3c944c40d3998435563c6cd9afa91bafe8def52fb81b11f35f3616a"
+    },
+    {
+      "original_path": "parameters/mass_integration.prm",
+      "path": "original/parameters/mass_integration.prm",
+      "sha256": "18b3496ae6ef42a5e47053b81f1d00422f69d4ac863c9d87c60b5db06e2357ac"
+    },
+    {
+      "original_path": "parameters/mass_integration_velocity.prm",
+      "path": "original/parameters/mass_integration_velocity.prm",
+      "sha256": "a126eedf3e11e093def0277d81f72e195b7f1e8d6b9c4266c13ea4a251948b34"
+    },
+    {
+      "original_path": "parameters/parameters_time.prm",
+      "path": "original/parameters/parameters_time.prm",
+      "sha256": "89be03431ad3b02631dad55c02418efdf87e64f5c4a92fe24869f47e82199400"
+    },
+    {
+      "original_path": "parameters/quadratic.prm",
+      "path": "original/parameters/quadratic.prm",
+      "sha256": "c6a2e9d477f8f1ee7ff40bce0436cade1a4ca200228e9cfc72d407feb2f5c04e"
+    },
+    {
+      "original_path": "parameters/visualization_parameters.pvsm",
+      "path": "original/parameters/visualization_parameters.pvsm",
+      "sha256": "e87413f622f31b828bd69eb58238728788fac5ab17cc3534f765d5a28e9394d4"
+    },
+    {
+      "original_path": "parameters/working_parameters/Hll_parameters1.prm",
+      "path": "original/parameters/working_parameters/hll_parameters1.prm",
+      "sha256": "ec7b2adeebdc2a51499ea263910efa2bdacb8f50d24ab3f221a12db387cd9413"
+    },
+    {
+      "original_path": "parameters/working_parameters/Hll_parameters2.prm",
+      "path": "original/parameters/working_parameters/hll_parameters2.prm",
+      "sha256": "8f8ad0aa9aa748dd1c5d048636db2829b52751eb995077861e04678adee6e88e"
+    },
+    {
+      "original_path": "parameters/working_parameters/hll_parameters3.prm",
+      "path": "original/parameters/working_parameters/hll_parameters3.prm",
+      "sha256": "bdd92e304bec9b79ec055dd757361387b6c4fed8ba5985e60c9de7779762e671"
+    },
+    {
+      "original_path": "parameters/working_parameters/parameters_1.prm",
+      "path": "original/parameters/working_parameters/parameters_1.prm",
+      "sha256": "3b297c90816702d9e3467441757f72ac35c39f665f00e9b1e6e4e202f22e3cc7"
+    },
+    {
+      "original_path": "parameters/working_parameters/parameters_2.prm",
+      "path": "original/parameters/working_parameters/parameters_2.prm",
+      "sha256": "4310867caba0e04f3563bcd2d4634b55b3469656ceee2e4237eaee290587ea70"
+    },
+    {
+      "original_path": "parameters/working_parameters/parameters_3.prm",
+      "path": "original/parameters/working_parameters/parameters_3.prm",
+      "sha256": "6f92f424b17e4f563bb5df1881a2827a9fdda1c89b74b3be2b5c1920dde8213e"
+    },
+    {
+      "original_path": "parameters/working_parameters/parameters_4.prm",
+      "path": "original/parameters/working_parameters/parameters_4.prm",
+      "sha256": "aca39015b324c13efcb38f55f100fba23fea338241343839cc8434ede15e91b1"
+    }
+  ],
+  "superseded_paths": [
+    {
+      "path": ".gitignore",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "CMakeLists.txt",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "include/DG_advection_reaction.h",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "include/blood_flow_system.h",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "include/blood_flow_system_updated_1d3d.h",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "include/burger_equation.h",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "include/junction_solver.h",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "include/non_linear_conservation_law.h",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "latex/blood_flow_with_newton_iteration.tex",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "latex/burgers.tex",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "main.cc",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "main_burger.cc",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "main_non_linear_conservation_law.cc",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "main_updated_1d3d.cc",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "source/DG_advection_reaction.cc",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "source/blood_flow_system.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "source/blood_flow_system_updated_1d3d.cc",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "source/burger_equation.cc",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "source/burger_with_periodic_bc.cc",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "source/main.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "source/non_linear_conservation_law.cc",
+      "resolution": "Keep current main deletion/renaming; do not resurrect obsolete paths."
+    },
+    {
+      "path": "tests/test_constant.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "tests/test_jacobian_const.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "tests/test_jacobian_fd.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "tests/test_jacobian_fd.output",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "tests/test_linear_01.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "tests/test_mass_integration.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "tests/test_mass_integration_velocity.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "tests/test_residual_quadratic.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    },
+    {
+      "path": "tests/test_residual_with_time.cc",
+      "resolution": "Keep current main implementation, API, build and regression tests. See rationale in README.md."
+    }
+  ]
+}
