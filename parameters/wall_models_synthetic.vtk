@@ -1,0 +1,90 @@
+# vtk DataFile Version 3.0
+vtk output
+ASCII
+DATASET UNSTRUCTURED_GRID
+POINTS 3 double
+0.0 0.0 0.0
+0.120685 0.0 0.0
+0.24137 0.0 0.0
+
+CELLS 2 6
+2 0 1
+2 1 2
+
+CELL_TYPES 2
+3
+3
+
+CELL_DATA 2
+SCALARS vessel_id int 1
+LOOKUP_TABLE default
+0 0
+SCALARS a0 double 1
+LOOKUP_TABLE default
+3.0605e-4 3.0605e-4
+SCALARS E double 1
+LOOKUP_TABLE default
+4e5 4e5
+SCALARS h_wall double 1
+LOOKUP_TABLE default
+1.2e-3 1.2e-3
+SCALARS p_d double 1
+LOOKUP_TABLE default
+9.46e3 9.46e3
+SCALARS p0 double 1
+LOOKUP_TABLE default
+0.0 0.0
+SCALARS L double 1
+LOOKUP_TABLE default
+0.24137 0.24137
+SCALARS a_d double 1
+LOOKUP_TABLE default
+4.5239e-4 4.5239e-4
+SCALARS r_d double 1
+LOOKUP_TABLE default
+0.012 0.012
+
+SCALARS adavn_p_ref double 1
+LOOKUP_TABLE default
+666.666 666.666
+SCALARS adavn_E_e double 1
+LOOKUP_TABLE default
+260000 260000
+SCALARS adavn_E_c double 1
+LOOKUP_TABLE default
+20000000 20000000
+SCALARS adavn_epsilon_0 double 1
+LOOKUP_TABLE default
+0.25 0.25
+SCALARS adavn_epsilon_r double 1
+LOOKUP_TABLE default
+0.05 0.05
+SCALARS adavn_venous_K double 1
+LOOKUP_TABLE default
+1000 1000
+SCALARS adavn_venous_m double 1
+LOOKUP_TABLE default
+10 10
+SCALARS adavn_venous_n double 1
+LOOKUP_TABLE default
+-1.5 -1.5
+SCALARS adavn_K_m double 1
+LOOKUP_TABLE default
+1.0 1.0
+
+POINT_DATA 3
+SCALARS boundary_id int 1
+LOOKUP_TABLE default
+0 255 1
+SCALARS R1 double 1
+LOOKUP_TABLE default
+0.0 0.0 1.1752e7
+SCALARS R2 double 1
+LOOKUP_TABLE default
+0.0 0.0 1.1167e8
+SCALARS C double 1
+LOOKUP_TABLE default
+0.0 0.0 1.0163e-8
+SCALARS P_out double 1
+LOOKUP_TABLE default
+0.0 0.0 0.0

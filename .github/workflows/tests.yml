@@ -58,6 +58,7 @@ jobs:
           ctest --test-dir build --no-tests=error --output-on-failure
           python3 tests/test_inflow_integration.py --executable build/blood_flow --mpi
           python3 tests/test_initialization_mpi.py --build-dir build
+          python3 tests/test_wall_integration.py --executable build/blood_flow --mpi
           python3 tests/test_iterative_bifurcation.py --executable build/blood_flow
           python3 tests/test_iterative_adan.py --executable build/blood_flow
           python3 tests/test_output_schedule.py --executable build/blood_flow

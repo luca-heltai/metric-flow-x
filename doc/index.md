@@ -21,6 +21,8 @@ mass balance and figure provenance.
 
 - [Mathematical formulation](math.md): conservation equations, elastic tube
   law, numerical fluxes, branch traces, junctions and RCR outlets.
+- [Optional ADAVN wall models](wall_models.md): arterial, venous and
+  viscoelastic laws, input requirements and validation limits.
 - [Examples from the manuscript](results.md): arterial pulse waveforms,
   conservation of network volume and adaptive time integration.
 - [Getting started](getting_started.md): build the standalone `blood_flow`
@@ -62,6 +64,7 @@ getting_started
 build_and_run
 containers
 math
+wall_models
 initialization
 stationary
 results

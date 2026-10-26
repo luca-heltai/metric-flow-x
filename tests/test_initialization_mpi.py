@@ -20,7 +20,9 @@ def main():
                        OMPI_ALLOW_RUN_AS_ROOT="1", OMPI_ALLOW_RUN_AS_ROOT_CONFIRM="1",
                        OMPI_MCA_rmaps_base_oversubscribe="1",
                        OMPI_MCA_hwloc_base_binding_policy="none")
-    cases = {"consistent_initialization": (2, 4),
+    cases = {"native_viscoelastic_initialization": (2, 4),
+             "wall_models": (2,),
+             "consistent_initialization": (2, 4),
              "nonfinite_initialization": (2, 4),
              "ida_error_guard": (2,),
              "ida_statistics": (2, 4),

@@ -308,6 +308,14 @@ namespace MetricFlowX
     add_parameter("Outlet boundary condition type", outlet_type);
     add_parameter("Vtk file path for mesh input", vtk_file_path);
     add_parameter(
+      "Wall model",
+      wall_model,
+      "Square root (default), ADAVN arterial, ADAVN venous, or ADAVN mixed; ADAVN requires constitutive CELL_DATA arrays.");
+    add_parameter(
+      "Viscoelastic wall",
+      viscoelastic_wall,
+      "Add the ADAVN Kelvin-Voigt pressure using adavn_K_m; supports native or IDA initialization.");
+    add_parameter(
       "Terminal parameter source",
       terminal_parameter_source,
       "VTK preserves legacy mesh values; Parameters uses defaults and optional CSV overrides.",
@@ -386,6 +394,19 @@ namespace MetricFlowX
                                   this->prm,
                                   ParameterHandler::Short);
 
+    AssertThrow(
+      wall_model == "Square root" || wall_model == "ADAVN arterial" ||
+        wall_model == "ADAVN venous" || wall_model == "ADAVN mixed",
+      ExcMessage(
+        "Wall model must be Square root, ADAVN arterial, ADAVN venous, or ADAVN mixed."));
+    AssertThrow(
+      !viscoelastic_wall || wall_model != "Square root",
+      ExcMessage(
+        "Viscoelastic wall requires an ADAVN wall model and its adavn_K_m input field."));
+    AssertThrow(
+      wall_model == "Square root" || initial_state_source != "steady network",
+      ExcMessage(
+        "ADAVN walls do not support the square-root steady-network initializer; select Initial state source = rest."));
     AssertThrow(std::isfinite(time_interval) && time_interval >= 0.0,
                 ExcMessage("Output time interval must be finite and "
                            "non-negative."));
@@ -656,6 +677,18 @@ namespace MetricFlowX
         check(PCGetType(subpc, &type));
         if (std::string(type) == PCILU || std::string(type) == PCLU)
           {
+            Mat      local_matrix;
+            PetscInt rows, columns;
+            check(KSPGetOperators(subsolvers[i], nullptr, &local_matrix));
+            check(MatGetSize(local_matrix, &rows, &columns));
+            if (rows == 0 && columns == 0)
+              {
+                // PETSc 3.19 ILU symbolic factorization divides by zero when
+                // computing fill ratios for empty subdomains. Their action is
+                // already empty: no factorization or shift is needed.
+                check(PCSetType(subpc, PCNONE));
+                continue;
+              }
             check(PCFactorSetShiftType(subpc, MAT_SHIFT_NONZERO));
             // The coupled vessel equations need fill beyond their original
             // sparsity pattern for a useful local approximation.
@@ -940,6 +973,139 @@ namespace MetricFlowX
     vtk.read_cell_data("L", cell_L);
     vtk.read_cell_data("r_d", cell_r_d);
 
+    wall_input.clear();
+    if (wall_model != "Square root")
+      {
+        const std::string context =
+          "Wall model " + wall_model + " in " + vtk_file_path + ": ";
+        const auto require_field = [&](const std::string &name) {
+          AssertThrow(vtk.has_cell_data(name),
+                      ExcMessage(context +
+                                 "missing required CELL_DATA array '" + name +
+                                 "'."));
+          vtk.read_cell_data(name, wall_input[name]);
+          AssertThrow(wall_input[name].size() == cell_vessel_ids.size(),
+                      ExcMessage(context + name +
+                                 " has the wrong number of entries."));
+        };
+        if (wall_model == "ADAVN mixed")
+          require_field("adavn_wall_type");
+        else if (vtk.has_cell_data("adavn_wall_type"))
+          require_field("adavn_wall_type");
+        bool artery = false, vein = false;
+        for (unsigned int i = 0; i < cell_vessel_ids.size(); ++i)
+          {
+            const double type = wall_input.count("adavn_wall_type") ?
+                                  wall_input.at("adavn_wall_type")[i] :
+                                  (wall_model == "ADAVN arterial" ? 1. : 2.);
+            AssertThrow(
+              type == 1. || type == 2. || type == 3.,
+              ExcMessage(
+                context +
+                "adavn_wall_type must be 1 (artery), 2 (vein), or 3 (dural sinus), cell " +
+                std::to_string(i)));
+            AssertThrow(wall_model != "ADAVN arterial" || type == 1.,
+                        ExcMessage(context +
+                                   "venous cell supplied to arterial model."));
+            AssertThrow(wall_model != "ADAVN venous" || type != 1.,
+                        ExcMessage(context +
+                                   "arterial cell supplied to venous model."));
+            artery |= type == 1.;
+            vein |= type != 1.;
+          }
+        require_field("adavn_p_ref");
+        if (artery)
+          for (const auto &name :
+               {"adavn_E_e", "adavn_E_c", "adavn_epsilon_0", "adavn_epsilon_r"})
+            require_field(name);
+        if (vein)
+          for (const auto &name :
+               {"adavn_venous_K", "adavn_venous_m", "adavn_venous_n"})
+            require_field(name);
+        if (viscoelastic_wall)
+          require_field("adavn_K_m");
+        std::map<unsigned int, unsigned int> first_cell;
+        for (unsigned int i = 0; i < cell_vessel_ids.size(); ++i)
+          {
+            const double id = cell_vessel_ids[i];
+            AssertThrow(
+              std::isfinite(id) && id >= 0. && id == std::floor(id) &&
+                id < std::numeric_limits<types::material_id>::max(),
+              ExcMessage(
+                context +
+                "vessel_id must be a nonnegative representable integer at cell " +
+                std::to_string(i)));
+            const auto [it, inserted] =
+              first_cell.emplace(static_cast<unsigned int>(id), i);
+            if (!inserted)
+              {
+                AssertThrow(
+                  cell_a_d[i] == cell_a_d[it->second],
+                  ExcMessage(
+                    context + "a_d differs between cells sharing vessel_id " +
+                    std::to_string(it->first) +
+                    "; split vessel IDs or use the supported taper arrays."));
+                const bool arterial =
+                  wall_input.count("adavn_wall_type") ?
+                    wall_input.at("adavn_wall_type")[i] == 1. :
+                    wall_model == "ADAVN arterial";
+                AssertThrow(
+                  !arterial || cell_h_wall[i] == cell_h_wall[it->second],
+                  ExcMessage(
+                    context +
+                    "h_wall differs between arterial cells sharing vessel_id " +
+                    std::to_string(it->first) +
+                    "; use distinct vessel IDs for distinct wall thickness."));
+              }
+            if (!inserted)
+              for (const auto &[name, values] : wall_input)
+                AssertThrow(
+                  values[i] == values[it->second],
+                  ExcMessage(
+                    context + name +
+                    " differs between cells sharing vessel_id " +
+                    std::to_string(it->first) +
+                    "; use distinct vessel IDs for distinct wall properties."));
+            const auto value = [&](const std::string &name) {
+              const double x = wall_input.at(name)[i];
+              AssertThrow(std::isfinite(x),
+                          ExcMessage(context + name +
+                                     " is not finite at cell " +
+                                     std::to_string(i)));
+              return x;
+            };
+            const double type = wall_input.count("adavn_wall_type") ?
+                                  value("adavn_wall_type") :
+                                  (wall_model == "ADAVN arterial" ? 1. : 2.);
+            AssertThrow(std::isfinite(cell_a_d[i]) && cell_a_d[i] > 0.,
+                        ExcMessage(context +
+                                   "a_d must be finite and positive."));
+            value("adavn_p_ref");
+            if (viscoelastic_wall)
+              AssertThrow(value("adavn_K_m") >= 0.,
+                          ExcMessage(context +
+                                     "adavn_K_m must be nonnegative."));
+            if (type == 1.)
+              AssertThrow(
+                value("adavn_E_e") > 0. && value("adavn_E_c") >= 0. &&
+                  value("adavn_epsilon_0") >= 0. &&
+                  value("adavn_epsilon_r") > 0. &&
+                  std::isfinite(cell_h_wall[i]) && cell_h_wall[i] > 0.,
+                ExcMessage(
+                  context +
+                  "arterial moduli, activation width, or wall thickness are invalid at cell " +
+                  std::to_string(i)));
+            else
+              AssertThrow(
+                value("adavn_venous_K") > 0. && value("adavn_venous_m") > 0. &&
+                  value("adavn_venous_n") <= 0.,
+                ExcMessage(
+                  context +
+                  "venous K and m must be positive and n nonpositive at cell " +
+                  std::to_string(i)));
+          }
+      }
+
     if (write_flow_regime_diagnostics)
       for (unsigned int i = 0; i < cell_a_d.size(); ++i)
         {
@@ -1140,18 +1306,48 @@ namespace MetricFlowX
         if (vessel_map.count(vid))
           continue;
 
+        const unsigned int data_index = wall_model == "Square root" ? vid : i;
         VesselPhysicalProperties vp;
-        vp.a0     = cell_a0[vid];
-        vp.E      = cell_E[vid];
-        vp.h_wall = cell_h_wall[vid];
-        vp.p_d    = cell_p_d[vid];
-        vp.p0     = cell_p0[vid];
-        vp.a_d    = cell_a_d[vid];
-        vp.L      = cell_L[vid];
-        vp.r_d    = cell_r_d[vid];
-        vp.r_in   = (cell_r_in.size() > vid) ? cell_r_in[vid] : 0.0;
-        vp.r_out  = (cell_r_out.size() > vid) ? cell_r_out[vid] : 0.0;
+        vp.a0     = cell_a0[data_index];
+        vp.E      = cell_E[data_index];
+        vp.h_wall = cell_h_wall[data_index];
+        vp.p_d    = cell_p_d[data_index];
+        vp.p0     = cell_p0[data_index];
+        vp.a_d    = cell_a_d[data_index];
+        vp.L      = cell_L[data_index];
+        vp.r_d    = cell_r_d[data_index];
+        vp.r_in = (cell_r_in.size() > data_index) ? cell_r_in[data_index] : 0.0;
+        vp.r_out =
+          (cell_r_out.size() > data_index) ? cell_r_out[data_index] : 0.0;
         vp.beta_p = compute_beta_p(vp.E, vp.h_wall);
+        if (wall_model != "Square root")
+          {
+            const unsigned int type =
+              wall_input.count("adavn_wall_type") ?
+                static_cast<unsigned int>(wall_input.at("adavn_wall_type")[i]) :
+                (wall_model == "ADAVN arterial" ? 1u : 2u);
+            vp.wall.type               = static_cast<WallLaw::Type>(type);
+            vp.wall.reference_pressure = wall_input.at("adavn_p_ref")[i];
+            vp.wall.km = viscoelastic_wall ? wall_input.at("adavn_K_m")[i] : 0.;
+            if (type == 1)
+              {
+                vp.wall.ee       = wall_input.at("adavn_E_e")[i];
+                vp.wall.ec       = wall_input.at("adavn_E_c")[i];
+                vp.wall.epsilon0 = wall_input.at("adavn_epsilon_0")[i];
+                vp.wall.epsilonr = wall_input.at("adavn_epsilon_r")[i];
+              }
+            else
+              {
+                vp.wall.stiffness = wall_input.at("adavn_venous_K")[i];
+                vp.wall.m         = wall_input.at("adavn_venous_m")[i];
+                vp.wall.n         = wall_input.at("adavn_venous_n")[i];
+              }
+            AssertThrow(vp.wall.elastic(vp.a_d, vp.a_d, vp.h_wall).first > 0.,
+                        ExcMessage(
+                          "Non-hyperbolic ADAVN reference state in vessel " +
+                          std::to_string(vid)));
+          }
+
 
         vessel_map[vid] = vp;
       }
@@ -2046,7 +2242,6 @@ namespace MetricFlowX
           continue;
 
         const unsigned int vid = cell->material_id();
-        const auto        &vpp = vessel_map.at(vid);
 
         for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
           {
@@ -2057,7 +2252,13 @@ namespace MetricFlowX
 
             const types::boundary_id bid = cell->face(f)->boundary_id();
             if (bid != 0 && is_terminal_boundary(bid))
-              terminal_Pc_storage.try_emplace(bid, vpp.p_d);
+              terminal_Pc_storage.try_emplace(
+                bid,
+                vessel_map.at(vid).wall.type == WallLaw::Type::square_root ?
+                  vessel_map.at(vid).p_d :
+                  compute_pressure_value(compute_a_d_at_face(cell, f),
+                                         vid,
+                                         compute_a_d_at_face(cell, f)));
           }
       }
   }
@@ -2133,7 +2334,13 @@ namespace MetricFlowX
             if (pit == rcr_pc_dof.end())
               continue;
 
-            dst(pit->second) = vessel_map.at(cell->material_id()).p_d;
+            dst(pit->second) =
+              vessel_map.at(cell->material_id()).wall.type ==
+                  WallLaw::Type::square_root ?
+                vessel_map.at(cell->material_id()).p_d :
+                compute_pressure_value(compute_a_d_at_face(cell, f),
+                                       cell->material_id(),
+                                       compute_a_d_at_face(cell, f));
           }
       }
 
@@ -2403,8 +2610,13 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::write_csv_row(const double      t,
-                                                const VectorType &sol)
+                                                const VectorType &sol,
+                                                const VectorType *ydot)
   {
+    AssertThrow(
+      !viscoelastic_wall || ydot != nullptr,
+      ExcMessage(
+        "Viscoelastic pressure output requires the state derivative."));
     if (!output_terminal_csv_file.empty())
       {
         using Row = std::pair<unsigned int, std::vector<std::string>>;
@@ -2428,7 +2640,10 @@ namespace MetricFlowX
                                                   compute_a_d_at_face(cell, f),
                                                   t,
                                                   cell->face(f)->center(),
-                                                  cell->id());
+                                                  cell->id()) +
+                        (ydot ? viscous_pressure(
+                                  sol, *ydot, cell, cell->face(f)->center()) :
+                                0.);
                       const auto        rcr = rcr_map.find(bid);
                       const std::string label =
                         rcr == rcr_map.end() ?
@@ -2517,7 +2732,8 @@ namespace MetricFlowX
                                     compute_a_d_at_point(cell, x_probe),
                                     t,
                                     x_probe,
-                                    cell->id());
+                                    cell->id()) +
+          (ydot ? viscous_pressure(sol, *ydot, cell, x_probe) : 0.);
         const double P_dynpcm2 = P_Pa * 10.0;
 
         const double Q_cm3ps = A_val * U_val * 1.0e6;
@@ -2648,9 +2864,34 @@ namespace MetricFlowX
     if (s_R <= 0.0)
       return {{FAR_j, FUR_j}};
 
-    const double inv = 1.0 / (s_R - s_L);
-    return {{(s_R * FAL_j - s_L * FAR_j + s_R * s_L * (dA_R - dA_L)) * inv,
-             (s_R * FUL_j - s_L * FUR_j + s_R * s_L * (dU_R - dU_L)) * inv}};
+    const double          inv    = 1.0 / (s_R - s_L);
+    std::array<double, 2> result = {
+      {(s_R * FAL_j - s_L * FAR_j + s_R * s_L * (dA_R - dA_L)) * inv,
+       (s_R * FUL_j - s_L * FUR_j + s_R * s_L * (dU_R - dU_L)) * inv}};
+    if (wall_model != "Square root")
+      {
+        const double du = .5 * (dU_L + dU_R);
+        const double dc =
+          .5 * (compute_wave_speed_derivative(A_L, vid_L, ad_L) * dA_L +
+                compute_wave_speed_derivative(A_R, vid_R, ad_R) * dA_R);
+        const double dsL = du - dc, dsR = du + dc;
+        const auto   flux = hll_flux(
+          bn_L, bn_R, A_L, U_L, A_R, U_R, vid_L, vid_R, ad_L, ad_R, 0., 0.);
+        const std::array<double, 2> left = {
+          scalar_area_flux(bn_L, A_L, U_L),
+          scalar_momentum_flux(
+            bn_L, U_L, compute_pressure_value(A_L, vid_L, ad_L), density)};
+        const std::array<double, 2> right = {
+          scalar_area_flux(bn_R, A_R, U_R),
+          scalar_momentum_flux(
+            bn_R, U_R, compute_pressure_value(A_R, vid_R, ad_R), density)};
+        const std::array<double, 2> jump = {A_R - A_L, U_R - U_L};
+        for (unsigned int i = 0; i < 2; ++i)
+          result[i] +=
+            inv * (dsR * left[i] - dsL * right[i] +
+                   (dsR * s_L + s_R * dsL) * jump[i] - (dsR - dsL) * flux[i]);
+      }
+    return result;
   }
 
   // HLL-HDG flux based on Paper "Hybridisable discontinuous
@@ -2863,8 +3104,32 @@ namespace MetricFlowX
       theta * compute_LF_penalty(
                 A_L, A_R, U_L, U_R, bn_L, bn_R, vid_L, vid_R, ad_L, ad_R);
 
-    return {{0.5 * (FAL_j + FAR_j) - 0.5 * alpha * (dA_R - dA_L),
-             0.5 * (FUL_j + FUR_j) - 0.5 * alpha * (dU_R - dU_L)}};
+    std::array<double, 2> result = {
+      {0.5 * (FAL_j + FAR_j) - 0.5 * alpha * (dA_R - dA_L),
+       0.5 * (FUL_j + FUR_j) - 0.5 * alpha * (dU_R - dU_L)}};
+    if (wall_model != "Square root")
+      {
+        const double dcL =
+          compute_wave_speed_derivative(A_L, vid_L, ad_L) * dA_L;
+        const double dcR =
+          compute_wave_speed_derivative(A_R, vid_R, ad_R) * dA_R;
+        const std::array<double, 4> waves = {(U_L - c2L) * bn_L,
+                                             (U_L + c2L) * bn_L,
+                                             (U_R - c2R) * bn_R,
+                                             (U_R + c2R) * bn_R};
+        const std::array<double, 4> dw    = {(dU_L - dcL) * bn_L,
+                                             (dU_L + dcL) * bn_L,
+                                             (dU_R - dcR) * bn_R,
+                                             (dU_R + dcR) * bn_R};
+        unsigned int                k     = 0;
+        for (unsigned int i = 1; i < 4; ++i)
+          if (std::abs(waves[i]) > std::abs(waves[k]))
+            k = i;
+        const double da = theta * (waves[k] >= 0. ? 1. : -1.) * dw[k];
+        result[0] -= .5 * da * (A_R - A_L);
+        result[1] -= .5 * da * (U_R - U_L);
+      }
+    return result;
   }
 
   template <int dim, int spacedim>
@@ -3307,14 +3572,11 @@ namespace MetricFlowX
         const double A_int     = std::max(A_int_v[0], 1e-10);
         const double U_int     = U_int_v[0];
         const double a_d_local = compute_a_d_at_face(cell, f);
-        const double c0        = compute_wave_speed(a_d_local, vid, a_d_local);
-        const double c_int     = compute_wave_speed(A_int, vid, a_d_local);
 
         // Current face trace (from trace block of y)
         const double A_hat_cur = y(face.a_hat_dof);
         const double U_hat_cur = y(face.u_hat_dof);
         const double A_hat     = std::max(A_hat_cur, 1e-10);
-        const double c_hat     = compute_wave_speed(A_hat, vid, a_d_local);
 
         double res_A = 0.0, res_U = 0.0;
 
@@ -3329,10 +3591,12 @@ namespace MetricFlowX
             const double Q_in =
               (inflow_series.empty() ? inflow_function.value(Point<1>(0.0)) :
                                        inflow_series.value(t));
-            const double W2_int = U_int - 4.0 * (c_int - c0);
+            const double W2_int =
+              U_int - compute_invariant(A_int, vid, a_d_local);
 
             res_A = A_hat_cur * U_hat_cur - Q_in;
-            res_U = (U_hat_cur - 4.0 * (c_hat - c0)) - W2_int;
+            res_U =
+              (U_hat_cur - compute_invariant(A_hat, vid, a_d_local)) - W2_int;
           }
         else if (outlet_type == "RCR" && rcr_map.count(bid) &&
                  (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
@@ -3357,17 +3621,22 @@ namespace MetricFlowX
                           A_hat, vid, a_d_local, t, point, cell->id()) -
                         ((rcr.R1 + rcr.R2) * Q + rcr.P_out);
               }
-            const double W1_int = U_int + 4.0 * (c_int - c0);
-            res_U               = (U_hat_cur + 4.0 * (c_hat - c0)) - W1_int;
+            const double W1_int =
+              U_int + compute_invariant(A_int, vid, a_d_local);
+            res_U =
+              (U_hat_cur + compute_invariant(A_hat, vid, a_d_local)) - W1_int;
           }
         else // Reflection outlet
           {
-            const double Rt     = reflection_coefficient;
-            const double W1_int = U_int + 4.0 * (c_int - c0);
+            const double Rt = reflection_coefficient;
+            const double W1_int =
+              U_int + compute_invariant(A_int, vid, a_d_local);
             const double W2_tgt = -Rt * W1_int;
 
-            res_A = (U_hat_cur + 4.0 * (c_hat - c0)) - W1_int;
-            res_U = (U_hat_cur - 4.0 * (c_hat - c0)) - W2_tgt;
+            res_A =
+              (U_hat_cur + compute_invariant(A_hat, vid, a_d_local)) - W1_int;
+            res_U =
+              (U_hat_cur - compute_invariant(A_hat, vid, a_d_local)) - W2_tgt;
           }
 
         // A boundary face has exactly one incident cell, so its rows are
@@ -3533,8 +3802,8 @@ namespace MetricFlowX
 
             // Outgoing Riemann invariant from cell i toward the
             // junction
-            const double c_i = compute_wave_speed(A_int[i], vid, a_d_face);
-            W[i] = U_int[i] + static_cast<double>(s[i]) * 4.0 * (c_i - c0[i]);
+            W[i] = U_int[i] + static_cast<double>(s[i]) *
+                                compute_invariant(A_int[i], vid, a_d_face);
 
             // Trace DOF indices and current trace values (from
             // trace block of y)
@@ -3654,7 +3923,13 @@ namespace MetricFlowX
         for (unsigned int i = 0; i < K; ++i)
           {
             const double compatibility_res =
-              U_hat[i] + static_cast<double>(s[i]) * 4.0 * (c_hat[i] - c0[i]) -
+              U_hat[i] +
+              static_cast<double>(s[i]) *
+                compute_invariant(
+                  A_hat[i],
+                  J.half_faces[i].cell->material_id(),
+                  compute_a_d_at_face(J.half_faces[i].cell,
+                                      J.half_faces[i].face_no)) -
               W[i];
 
             const types::global_dof_index row =
@@ -3772,6 +4047,8 @@ namespace MetricFlowX
     assemble_rcr_capacitor_equations(y_relevant, ydot, residual);
 
     residual.compress(VectorOperation::add);
+    if (viscoelastic_wall)
+      assemble_viscous_wall(y, ydot, &residual, nullptr, false);
     if (verbosity > 1)
       deallog.pop();
   }
@@ -3912,6 +4189,8 @@ namespace MetricFlowX
     jacobian_matrix.compress(VectorOperation::add);
     jacobian_matrix *= -1.0;
     jacobian_matrix.compress(VectorOperation::insert);
+    if (viscoelastic_wall)
+      assemble_viscous_wall(y, ydot, nullptr, &jacobian_matrix, false);
     state_jacobian_matrix_.copy_from(jacobian_matrix);
   }
 
@@ -3927,7 +4206,7 @@ namespace MetricFlowX
     (void)ydot;
     // Only the mesh mass matrices and terminal capacitances enter this block.
     // They change during setup or parameter reload, which invalidate the cache.
-    if (derivative_jacobian_is_current_)
+    if (derivative_jacobian_is_current_ && !viscoelastic_wall)
       return;
     derivative_jacobian_matrix_ = 0.0;
 
@@ -3950,6 +4229,9 @@ namespace MetricFlowX
         derivative_jacobian_matrix_.add(pc_dof, pc_dof, rcr_map.at(bid).C);
 
     derivative_jacobian_matrix_.compress(VectorOperation::add);
+    if (viscoelastic_wall)
+      assemble_viscous_wall(
+        y, ydot, nullptr, &derivative_jacobian_matrix_, true);
     derivative_jacobian_is_current_ = true;
   }
 
@@ -4453,13 +4735,13 @@ namespace MetricFlowX
         const double A_int     = std::max(A_int_v[0], 1e-10);
         const double a_d_local = compute_a_d_at_face(cell, f);
         const double dc_int =
-          compute_wave_speed_derivative(A_int, vid, a_d_local);
+          0.25 * compute_invariant_derivative(A_int, vid, a_d_local);
 
         const double A_hat_cur = y(face.a_hat_dof);
         const double U_hat_cur = y(face.u_hat_dof);
         const double A_hat     = std::max(A_hat_cur, 1e-10);
         const double dc_hat =
-          compute_wave_speed_derivative(A_hat, vid, a_d_local);
+          0.25 * compute_invariant_derivative(A_hat, vid, a_d_local);
         const double dPdA_hat =
           compute_pressure_derivative(A_hat, vid, a_d_local);
 
@@ -4700,7 +4982,7 @@ namespace MetricFlowX
 
             const double a_d_face = compute_a_d_at_face(hf.cell, hf.face_no);
             dc_int_v[i] =
-              compute_wave_speed_derivative(A_int[i], vid, a_d_face);
+              0.25 * compute_invariant_derivative(A_int[i], vid, a_d_face);
 
 
             // c0[i]       =
@@ -4726,7 +5008,7 @@ namespace MetricFlowX
             U_hat[i] = y(u_row[i]);
 
             dc_hat_v[i] =
-              compute_wave_speed_derivative(A_hat[i], vid, a_d_face);
+              0.25 * compute_invariant_derivative(A_hat[i], vid, a_d_face);
             dP_hat[i] = compute_pressure_derivative(A_hat[i], vid, a_d_face);
           }
 
@@ -4808,6 +5090,9 @@ namespace MetricFlowX
                                                    VectorType       &p,
                                                    const double      t) const
   {
+    AssertThrow(!viscoelastic_wall,
+                ExcMessage(
+                  "Viscoelastic compute_pressure requires y and ydot."));
     compute_pressure_impl(y, p, t, nullptr);
   }
 
@@ -4821,7 +5106,34 @@ namespace MetricFlowX
   {
     AssertThrow(provider,
                 ExcMessage("An external-pressure provider cannot be empty."));
+    AssertThrow(!viscoelastic_wall,
+                ExcMessage(
+                  "Viscoelastic compute_pressure requires y and ydot."));
     compute_pressure_impl(y, p, t, &provider);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::compute_pressure(const VectorType &y,
+                                                   const VectorType &ydot,
+                                                   VectorType       &p,
+                                                   const double      t) const
+  {
+    compute_pressure_impl(y, p, t, nullptr);
+    if (!viscoelastic_wall)
+      return;
+    std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          cell->get_dof_indices(indices);
+          for (unsigned int i = 0; i < indices.size(); ++i)
+            if (fe_->system_to_component_index(i).first == 0)
+              p(indices[i]) =
+                p(indices[i]) +
+                viscous_pressure(y, ydot, cell, support_point(cell, i));
+        }
+    p.compress(VectorOperation::insert);
   }
 
   template <int dim, int spacedim>
@@ -5397,9 +5709,10 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::write_output_step(const double      t,
-                                                    const VectorType &sol)
+                                                    const VectorType &sol,
+                                                    const VectorType *ydot)
   {
-    write_csv_row(t, sol);
+    write_csv_row(t, sol, ydot);
     check_mass_conservation(sol, t);
   }
 

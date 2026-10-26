@@ -80,7 +80,7 @@ compliant HDG equations or the nonlinear total-head junction conditions.
 ## Native consistency and the first step
 
 With cell and capacitor states fixed, solve the actual algebraic equations.
-Their Jacobian separates into small face/junction blocks, including duplicate
+For elastic walls their Jacobian separates into small face/junction blocks, including duplicate
 trace-continuity rows. The correction factors these blocks instead of pinning
 all differential rows and factorizing a full-system matrix. Backtracking keeps
 areas positive and requires a decreasing residual.
@@ -90,7 +90,7 @@ final IDA state weights, `atol_j + rtol*abs(y_j)`. Thus flow, pressure and
 continuity equations are checked in their own units. The default consistency
 threshold is 0.01 of this weighted scale; it is separate from the startup ramp.
 
-Reconstruct cell derivatives from the existing inverse mass blocks and capacitor
+For elastic walls, reconstruct cell derivatives from the existing inverse mass blocks and capacitor
 derivatives from `C*Pc_dot = Q - (Pc-P_out)/R2`. Algebraic derivatives are zero;
 they do not enter the DAE residual. Check the complete `F(t0,y0,ydot0)` again,
 including the mass-inverted differential defect over the initial step divided
@@ -112,6 +112,49 @@ to be accepted without error-test or convergence failures. It covers rest and
 initial time and external pressure. Perturbed traces provide a negative control
 that must be corrected. Consistency does not guarantee acceptance of an
 arbitrarily large first step.
+
+## Native viscoelastic consistency
+
+With `Viscoelastic wall = true`, the same native policy prepares a consistent
+pair without `IDACalcIC`. The Kelvin–Voigt stress contains $\nu(A)\dot A$, so
+pressure-closure equations couple traces to cell-area rates. Those rates also
+depend on traces through continuity: independent face/junction solves and a
+subsequent inverse-mass reconstruction would omit this coupling.
+
+Let $P_a$ select algebraic traces and $P_d$ select cell/capacitor variables.
+Keep $P_d y_0$ fixed at the physical seed, set $P_a\dot y_0=0$, and solve
+
+$$
+F(t_0,y_0,\dot y_0)=0,\qquad
+J_{IC}=F_yP_a+F_{\dot y}P_d/h_0.
+$$
+
+The unknown combines $P_a y$ with $h_0P_d\dot y$, where $h_0$ is the initial
+step size (or the existing consistency time horizon when that size is zero).
+An elastic trace correction and mass-only derivative reconstruction provide a
+predictor; the complete viscous residual must still pass the final bounds.
+The implementation selects columns from the existing analytic state and rate
+Jacobians; it does not approximate $F_{\dot y}$ by the block mass matrix.
+Physical column scales and equation sensitivity to final IDA error weights
+normalize the global sparse Newton system. It uses `Use direct solver` and the
+existing backend-specific direct or preconditioned GMRES solvers. Direct MPI
+solves with PETSc require MUMPS, as in the time integrator; otherwise select the
+iterative solver. No dense network-sized matrix is gathered to a root rank.
+
+Backtracking requires a decreasing complete scaled residual and finite positive
+areas with positive elastic wave-speed modulus. The final check uses the same
+algebraic and mass-normalized differential defect bounds as the elastic
+initializer. Differential seed values remain unchanged; algebraic time
+derivatives remain zero. Exhausted iterations or failed admissibility/consistency
+checks stop the run before time integration.
+
+`test_native_viscoelastic_initialization` checks arterial, venous and mixed
+arterial/venous/dural networks, degrees one and two, direct and iterative solves,
+nonzero inflow/external pressure, the full residual, the fixed seed and the
+zero-viscosity limit against the elastic initializer. MPI cases include ranks
+without owned cells. Integration tests inspect the initial diagnostics to ensure
+that native runs perform no IDA initial-condition residual or linear solves,
+and compare native trajectories with explicit IDA correction on nonempty ranks.
 
 ## Looser tolerances during discarded startup
 
