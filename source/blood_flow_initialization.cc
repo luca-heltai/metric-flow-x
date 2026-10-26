@@ -3,6 +3,7 @@
 #include <deal.II/lac/full_matrix.h>
 
 #include <metric_flow_x/blood_flow_system.h>
+#include <metric_flow_x/serial_direct_solver.h>
 #include <metric_flow_x/steady_network.h>
 
 #include <algorithm>
@@ -530,7 +531,8 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::verify_initial_pair(
     const VectorType &state,
     const VectorType &state_dot,
-    const double      t)
+    const double      t,
+    const bool        enforce_tolerance)
   {
     unsigned int invalid = 0;
     for (const auto i : locally_owned_dofs_)
@@ -617,9 +619,268 @@ namespace MetricFlowX
     initial_state_diagnostics_.differential_defect = differential;
     AssertThrow(
       std::isfinite(algebraic) && std::isfinite(differential) &&
-        std::max(algebraic, differential) <= initial_consistency_tolerance,
+        (!enforce_tolerance ||
+         std::max(algebraic, differential) <= initial_consistency_tolerance),
       ExcMessage(
         "The prepared initial state/derivative pair does not satisfy the native DAE consistency bounds."));
+  }
+
+  // With fixed differential states, Newton's unknown is (y_algebraic,
+  // ydot_differential). Viscous pressure couples these unknowns across cells,
+  // so the face-local elastic correction cannot be used here.
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::correct_viscoelastic_initial_pair(
+    VectorType  &state,
+    VectorType  &state_dot,
+    const double t)
+  {
+    // The elastic face solution is a useful predictor and gives the exact
+    // zero-viscosity limit. Its mass-only rates are subsequently corrected
+    // by the full coupled equations, never accepted without verification.
+    correct_initial_traces(state, t);
+    const auto predictor_iterations =
+      initial_state_diagnostics_.trace_iterations;
+    reconstruct_initial_derivative(state, state_dot, t);
+    const double horizon = ida_parameters.initial_step_size > 0. ?
+                             ida_parameters.initial_step_size :
+                             std::min(1., ida_parameters.final_time - t);
+    AssertThrow(std::isfinite(horizon) && horizon > 0.,
+                ExcMessage("Invalid initial consistency time horizon."));
+    auto residual = make_state(), rhs = make_state(), update = make_state();
+    auto scales = make_state(), errors = make_state(), kinds = make_state();
+    auto trial = make_state(), trial_dot = make_state();
+    auto atol = make_state();
+    if (use_componentwise_tolerances)
+      atol = make_absolute_tolerances();
+    else
+      atol = ida_parameters.absolute_tolerance;
+    // Physical column scaling is independent of the Newton iterate. A rate
+    // column represents a state change over the initial time horizon.
+    for (const auto i : locally_owned_dofs_)
+      {
+        const bool algebraic = trace_dofs_owned.is_element(i);
+        kinds(i)             = algebraic ? 1. : 0.;
+        errors(i) =
+          (atol(i) + ida_parameters.relative_tolerance * std::abs(state(i))) /
+          (algebraic ? 1. : horizon);
+        scales(i) = std::max(1., std::abs(double(state(i)))) / horizon;
+      }
+    std::vector<Index> indices(fe_->n_dofs_per_cell());
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          cell->get_dof_indices(indices);
+          for (unsigned int j = 0; j < indices.size(); ++j)
+            {
+              const auto   component = fe_->system_to_component_index(j).first;
+              const double ad =
+                compute_a_d_at_point(cell, support_point(cell, j));
+              scales(indices[j]) =
+                (component % 2 == 0 ?
+                   ad :
+                   compute_wave_speed(ad, cell->material_id(), ad)) /
+                (component < 2 ? horizon : 1.);
+            }
+        }
+    scales.compress(VectorOperation::insert);
+    errors.compress(VectorOperation::insert);
+    kinds.compress(VectorOperation::insert);
+    VectorType relevant_scales, relevant_errors, relevant_kinds;
+    for (auto *v : {&relevant_scales, &relevant_errors, &relevant_kinds})
+      v->reinit(locally_owned_dofs_, locally_relevant_dofs_, mpi_communicator_);
+    relevant_scales = scales;
+    relevant_errors = errors;
+    relevant_kinds  = kinds;
+    reinit_state(initial_trace_weights_);
+    for (unsigned int iteration = 0;
+         iteration < initial_consistency_max_iterations;
+         ++iteration)
+      {
+        assemble_state_jacobian(t, state, state_dot);
+        assemble_derivative_jacobian(t, state, state_dot);
+        linear_system_matrix     = 0.;
+        initial_trace_weights_   = 0.;
+        auto         row_weights = make_state();
+        unsigned int invalid     = 0;
+        for (const auto row : locally_owned_dofs_)
+          {
+            double weight = 0.;
+            for (const bool state_block : {true, false})
+              {
+                const auto &matrix = state_block ? state_jacobian_matrix_ :
+                                                   derivative_jacobian_matrix_;
+                for (auto entry = matrix.begin(row); entry != matrix.end(row);
+                     ++entry)
+                  {
+                    const auto column = entry->column();
+                    if ((relevant_kinds(column) > 0.) == state_block)
+                      weight +=
+                        std::abs(entry->value()) * relevant_errors(column);
+                  }
+              }
+            if (!std::isfinite(weight) || weight <= 0.)
+              invalid = 1;
+            row_weights(row) = weight;
+            if (trace_dofs_owned.is_element(row))
+              initial_trace_weights_(row) = weight;
+          }
+        AssertThrow(
+          Utilities::MPI::max(invalid, mpi_communicator_) == 0,
+          ExcMessage(
+            "Invalid or singular native viscoelastic initial Jacobian scaling."));
+        row_weights.compress(VectorOperation::insert);
+        initial_trace_weights_.compress(VectorOperation::insert);
+        verify_initial_pair(state, state_dot, t, false);
+        const double norm =
+          std::max(initial_state_diagnostics_.algebraic_defect,
+                   initial_state_diagnostics_.differential_defect);
+        initial_state_diagnostics_.trace_iterations =
+          predictor_iterations + iteration;
+        if (verbosity > 0)
+          pcout << "Initial viscoelastic iteration " << iteration
+                << ", scaled residual " << norm << '\n';
+        if (norm <= initial_consistency_tolerance)
+          return;
+        assemble_residual(t, state, state_dot, residual);
+        for (const auto row : locally_owned_dofs_)
+          {
+            rhs(row) = -residual(row) / row_weights(row);
+            for (const bool state_block : {true, false})
+              {
+                const auto &matrix = state_block ? state_jacobian_matrix_ :
+                                                   derivative_jacobian_matrix_;
+                for (auto entry = matrix.begin(row); entry != matrix.end(row);
+                     ++entry)
+                  {
+                    const auto column = entry->column();
+                    if ((relevant_kinds(column) > 0.) == state_block)
+                      linear_system_matrix.add(row,
+                                               column,
+                                               entry->value() *
+                                                 relevant_scales(column) /
+                                                 row_weights(row));
+                  }
+              }
+          }
+        rhs.compress(VectorOperation::insert);
+        linear_system_matrix.compress(VectorOperation::add);
+        update = 0.;
+        SolverControl control(1000, std::max(1.e-14, 1.e-11 * rhs.l2_norm()));
+        if (use_direct_solver)
+          {
+#ifdef METRIC_FLOW_X_WITH_PETSC
+#  ifdef DEAL_II_PETSC_WITH_MUMPS
+            PETScWrappers::SparseDirectMUMPS solver(control);
+            solver.solve(linear_system_matrix, update, rhs);
+#  elif defined(DEAL_II_WITH_UMFPACK)
+            AssertThrow(
+              n_mpi_processes == 1,
+              ExcMessage(
+                "Native viscoelastic parallel direct initialization requires PETSc with MUMPS; set Use direct solver = false."));
+            SerialDirectSolver solver;
+            solver.initialize(linear_system_matrix);
+            solver.vmult(update, rhs);
+#  else
+            AssertThrow(
+              false,
+              ExcMessage(
+                "Native viscoelastic direct initialization needs UMFPACK or MUMPS; set Use direct solver = false."));
+#  endif
+#else
+            TrilinosWrappers::SolverDirect solver(control);
+            solver.initialize(linear_system_matrix);
+            solver.solve(update, rhs);
+#endif
+          }
+        else
+          {
+            IterativePreconditioner preconditioner;
+            initialize_iterative_preconditioner(preconditioner,
+                                                linear_system_matrix);
+            typename LA::SolverGMRES::AdditionalData data;
+            data.right_preconditioning = true;
+            LA::SolverGMRES solver(control, data);
+            solver.solve(linear_system_matrix, update, rhs, preconditioner);
+          }
+        bool accepted = false;
+        for (double damping = 1.; damping >= std::ldexp(1., -16); damping *= .5)
+          {
+            trial     = state;
+            trial_dot = state_dot;
+            invalid   = 0;
+            for (const auto i : locally_owned_dofs_)
+              {
+                const double delta = damping * scales(i) * update(i);
+                if (trace_dofs_owned.is_element(i))
+                  trial(i) = state(i) + delta;
+                else
+                  trial_dot(i) = state_dot(i) + delta;
+                if (!std::isfinite(trial(i)) || !std::isfinite(trial_dot(i)) ||
+                    ((component_dofs_[0].is_element(i) ||
+                      component_dofs_[2].is_element(i)) &&
+                     trial(i) <= 0.))
+                  invalid = 1;
+              }
+            // Positive area alone is insufficient for the arterial law:
+            // reject non-hyperbolic trial states collectively before assembly.
+            for (const auto &cell : dof_handler_.active_cell_iterators())
+              if (cell->is_locally_owned())
+                {
+                  cell->get_dof_indices(indices);
+                  const auto &vp = vessel_map.at(cell->material_id());
+                  for (unsigned int j = 0; j < indices.size(); ++j)
+                    if (fe_->system_to_component_index(j).first % 2 == 0)
+                      {
+                        const double area = trial(indices[j]);
+                        if (!std::isfinite(area) || area <= 0.)
+                          {
+                            invalid = 1;
+                            continue;
+                          }
+                        const double slope =
+                          vp.wall
+                            .elastic(area,
+                                     compute_a_d_at_point(
+                                       cell, support_point(cell, j)),
+                                     vp.h_wall)
+                            .first;
+                        if (!std::isfinite(slope) || slope <= 0.)
+                          invalid = 1;
+                      }
+                }
+            trial.compress(VectorOperation::insert);
+            trial_dot.compress(VectorOperation::insert);
+            if (Utilities::MPI::max(invalid, mpi_communicator_) != 0)
+              continue;
+            verify_initial_pair(trial, trial_dot, t, false);
+            const double candidate =
+              std::max(initial_state_diagnostics_.algebraic_defect,
+                       initial_state_diagnostics_.differential_defect);
+            if (candidate <= (1. - 1.e-4 * damping) * norm ||
+                candidate <= initial_consistency_tolerance)
+              {
+                state     = trial;
+                state_dot = trial_dot;
+                accepted  = true;
+                if (candidate <= initial_consistency_tolerance)
+                  {
+                    initial_state_diagnostics_.trace_iterations =
+                      predictor_iterations + iteration + 1;
+                    return;
+                  }
+                break;
+              }
+          }
+        AssertThrow(
+          accepted,
+          ExcMessage(
+            "No admissible decreasing native viscoelastic initial correction; check the seed, wall law and boundary data."));
+      }
+    AssertThrow(
+      false,
+      ExcMessage(
+        "Native viscoelastic initial consistency did not converge within its iteration limit."));
   }
 
   template <int dim, int spacedim>
@@ -629,16 +890,17 @@ namespace MetricFlowX
     VectorType  &state_dot,
     const double t)
   {
-    AssertThrow(
-      !viscoelastic_wall,
-      ExcMessage(
-        "Native consistent-state initialization does not support Viscoelastic wall; use IDA initial-condition correction."));
     TimerOutput::Scope timer(computing_timer, "initialize_consistent_state");
     initial_state_diagnostics_ = InitialStateDiagnostics{};
     reinit_state(state);
     compute_initial_solution(state, t);
-    correct_initial_traces(state, t);
-    reconstruct_initial_derivative(state, state_dot, t);
+    if (viscoelastic_wall)
+      correct_viscoelastic_initial_pair(state, state_dot, t);
+    else
+      {
+        correct_initial_traces(state, t);
+        reconstruct_initial_derivative(state, state_dot, t);
+      }
     verify_initial_pair(state, state_dot, t);
   }
 
@@ -654,7 +916,12 @@ namespace MetricFlowX
   template void
   BloodFlowSystem<1, 3>::verify_initial_pair(const VectorType &,
                                              const VectorType &,
-                                             const double);
+                                             const double,
+                                             const bool);
+  template void
+  BloodFlowSystem<1, 3>::correct_viscoelastic_initial_pair(VectorType &,
+                                                           VectorType &,
+                                                           const double);
   template void
   BloodFlowSystem<1, 3>::initialize_consistent_state(VectorType &,
                                                      VectorType &,

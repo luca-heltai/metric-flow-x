@@ -314,7 +314,7 @@ namespace MetricFlowX
     add_parameter(
       "Viscoelastic wall",
       viscoelastic_wall,
-      "Add the ADAVN Kelvin-Voigt pressure using adavn_K_m; requires IDA initial-condition correction.");
+      "Add the ADAVN Kelvin-Voigt pressure using adavn_K_m; supports native or IDA initialization.");
     add_parameter(
       "Terminal parameter source",
       terminal_parameter_source,
@@ -403,12 +403,6 @@ namespace MetricFlowX
       !viscoelastic_wall || wall_model != "Square root",
       ExcMessage(
         "Viscoelastic wall requires an ADAVN wall model and its adavn_K_m input field."));
-    AssertThrow(
-      !viscoelastic_wall || (initial_condition_policy == "IDA" &&
-                             ida_parameters.ic_type !=
-                               SUNDIALS::IDA<VectorType>::AdditionalData::none),
-      ExcMessage(
-        "Viscoelastic wall requires Initial condition policy = IDA with IDA consistent-initial-condition correction enabled."));
     AssertThrow(
       wall_model == "Square root" || initial_state_source != "steady network",
       ExcMessage(

@@ -14,12 +14,7 @@ Select the law in the existing system subsection:
 subsection MetricFlowSystem<1, 3>
   set Wall model = ADAVN arterial
   set Viscoelastic wall = true
-  set Initial condition policy = IDA
-  subsection IDA parameters
-    subsection Initial condition correction parameters
-      set Correction type at initial time = use_y_diff
-    end
-  end
+  set Initial condition policy = native
 end
 ```
 
@@ -58,10 +53,12 @@ Use a distinct vessel ID when wall properties change along a vessel.
 Reference area and arterial wall thickness must also agree on cells sharing an
 ID; use the supported taper arrays for a varying local reference area.
 
-Viscoelastic runs currently require IDA initial-condition correction:
-`Initial condition policy = IDA` and correction type other than `none`.
-The native initializer assumes a block-diagonal mass operator and is therefore
-rejected for this option. `Initial state source = steady network` uses the old
+Viscoelastic runs support the default `Initial condition policy = native`.
+This solves for algebraic traces and differential-state time derivatives
+simultaneously while keeping the differential seed fixed; see
+[native viscoelastic consistency](initialization.md#native-viscoelastic-consistency).
+`Initial condition policy = IDA` remains available as an alternative.
+`Initial state source = steady network` uses the old
 inverse tube law and is rejected for every ADAVN model; use `rest` instead.
 The graph-only `Run mode = steady network` reconstruction is also rejected.
 The rest state seeds the terminal capacitor pressure from the selected law.
@@ -197,9 +194,10 @@ characteristic derivatives, full state/rate Jacobians for all three fluxes,
 mixed junctions, pressure output and rejected inputs. Short IDA examples are
 smoke tests. On the tested deal.II 9.8.0-rc1 build, IDA's `use_y_diff`
 initial-condition correction fails inside the upstream non-block `N_Vector`
-minimum operation when a rank owns no DoFs. The MPI integration tests therefore
-use partitions with owned DoFs on both ranks; empty-rank viscoelastic integration
-is not supported by that runtime. Use fewer ranks or more coarse input cells.
+minimum operation when a rank owns no DoFs. Native initialization avoids
+`IDACalcIC` and is tested with empty ranks. The separate built-in vector-tolerance
+minimum issue still requires scalar tolerances or the existing custom weight
+callback for empty-rank integration; see [initialization](initialization.md).
 
 The paper's full closed-loop results additionally require its heart,
 valves, microcirculation, venous topology and parameter calibration. Those

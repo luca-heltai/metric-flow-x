@@ -2011,7 +2011,13 @@ namespace MetricFlowX
                                    VectorType &,
                                    const double);
     void
-    verify_initial_pair(const VectorType &, const VectorType &, const double);
+    verify_initial_pair(const VectorType &,
+                        const VectorType &,
+                        const double,
+                        const bool enforce_tolerance = true);
+
+    void
+    correct_viscoelastic_initial_pair(VectorType &, VectorType &, const double);
 
     friend void ::test();
   };
