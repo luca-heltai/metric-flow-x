@@ -36,14 +36,11 @@ test()
       data.initial_step_size = .03125;
       data.ic_type           = Integrator::AdditionalData::none;
       const double  maximum  = 1. / 256;
-      Integrator    ida(data, comm);
       IDAErrorGuard guard(comm);
+      Integrator    ida(data, comm);
       ida.reinit_vector = [&](VectorType &v) { v.reinit(owned, comm); };
       ida.differential_components = [&] {
-        guard.install(MetricFlowX::internal::native_ida_memory(ida),
-                      10000,
-                      0.,
-                      maximum);
+        guard.install(ida, 10000, 0., maximum);
         return owned;
       };
       ida.residual = [&](double,
