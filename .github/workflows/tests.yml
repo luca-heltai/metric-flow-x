@@ -53,6 +53,11 @@ jobs:
     container:
       image: dealii/dealii:v9.7.1-noble
       options: --user root
+    env:
+      # Native CTest MPI variants run inside this disposable root container.
+      OMPI_ALLOW_RUN_AS_ROOT: "1"
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
+      OMPI_MCA_rmaps_base_oversubscribe: "1"
 
     steps:
       - uses: actions/checkout@v4
