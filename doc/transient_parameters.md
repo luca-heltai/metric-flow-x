@@ -1,6 +1,6 @@
 # Current transient parameter policy
 
-All tracked `.prm` and `.prm.in` sources were reviewed against
+All application `.prm` and `.prm.in` sources were reviewed against
 `f922927df89e58a0bd316aca26d971f955d6c24e`, the head of PR #80 in
 `metric-flow-x-adan-full`. These are inputs for the forthcoming paper runs,
 including the Raksha/Müller experiment matrix. Earlier local measurements must
@@ -100,7 +100,14 @@ are left to the author for the final rerun.
 
 ## Complete parameter-source inventory
 
-The active input set contains 41 tracked parameter sources.
+The active application input set contains 41 tracked parameter sources. Six
+additional library regression fixtures live in `tests/parameters/` and are
+configured into `build/tests/parameters/`. They retain the pre-rollout inputs
+for assembly, constitutive and API checks, without standalone IDA-runner
+settings. The inflow, output-schedule and work-limit integration checks also
+start from the constant fixture and apply their own time/solver controls.
+The audit reports these separately as `library regression fixture` (47 total
+tracked sources).
 
 | Source | Policy |
 |---|---|

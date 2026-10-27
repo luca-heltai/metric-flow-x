@@ -124,7 +124,7 @@ endforeach()
 add_library(MetricFlowX::metric_flow_x ALIAS metric_flow_x)
 
 
-# Mirror parameters/ into the build tree so tests and examples always use
+# Mirror parameters/ into the build tree so applications always use
 # configured files. Both .prm and .prm.in expand the source tree location;
 # the .in suffix is removed from template destinations.
 set(SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -150,7 +150,6 @@ endforeach()
 set(METRIC_FLOW_X_PARAMETER_DIR
   "${CMAKE_CURRENT_BINARY_DIR}/parameters/")
 add_compile_definitions(
-  PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/"
   METRIC_FLOW_X_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 

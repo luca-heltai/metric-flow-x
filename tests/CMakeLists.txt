@@ -1,3 +1,11 @@
+# Library regressions use fixed inputs without standalone IDA-runner controls.
+# Keep these separate from the evolving tutorial and paper startup policy.
+foreach(_fixture constant aortic multi_vessel wall_arterial wall_venous wall_mixed)
+  configure_file("parameters/${_fixture}.prm.in"
+    "parameters/${_fixture}.prm" @ONLY)
+endforeach()
+add_compile_definitions(PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/")
+
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/third_party/rapidcsv")
 deal_II_pickup_tests()
 

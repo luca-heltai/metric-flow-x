@@ -81,6 +81,10 @@ def main():
                    'include/metric_flow_x/tolerance_ramp.h', 'tools/adan/mean_flow.cc'):
         known.update(re.findall(r'add_parameter\(\s*"([^"]+)"', (ROOT / source).read_text()))
     known |= IDA_KEYS
+    library_keys = set(re.findall(
+        r'add_parameter\(\s*"([^"]+)"',
+        (ROOT / 'source/blood_flow_system.cc').read_text()))
+    library_keys |= IDA_KEYS - {'Maximum step size', 'Nonlinear convergence coefficient'}
     physical = {'Density (rho)', 'Viscosity coefficient (mu)',
                 'Profile constant for friction term (xi)', 'Tube law exponent (m)',
                 'Reflection coefficient at outflow boundary (Rt)'}
@@ -104,7 +108,12 @@ def main():
                 else:
                     assert key[-1] in known, f'Unregistered setting: {key}'
                     assert len(key) == 1 or key[0] == SYSTEM, key
-            if name.endswith('/mean.prm.in'):
+            if name.startswith('tests/parameters/'):
+                for key in entries:
+                    if key[0] == SYSTEM:
+                        assert key[-1] in library_keys, f'Runner setting in library fixture: {key}'
+                category = 'library regression fixture'
+            elif name.endswith('/mean.prm.in'):
                 category = 'resistive mean driver'
             elif name.endswith('/assembly.prm.in'):
                 category = 'assembly benchmark'
