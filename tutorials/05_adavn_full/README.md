@@ -27,6 +27,11 @@ coarse two-cell representation can differ visibly from the full surface curve.
 In the checked reconstruction, maximum shared-node disagreement is 12.16 mm;
 source-length reconciliation moves averaged nodes by at most 3.10 mm. These
 are adaptation diagnostics, not guarantees of anatomical accuracy.
+The 3.10 mm value concerns shared nodes only. With just two straight cells per
+source segment, midpoints of long curved vessels can depart substantially from
+the sampled atlas curve: up to 120 mm for the great saphenous vein in this mesh.
+This is a coarse anatomical simulation mesh; it does not preserve the full
+surface-centerline curvature.
 
 The atlases have separate HeMoLab terms. Run the anatomical workflow only with
 the written permission required for your intended use. `ADAVN_ATLAS_PERMISSION=1`
@@ -253,6 +258,24 @@ assembly experiments. Submit from the repository root with `DEAL_II_DIR`, `CXX`
 and `MPIEXEC` exported from a known working GPU configuration. Adjust the Slurm
 allocation to the local cluster and keep each execution's output directory
 separate.
+
+## Verified anatomical execution
+
+The atlas-derived input was independently read with meshio and checked against
+the earlier metric input: connectivity, material IDs and all physical fields
+are identical, with maximum relative cell-length error 8.13e-13. The anatomical
+preview and generated meshes remain local under the atlas terms.
+
+The anatomical run completed all ten cycles to **8 s**, with **1,005 IDA steps**,
+6,036 Newton iterations and final ramp factors one. Integration took **751.64 s**
+on one CPU core of the GPU partition. Cycle-ten MAP was **89.0727 mmHg** and
+mean aortic probe flow **96.3476 mL/s**. The final sampled area is positive
+throughout (minimum 4.0222e-9 m²). These results agree with the metric run to
+the reported precision, as expected when the physical metric is preserved.
+They retain the model limitations and incomplete periodic relaxation discussed
+below. The local output paths are `build/adavn_anatomical/adavn_full.vtk` for
+the input and `build/adavn_anatomical/arteries_veins_hdg.vtk` for the completed
+result; the tutorial commands regenerate them in `ADAVN_DATA_DIR`.
 
 ## Verified synthetic-metric reference execution
 
