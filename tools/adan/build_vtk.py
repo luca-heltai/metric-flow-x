@@ -101,10 +101,11 @@ def midpoint(a, b, desired_length, hint):
     return tuple(center[j] + height * radial[j] / norm for j in range(3))
 
 
-def write_vtk(path, points, cells, cell_data, point_data, anatomical=False):
+def write_vtk(path, points, cells, cell_data, point_data, anatomical=False,
+              description="ADAVN arterial subset"):
     with path.open("w") as stream:
         attribution = (
-            "ADAVN arterial subset; Muller/Watanabe/Toro/Feijoo/Blanco 2023; "
+            description + "; Muller/Watanabe/Toro/Feijoo/Blanco 2023; "
             "doi:10.3389/fphys.2023.1162391; modified SI metric graph; "
         )
         license_notice = (

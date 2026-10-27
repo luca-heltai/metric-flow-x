@@ -1,0 +1,12 @@
+# Reference-geometry mean-flow approximation; see README.md for omitted physics.
+set Edges CSV file = @DATA_DIR@/edges.csv
+set Outlets CSV file = @DATA_DIR@/outlets.csv
+set Node output CSV file = @DATA_DIR@/nodes.csv
+set Flow output CSV file = @DATA_DIR@/flows.csv
+set Inlet node = 778
+# These two Table 3 values are imposed inputs, not reproduced outputs.
+set Inflow (m3/s) = 96.36e-6
+set Reservoir pressure (Pa) = 623.949
+# Small finite anchoring resistance at each central venous outlet.
+set Reservoir resistance (Pa s/m3) = 1e5
+set Repetitions = 5

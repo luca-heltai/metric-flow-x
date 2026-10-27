@@ -1,0 +1,38 @@
+{
+  "model": "Reference-geometry Poiseuille vessels, 15% source peripheral R before each arterial compartment, remaining 85% split in parallel by draining-vein endpoint radius cubed, venous endpoint impedances, prescribed CO and right-atrial reservoir pressure.",
+  "source_doi": "10.3389/fphys.2023.1162391",
+  "imposed_inputs": {
+    "cardiac_output_ml_s": 96.36,
+    "right_atrial_reservoir_pressure_mmHg": 4.680000016934883
+  },
+  "MAP": {
+    "paper_vessel_index": 816,
+    "source_row": 815,
+    "source_name": "A_aortic_arch_C_815",
+    "paper_table3_mmHg": 92.58,
+    "predicted_mmHg": 90.45231233525095,
+    "relative_difference": -0.02298215235200958
+  },
+  "independent_max_interior_balance_m3_s": 5.097751326019759e-15,
+  "native_metrics": {
+    "nodes": 5622,
+    "edges": 7657,
+    "inflow_m3_s": 9.636e-05,
+    "outflow_m3_s": 9.635999999952105e-05,
+    "max_mass_balance_m3_s": 5.097751326019759e-15,
+    "solve_min_s": 0.008586021,
+    "solve_median_s": 0.009027198,
+    "solve_max_s": 0.009170337
+  },
+  "omitted_physics": [
+    "compliant vessel area response",
+    "heart and pulmonary circulation",
+    "pulsatile inertia",
+    "peripheral storage",
+    "coronary intramyocardial forcing",
+    "intracranial-pressure feedback",
+    "valves and Starling resistors"
+  ],
+  "result_vtk_sha256": "256f3247949ee06f5a0ed118bd8e695b15b7e3d115f5fd7e40bb1d876dc14b8c",
+  "interpretation": "Reduced-model comparison to a published mean value; not reproduction of the complete closed-loop pulsatile model or its waveforms."
+}

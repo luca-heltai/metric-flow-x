@@ -18,7 +18,7 @@ from pathlib import Path
 DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "build/adan"
 
 
-def read_rows(root=DEFAULT_DATA_DIR):
+def read_rows(root=DEFAULT_DATA_DIR, include_veins=False):
     with (root / "source/data_sheet_1.csv").open() as stream:
         data = list(csv.reader(stream, delimiter=";"))[1:]
     rows = []
@@ -29,9 +29,11 @@ def read_rows(root=DEFAULT_DATA_DIR):
         row = [field.strip() for field in row]
         if row[6] not in ("0", "1"):
             raise ValueError("Vessel type must be 0 (vein) or 1 (artery)")
-        if row[6] == "0":
+        if row[6] == "0" and not include_veins:
             continue
-        if row[0] in names:
+        # The full supplement repeats some venous names (including split
+        # Starling-resistor segments). Row number, not name, is their identity.
+        if row[0] in names and not include_veins:
             raise ValueError("Duplicate source vessel name: " + row[0])
         names.add(row[0])
         if int(row[1]) < 0 or int(row[2]) < 0 or row[1] == row[2]:

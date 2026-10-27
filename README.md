@@ -305,7 +305,7 @@ are rejected. Duplicate or unknown boundary IDs are errors.
 Output `network_terminals.csv` records the effective `boundary_id`,
 `vessel_id`, `label`, `R1`, `R2`, `C`, and `P_out` for each terminal. Vessel
 probe files carry a `boundary_<id>_label` column for each terminal connected to
-that vessel. Existing probe filenames keep their numeric vessel IDs; labels
+that vessel. The consolidated midpoint CSV keeps numeric vessel IDs; labels
 never become filesystem paths. Visualization files include `vessel_id` cell
 data, which links them to the terminal table. Global mass and timing summaries
 retain their aggregate columns.
@@ -372,8 +372,11 @@ Pressure and velocity/area come from the boundary trace, including prescribed
 external pressure. Flow is outward: negative at a conventionally oriented inlet
 and positive at an outlet. Each boundary ID must identify exactly one terminal;
 its owning MPI rank evaluates the trace, and rank zero writes all terminals,
-ordered by time and boundary ID. Existing midpoint probe CSVs retain
-their original names and units.
+ordered by time and boundary ID.
+
+Midpoint probes use one SI CSV. Set `Output vessel CSV file = probes.csv` and,
+optionally, `Vessel probe IDs = 0, 2, 7`. An empty filename disables probes;
+an empty ID list selects all vessels. See [outputs](doc/outputs.md).
 
 The PETSc direct path uses MUMPS when available and deal.II's pivoted UMFPACK
 for serial builds without MUMPS. The serial fallback requires deal.II with
@@ -397,6 +400,10 @@ MOX pressure datum, valve sign, cardiac period, RCR compatibility or a complete
 physiological cardiac cycle.
 
 ## Complete ADAN network
+
+The [full arterial–venous ADAVN tutorial](tutorials/05_adavn_full/README.md)
+prepares all 4,402 source segments, coupled peripheral connections, a ten-cycle
+transient, a mean-pressure comparison with the 2023 article and MPI assembly timings.
 
 The [complete ADAN workflow](doc/adan_complete.md) downloads the checksum-pinned
 ADAVN 2023 arterial table and reconstructs a MetricFlowX input. It documents

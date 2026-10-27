@@ -1,5 +1,6 @@
 """Keep project-owned paths and published dataset paths consistently named."""
 import json
+import re
 from pathlib import Path
 import subprocess
 import unittest
@@ -14,6 +15,10 @@ class PathNamesTest(unittest.TestCase):
     def assert_standard_path(self, path):
         for part in Path(path).parts:
             if part in STANDARD_FILENAMES:
+                continue
+            # deal.II discovers MPI test variants through this required suffix.
+            if Path(path).parts[0] == "tests" and re.fullmatch(
+                    r"test_[a-z0-9_]+\.mpirun=[1-9][0-9]*\.output", part):
                 continue
             self.assertEqual(part, part.lower(), path)
             self.assertRegex(part, r"^[a-z0-9_.]+$", path)

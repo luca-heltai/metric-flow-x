@@ -331,16 +331,17 @@ namespace MetricFlowX
 
     struct VesselProperties
     {
-      double  a0     = 0.0;
-      double  r_d    = 0.0;
-      double  a_d    = 0.0;
-      double  E      = 0.0;
-      double  h_wall = 0.0;
-      double  p_d    = 0.0;
-      double  p0     = 0.0;
-      double  L      = 0.0;
-      double  r_in   = 0.0;
-      double  r_out  = 0.0;
+      double  a0                = 0.0;
+      double  r_d               = 0.0;
+      double  a_d               = 0.0;
+      double  E                 = 0.0;
+      double  h_wall            = 0.0;
+      double  p_d               = 0.0;
+      double  p0                = 0.0;
+      double  L                 = 0.0;
+      double  r_in              = 0.0;
+      double  r_out             = 0.0;
+      double  dynamic_viscosity = 0.0; // Pa s; optional per-vessel VTK value
       WallLaw wall;
     };
 
@@ -376,6 +377,13 @@ namespace MetricFlowX
      */
     std::map<unsigned int, double>
     maximum_mach_numbers(const VectorType &state);
+
+    /** Collective domain check for a trial state before IDA assembly.
+     * Rejects nonfinite unknowns, nonpositive areas and non-hyperbolic ADAVN
+     * states at cell quadrature points and both cell/trace face states.
+     */
+    bool
+    has_admissible_wall_states(const VectorType &state) const;
 
     void
     report_flow_regime(const VectorType &state, const double t);
@@ -783,6 +791,7 @@ namespace MetricFlowX
 
     std::string terminal_parameter_source = "VTK";
     std::string terminal_parameters_csv_file;
+    std::string terminal_connections_csv_file;
     double      default_terminal_r1    = 0.0;
     double      default_terminal_r2    = 1e8;
     double      default_terminal_c     = 0.0;
@@ -844,7 +853,7 @@ namespace MetricFlowX
     // numbering of the file and read on the group masters only.
     Vector<double> cell_vessel_ids, cell_a0, cell_r_d, cell_a_d, cell_E;
     Vector<double> cell_h_wall, cell_p_d, cell_p0, cell_L;
-    Vector<double> cell_r_in, cell_r_out;
+    Vector<double> cell_r_in, cell_r_out, cell_viscosity;
     Vector<double> point_boundary_id, point_R1, point_R2, point_C, point_P_out;
 
     // Fill vessel_map, rcr_map, terminal_boundary_ids and vessel_s_bounds so
@@ -949,7 +958,48 @@ namespace MetricFlowX
     void
     assemble_rcr_capacitor_equations(const VectorType &y,
                                      const VectorType &ydot,
-                                     VectorType       &F);
+                                     VectorType       &F,
+                                     const double      t);
+
+    // A resistor graph between terminal compartments. A terminal with C>0
+    // exposes Pc; a terminal with C=0 exposes its physical trace pressure.
+    // The CSV supplies one undirected edge per pair, in Pa s/m^3.
+    std::map<types::boundary_id,
+             std::vector<std::pair<types::boundary_id, double>>>
+      terminal_links;
+
+    struct TerminalPort
+    {
+      types::global_dof_index area, velocity;
+      unsigned int            vessel;
+      double                  reference_area;
+      int                     outward_sign;
+      Point<spacedim>         point;
+      CellId                  cell_id;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &area &velocity &vessel &reference_area &outward_sign &point
+          &cell_id;
+      }
+    };
+    std::map<types::boundary_id, TerminalPort> terminal_ports;
+
+    void
+    setup_terminal_connections();
+    void
+    build_terminal_connection_sparsity(DynamicSparsityPattern &dsp);
+    types::global_dof_index
+    terminal_pressure_dof(types::boundary_id bid) const;
+    double
+    terminal_pressure_derivative(types::boundary_id bid,
+                                 const VectorType  &y) const;
+    double
+    terminal_pressure(types::boundary_id bid,
+                      const VectorType  &y,
+                      double             t) const;
 
     void
     assemble_jacobian_rcr_capacitor_block(const VectorType &y);
@@ -1196,6 +1246,9 @@ namespace MetricFlowX
 
     SUNDIALS::IDA<VectorType>::AdditionalData ida_parameters;
 
+    double
+    prescribed_inflow(double t);
+
     ParsedTools::Function<spacedim> rhs_function;
     ParsedTools::Function<spacedim> exact_solution;
     ParsedTools::Function<1>        inflow_function;
@@ -1213,12 +1266,13 @@ namespace MetricFlowX
     std::ofstream csv_terminal;
 
     // -----------------------------------------------------------------------
-    // CSV time-series output, one file per vessel.
-    //
-    // A probe is opened only on the rank owning the probed cell, so each file
-    // is written by exactly one rank and no output is duplicated.
+    // Midpoint probes are evaluated by their unique owning ranks and gathered
+    // into one ordered CSV on rank zero. An empty filename disables probes;
+    // an empty ID list selects all vessels.
     // -----------------------------------------------------------------------
-    std::map<unsigned int, std::ofstream> csv_vessel;
+    std::ofstream             csv_vessel;
+    std::string               output_vessel_csv_file = "vessel_probes.csv";
+    std::vector<unsigned int> vessel_probe_ids;
     // (vessel id, cell containing the vessel's arc-length midpoint, reference
     // coordinate of the midpoint inside that cell).
     std::vector<

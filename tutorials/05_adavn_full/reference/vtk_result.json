@@ -1,0 +1,40 @@
+{
+  "time": 8.0,
+  "native_receipt": {
+    "max_order": "2",
+    "wall_time": "749.48925852499997",
+    "n_steps": "1005",
+    "n_err_test_fails": "1",
+    "n_nonlin_iters": "6036",
+    "n_nonlin_conv_fails": "1",
+    "bdf1_steps": "9",
+    "bdf2_steps": "996",
+    "bdf3_steps": "0",
+    "bdf4_steps": "0",
+    "bdf5_steps": "0",
+    "n_outputs": "401",
+    "nonlin_iters_per_step": "6.0059701492537316",
+    "steps_per_output": "2.5062344139650872",
+    "nonlin_iters_per_output": "15.052369077306734"
+  },
+  "cells": 8804,
+  "source_arterial_rows": 4041,
+  "source_venous_rows": 361,
+  "minimum_native_area_m2": 4.022191468777692e-09,
+  "aortic_pressure_mmHg": 87.57592322697029,
+  "pressure_sampling": "Mean of probes at the two half-segment midpoints of paper vessel 816 (source row 815).",
+  "model": "ADAVN mixed elastic walls, source arterial compliances, proximal R1=15% of source total R, remaining R coupled to residual venous compartments and impedance-matched 1D venous ports. Prescribed inflow and three right-atrial reservoir outlets; the transient tutorial uses a smooth 0.8 s pulse with mean 96.36 ml/s.",
+  "omitted_physics": [
+    "Kelvin-Voigt wall viscosity",
+    "radius-dependent venous reference wave speed",
+    "heart/pulmonary closed loop",
+    "coronary bed forcing",
+    "ICP feedback",
+    "venous valves/Starling resistors"
+  ],
+  "vtk_sha256": "5d2df20888a47ee1d112488219d802f2f5303c578586565d7b4b5b25d9d88ad2",
+  "source_csv_sha256": "23d14886d2cd4e98ed5be7c89152259910d7e606d48d19157a854c3a1333cbae",
+  "native_vtu_sha256": {
+    "adavn_full_00400.0.vtu": "c01da34cd88d82c8a83d311b068eb082e7494bf2c9d99c55c7674789b44653b8"
+  }
+}

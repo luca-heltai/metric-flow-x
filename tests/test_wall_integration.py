@@ -87,8 +87,8 @@ def main():
                             assert diagnostics[key] == 0, diagnostics
                         assert diagnostics["algebraic_defect"] <= 0.01, diagnostics
                         assert diagnostics["differential_defect"] <= 0.01, diagnostics
-                    with (folder / "HDG_IDA_Vessel_0.csv").open() as stream:
-                        records = list(csv.DictReader(stream))
+                    with (folder / "vessel_probes.csv").open() as stream:
+                        records = [row for row in csv.DictReader(stream) if int(row["vessel_id"]) == 0]
                     assert len(records) >= 2, records
                     final = records[-1]
                     assert math.isclose(
@@ -97,8 +97,8 @@ def main():
                     for key, value in final.items():
                         if not key.endswith("_label"):
                             assert math.isfinite(float(value)), final
-                    assert float(final["A_cm2"]) > 0.0, final
-                    results[model, viscous, policy, ranks] = float(final["P_dynpcm2"])
+                    assert float(final["area_m2"]) > 0.0, final
+                    results[model, viscous, policy, ranks] = float(final["pressure_Pa"])
         for model in ("arterial", "venous"):
             assert (
                 abs(

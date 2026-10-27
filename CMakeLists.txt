@@ -158,6 +158,11 @@ string(TOUPPER "${_benchmark_variant}" _benchmark_variant_upper)
 deal_ii_setup_target(benchmark_assembly ${_benchmark_variant_upper})
 target_link_libraries(benchmark_assembly metric_flow_x)
 
+add_executable(adavn_mean_flow EXCLUDE_FROM_ALL tools/adan/mean_flow.cc)
+target_include_directories(adavn_mean_flow SYSTEM PRIVATE third_party/rapidcsv)
+deal_ii_setup_target(adavn_mean_flow ${_benchmark_variant_upper})
+target_link_libraries(adavn_mean_flow metric_flow_x)
+
 # Add tests
 enable_testing()
 add_subdirectory(tests)

@@ -9,6 +9,7 @@ import tempfile
 
 
 DEFAULTS = {
+    "vessel": "vessel_probes.csv",
     "network terminals": "network_terminals.csv",
     "mass conservation": "mass_conservation.csv",
     "IDA statistics": "ida_statistics.csv",
@@ -75,7 +76,7 @@ end
         if baseline is None:
             baseline = [line.split("|")[2:-2] for line in table]
         assert [line.split("|")[2:-2] for line in table] == baseline
-        expected = {output / "HDG_IDA_Vessel_0.csv"}
+        expected = set()
         for key, name in names.items():
             if not name:
                 continue

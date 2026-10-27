@@ -153,8 +153,8 @@ This is recorded for reproducibility preparation only.
 
 The current executable's output behavior is described in
 [`doc/outputs.md`](../outputs.md). A successful ordinary run is expected to
-write visualization files, `last_used_parameters.prm`, and one vessel probe
-CSV named `HDG_IDA_Vessel_<vessel-id>.csv`; the exact runtime output has not
+write visualization files, `last_used_parameters.prm`, and the consolidated
+probe CSV `vessel_probes.csv`; the exact runtime output has not
 been established for these MMS templates.
 
 The probe CSV header is source-backed and uses these units/conversions:
@@ -162,15 +162,14 @@ The probe CSV header is source-backed and uses these units/conversions:
 | Column | Unit |
 |---|---|
 | `time_s` | s |
-| `P_dynpcm2` | dyn/cm² |
-| `Q_cm3ps` | cm³/s |
-| `A_cm2` | cm² |
-| `U_cmps` | cm/s |
+| `vessel_id` | dimensionless |
+| `pressure_Pa` | Pa |
+| `flow_m3_s` | m³/s |
+| `area_m2` | m² |
+| `velocity_m_s` | m/s |
 
-The implementation converts pressure from Pa to dyn/cm² by multiplying by 10,
-area from m² to cm² by multiplying by `1e4`, velocity from m/s to cm/s by
-multiplying by `1e2`, and flow `A U` from m³/s to cm³/s by multiplying by
-`1e6`.
+The current consolidated output uses SI directly. Historical per-vessel CSV
+artifacts used dyn/cm², cm³/s, cm² and cm/s.
 
 ## Post-processing commands
 

@@ -1,0 +1,139 @@
+{
+  "period_s": 0.8,
+  "final_time_s": 8.0,
+  "startup_cycles": 6,
+  "final_tolerance_cycles": [
+    {
+      "cycle": 7,
+      "MAP_mmHg": 87.75834834656594,
+      "mean_aortic_flow_ml_s": 96.31856466485853,
+      "systolic_pressure_mmHg": 92.05232084250778,
+      "diastolic_pressure_mmHg": 83.32859165267287,
+      "mean_total_central_probe_flow_ml_s": 68.67533423134306
+    },
+    {
+      "cycle": 8,
+      "MAP_mmHg": 88.38545982917942,
+      "mean_aortic_flow_ml_s": 96.33354518381076,
+      "systolic_pressure_mmHg": 92.61446559218405,
+      "diastolic_pressure_mmHg": 84.05814544936952,
+      "mean_total_central_probe_flow_ml_s": 72.94241389645877
+    },
+    {
+      "cycle": 9,
+      "MAP_mmHg": 88.79395722031238,
+      "mean_aortic_flow_ml_s": 96.34229926041351,
+      "systolic_pressure_mmHg": 92.9846208536435,
+      "diastolic_pressure_mmHg": 84.52772781834803,
+      "mean_total_central_probe_flow_ml_s": 76.38502331826572
+    },
+    {
+      "cycle": 10,
+      "MAP_mmHg": 89.07273483955359,
+      "mean_aortic_flow_ml_s": 96.34758161221066,
+      "systolic_pressure_mmHg": 93.24025579459479,
+      "diastolic_pressure_mmHg": 84.8435109576639,
+      "mean_total_central_probe_flow_ml_s": 79.17658763769221
+    }
+  ],
+  "cycle10_MAP_relative_difference": -0.037883615904584236,
+  "paper_Table3_MAP_mmHg": 92.58,
+  "cycle10_vs9_max_absolute_difference": {
+    "1630": {
+      "pressure_Pa": 44.60537865353581,
+      "flow_m3_s": 3.6334238955798624e-09,
+      "area_m2": 1.8509045998854135e-06,
+      "velocity_m_s": 0.0003588519525472289
+    },
+    "1631": {
+      "pressure_Pa": 44.60533633164778,
+      "flow_m3_s": 1.0624211046419312e-08,
+      "area_m2": 1.7726815097596866e-06,
+      "velocity_m_s": 0.0003632835924265998
+    },
+    "8298": {
+      "pressure_Pa": 0.16276992808138857,
+      "flow_m3_s": 1.8925030064181422e-06,
+      "area_m2": 1.2880017248118134e-08,
+      "velocity_m_s": 0.006205647806608344
+    },
+    "8299": {
+      "pressure_Pa": 0.18047662228366335,
+      "flow_m3_s": 1.8925408357900879e-06,
+      "area_m2": 1.4402099484680207e-08,
+      "velocity_m_s": 0.006157363018776479
+    },
+    "8574": {
+      "pressure_Pa": 0.13951964587624843,
+      "flow_m3_s": 9.898894510701593e-07,
+      "area_m2": 4.7946099593560495e-09,
+      "velocity_m_s": 0.007527810131471524
+    },
+    "8575": {
+      "pressure_Pa": 0.11250496679087973,
+      "flow_m3_s": 9.898941270613752e-07,
+      "area_m2": 3.871473773183788e-09,
+      "velocity_m_s": 0.007530178791845948
+    },
+    "8696": {
+      "pressure_Pa": 0.010536989663705754,
+      "flow_m3_s": 2.0914851503491825e-07,
+      "area_m2": 1.6792736696498575e-10,
+      "velocity_m_s": 0.003448602826086014
+    },
+    "8697": {
+      "pressure_Pa": 0.01758013748360554,
+      "flow_m3_s": 2.0914868191383602e-07,
+      "area_m2": 2.8727039357598436e-10,
+      "velocity_m_s": 0.003363559830411547
+    }
+  },
+  "pressure_sampling": "Spatial mean of midpoint probes in the two halves of source row 815.",
+  "interpretation": "Prescribed-flow open-loop elastic reduction; CO and reservoir CVP are imposed. Ten cycles do not by themselves establish periodic convergence.",
+  "native_statistics": {
+    "max_order": "2",
+    "wall_time": "749.48925852499997",
+    "n_steps": "1005",
+    "n_err_test_fails": "1",
+    "n_nonlin_iters": "6036",
+    "n_nonlin_conv_fails": "1",
+    "bdf1_steps": "9",
+    "bdf2_steps": "996",
+    "bdf3_steps": "0",
+    "bdf4_steps": "0",
+    "bdf5_steps": "0",
+    "n_outputs": "401",
+    "nonlin_iters_per_step": "6.0059701492537316",
+    "steps_per_output": "2.5062344139650872",
+    "nonlin_iters_per_output": "15.052369077306734"
+  },
+  "initialization": {
+    "initial_state_source": "steady network",
+    "initial_condition_policy": "native",
+    "preparation_wall_s": 1.786345484,
+    "ida_setup_and_ic_wall_s": 0.00442224,
+    "first_ida_output_interval_wall_s": 16.195177315,
+    "ic_residual_calls": 0,
+    "ic_jacobian_setups": 0,
+    "ic_linear_solves": 0,
+    "trace_iterations": 3,
+    "largest_trace_block": 8,
+    "algebraic_defect": 2.8331473184612844e-07,
+    "differential_defect": 3.2366084413434295e-12,
+    "native_pair_verified": true,
+    "tolerance_ramp_enabled": true,
+    "ramp_registrations": 1,
+    "ramp_weight_evaluations": 1005,
+    "ramp_stop_arms": 1,
+    "ramp_stop_releases": 1,
+    "ramp_last_relative_factor": 1,
+    "ramp_last_absolute_factor": 1
+  },
+  "cycle10_mesh_volume_balance": {
+    "volume_change_rate_ml_s": 0.7290686915801061,
+    "trapezoidal_mean_net_boundary_flux_ml_s": 0.8186911866392612,
+    "mismatch_ml_s": -0.08962249505915501,
+    "mismatch_fraction_of_imposed_mean_flow": -0.0009300798574009444,
+    "interpretation": "Mesh vessel volume only; all mesh boundary ports, including exchanges with lumped compartments. Output cadence 0.02 s; finite-cadence check, not an exact residual identity."
+  }
+}

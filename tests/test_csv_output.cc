@@ -115,16 +115,25 @@ test()
                   vid,
               ExcMessage(
                 "Consolidated traces must retain outlet labels and vessel ids."));
-          const auto probe =
-            read("HDG_IDA_Vessel_" + std::to_string(vid) + ".csv");
-          AssertThrow(probe.GetRowCount() == 2 &&
-                        probe.GetCell<double>("time_s", 1) == 0.125,
+        }
+      const auto probes = read("vessel_probes.csv");
+      AssertThrow(
+        probes.GetRowCount() == 2 * flow.vessel_map.size() &&
+          probes.GetColumnCount() == 6,
+        ExcMessage(
+          "Consolidated vessel probes must contain every selected vessel once per output."));
+      for (size_t row = 0; row < probes.GetRowCount(); ++row)
+        {
+          AssertThrow(probes.GetCell<unsigned int>("vessel_id", row) ==
+                          row % flow.vessel_map.size() &&
+                        probes.GetCell<double>("time_s", row) ==
+                          (row < flow.vessel_map.size() ? 0. : .125),
+                      ExcMessage(
+                        "Vessel snapshots must be ordered by time and ID."));
+          AssertThrow(probes.GetCell<double>("area_m2", row) > 0. &&
+                        std::isfinite(
+                          probes.GetCell<double>("pressure_Pa", row)),
                       ExcInternalError());
-          for (std::size_t i = 0; i < 2; ++i)
-            AssertThrow(probe.GetCell<std::string>(
-                          "boundary_" + std::to_string(bid) + "_label", i) ==
-                          expected,
-                        ExcInternalError());
         }
       const auto mass = read("mass_conservation.csv");
       AssertThrow(mass.GetRowCount() == 2 && mass.GetColumnCount() == 6 &&
@@ -144,16 +153,19 @@ test()
             "quoted, \"section\"\nname")
           ++matches;
       AssertThrow(matches == 2, ExcInternalError());
-      unsigned int probes = 0;
+      unsigned int legacy_probes = 0;
       for (const auto &entry : std::filesystem::directory_iterator(dir))
         if (entry.path().filename().string().find("HDG_IDA_Vessel_") == 0)
-          ++probes;
-      AssertThrow(probes == flow.vessel_map.size(), ExcInternalError());
+          ++legacy_probes;
+      AssertThrow(legacy_probes == 0,
+                  ExcMessage("Per-vessel probe files must not be created."));
     }
 
   // Reuse the same state with nested relative and absolute filenames. The
   // default-output checks above ensure existing parameter files are unchanged.
   flow.output_directory                   = dir + "/custom";
+  flow.output_vessel_csv_file             = "probes/midpoints.csv";
+  flow.vessel_probe_ids                   = {1};
   flow.output_terminal_csv_file           = "traces/terminals.csv";
   flow.output_network_terminals_csv_file  = "metadata/outlets.csv";
   flow.output_mass_conservation_csv_file  = "diagnostics/mass.csv";
@@ -173,6 +185,7 @@ test()
   if (rank == 0)
     {
       for (const auto &name : {"traces/terminals.csv",
+                               "probes/midpoints.csv",
                                "metadata/outlets.csv",
                                "diagnostics/mass.csv",
                                "diagnostics/statistics.csv",
@@ -185,9 +198,19 @@ test()
       AssertThrow(std::filesystem::is_regular_file(
                     flow.output_flow_regime_csv_file),
                   ExcInternalError());
+      const rapidcsv::Document selected(flow.output_directory +
+                                        "/probes/midpoints.csv");
+      AssertThrow(
+        selected.GetRowCount() == 2 &&
+          selected.GetCell<unsigned int>("vessel_id", 0) == 1 &&
+          selected.GetCell<unsigned int>("vessel_id", 1) == 1,
+        ExcMessage("Explicit vessel selection must exclude all other probes."));
     }
 
   flow.output_directory = dir + "/disabled";
+  flow.output_vessel_csv_file.clear();
+  // Empty filename disables probes even if the unused ID list is invalid.
+  flow.vessel_probe_ids = {numbers::invalid_unsigned_int};
   flow.output_terminal_csv_file.clear();
   flow.output_network_terminals_csv_file.clear();
   flow.output_mass_conservation_csv_file.clear();
@@ -203,10 +226,8 @@ test()
   flow.finalize_output(ida, 1.);
   flow.write_scaling_timings();
   if (rank == 0)
-    for (const auto &entry :
-         std::filesystem::directory_iterator(flow.output_directory))
-      AssertThrow(entry.path().filename().string().find("HDG_IDA_Vessel_") == 0,
-                  ExcMessage("Disabled diagnostics CSV was written."));
+    AssertThrow(std::filesystem::is_empty(flow.output_directory),
+                ExcMessage("Disabled CSV output was written."));
 
   // Fail on the writer rank, then verify all ranks receive the exception.
   flow.output_network_terminals_csv_file = "blocked/outlets.csv";

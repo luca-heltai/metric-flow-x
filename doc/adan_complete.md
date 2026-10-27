@@ -12,6 +12,10 @@ graph.** The optional anatomical reconstruction uses separately licensed
 HeMoLab surfaces and requires the relevant written permission. No downloaded
 surfaces, surface-derived meshes or figures are distributed in this repository.
 
+For **arteries and veins together**, use the [full ADAVN tutorial](../tutorials/05_adavn_full/README.md),
+which adds venous walls and coupled arterial–venous terminal connections.
+The arterial-only workflow below remains available.
+
 ## Sources, attribution and licenses
 
 | Material | Primary source | License and use in this workflow |

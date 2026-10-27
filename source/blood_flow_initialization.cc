@@ -19,6 +19,53 @@ namespace MetricFlowX
   /// @cond INTERNAL
   namespace
   {
+    // Invert only the positive-tangent branch connected to the reference
+    // state. The arterial law need not remain monotone at arbitrary dilation.
+    double
+    reference_branch_area(const WallLaw &wall,
+                          const double   pressure,
+                          const double   reference_area,
+                          const double   thickness)
+    {
+      AssertThrow(std::isfinite(pressure),
+                  ExcMessage("Nonfinite seed pressure."));
+      double lo = reference_area, hi = reference_area;
+      for (unsigned int step = 0;
+           wall.elastic(lo, reference_area, thickness).pressure > pressure;
+           ++step)
+        {
+          AssertThrow(step < 100,
+                      ExcMessage(
+                        "Cannot bracket the ADAVN seed area below reference."));
+          lo *= .8;
+        }
+      for (unsigned int step = 0;
+           wall.elastic(hi, reference_area, thickness).pressure < pressure;
+           ++step)
+        {
+          AssertThrow(
+            step < 100 &&
+              wall.elastic(hi, reference_area, thickness).first > 0.,
+            ExcMessage(
+              "Seed pressure is outside the supported ADAVN reference branch."));
+          hi *= 1.1;
+        }
+      AssertThrow(
+        wall.elastic(hi, reference_area, thickness).first > 0.,
+        ExcMessage(
+          "Seed bracket leaves the hyperbolic ADAVN reference branch."));
+      for (unsigned int iteration = 0; iteration < 64; ++iteration)
+        {
+          const double middle = .5 * (lo + hi);
+          if (wall.elastic(middle, reference_area, thickness).pressure <
+              pressure)
+            lo = middle;
+          else
+            hi = middle;
+        }
+      return .5 * (lo + hi);
+    }
+
     using Index = types::global_dof_index;
 
     void
@@ -161,10 +208,6 @@ namespace MetricFlowX
     VectorType  &state,
     const double t)
   {
-    AssertThrow(
-      wall_model == "Square root",
-      ExcMessage(
-        "Steady network reconstruction requires Wall model = Square root; ADAVN has no supported steady-network inverse."));
     TimerOutput::Scope timer(computing_timer, "initialize_steady_network");
     AssertThrow(
       outlet_type == "RCR",
@@ -204,17 +247,36 @@ namespace MetricFlowX
            tube_resistance(p0.distance(p1),
                            std::sqrt(area(edge, p0) / numbers::PI),
                            std::sqrt(area(edge, p1) / numbers::PI),
-                           viscosity,
+                           vessel_map.at(edge.vessel_id).dynamic_viscosity,
                            friction_profile)});
       }
-    inflow_function.set_time(t);
-    const double inflow = inflow_series.empty() ?
-                            inflow_function.value(Point<1>(0.)) :
-                            inflow_series.value(t);
+    const double                               inflow = prescribed_inflow(t);
+    std::map<types::boundary_id, unsigned int> boundary_node, compartment_node;
+    for (const auto &[node, bid] : initial_graph_boundaries_)
+      boundary_node.emplace(bid, node);
+    for (const auto &[bid, links] : terminal_links)
+      {
+        const auto  node = boundary_node.at(bid);
+        const auto &r    = rcr_map.at(bid);
+        if (r.R1 > 0.)
+          {
+            const auto pc_node = static_cast<unsigned int>(injections.size());
+            injections.push_back(0.);
+            compartment_node[bid] = pc_node;
+            edges.push_back({node, pc_node, r.R1});
+          }
+        else
+          compartment_node[bid] = node;
+      }
+    for (const auto &[bid, links] : terminal_links)
+      for (const auto &[other, resistance] : links)
+        if (bid < other)
+          edges.push_back(
+            {compartment_node.at(bid), compartment_node.at(other), resistance});
     for (const auto &[node, bid] : initial_graph_boundaries_)
       if (bid == 0)
         injections[node] += inflow;
-      else
+      else if (!terminal_links.count(bid))
         {
           AssertThrow(
             rcr_map.count(bid),
@@ -273,7 +335,7 @@ namespace MetricFlowX
                                             tube_resistance(p0.distance(p1) * x,
                                                             r0,
                                                             r0 + x * (r1 - r0),
-                                                            viscosity,
+                                                            v.dynamic_viscosity,
                                                             friction_profile) /
                                               edges[n].resistance;
                   const double pressure =
@@ -281,18 +343,24 @@ namespace MetricFlowX
                     fraction * (graph.pressures[edge.node1] -
                                 graph.pressures[edge.node0]);
                   const double ad = compute_a_d_at_point(cell, point);
-                  const double root =
-                    std::sqrt(ad) +
-                    ad / v.beta_p *
-                      (pressure - v.p0 - v.p_d -
-                       external_pressure(
-                         {t, point, edge.vessel_id, cell->id()}));
-                  AssertThrow(
-                    std::isfinite(root) && root > 0.,
-                    ExcMessage(
-                      "The graph pressure has no admissible positive-area tube-law inverse."));
-                  const double a = root * root;
-                  const auto   component =
+                  const double transmural =
+                    pressure -
+                    external_pressure({t, point, edge.vessel_id, cell->id()});
+                  double a;
+                  if (v.wall.type == WallLaw::Type::square_root)
+                    {
+                      const double root =
+                        std::sqrt(ad) +
+                        ad / v.beta_p * (transmural - v.p0 - v.p_d);
+                      AssertThrow(
+                        std::isfinite(root) && root > 0.,
+                        ExcMessage(
+                          "The graph pressure has no admissible positive-area tube-law inverse."));
+                      a = root * root;
+                    }
+                  else
+                    a = reference_branch_area(v.wall, transmural, ad, v.h_wall);
+                  const auto component =
                     fe_->system_to_component_index(i).first;
                   values.emplace_back(ldofs[i],
                                       component == 0 || component == 2 ?
@@ -312,9 +380,16 @@ namespace MetricFlowX
       if (rcr_pc_dof.count(bid) &&
           locally_owned_dofs_.is_element(rcr_pc_dof.at(bid)))
         {
-          const auto  &r = rcr_map.at(bid);
-          const double q = (graph.pressures[node] - r.P_out) / (r.R1 + r.R2);
-          state(rcr_pc_dof.at(bid)) = r.P_out + r.R2 * q;
+          if (terminal_links.count(bid))
+            state(rcr_pc_dof.at(bid)) =
+              graph.pressures[compartment_node.at(bid)];
+          else
+            {
+              const auto  &r = rcr_map.at(bid);
+              const double q =
+                (graph.pressures[node] - r.P_out) / (r.R1 + r.R2);
+              state(rcr_pc_dof.at(bid)) = r.P_out + r.R2 * q;
+            }
         }
     state.compress(VectorOperation::insert);
   }
@@ -452,6 +527,9 @@ namespace MetricFlowX
                    trial(i) <= 0.))
                 invalid = 1;
             if (Utilities::MPI::max(invalid, mpi_communicator_) != 0)
+              continue;
+            if (wall_model != "Square root" &&
+                !has_admissible_wall_states(trial))
               continue;
             assemble_g(trial, g);
             double norm = 0.;

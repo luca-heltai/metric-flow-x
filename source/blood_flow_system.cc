@@ -298,6 +298,14 @@ namespace MetricFlowX
     add_parameter("Verbosity (console depth)", verbosity);
     add_parameter("Output directory", output_directory);
     add_parameter(
+      "Output vessel CSV file",
+      output_vessel_csv_file,
+      "One midpoint probe CSV relative to Output directory, or absolute. Empty disables vessel probes.");
+    add_parameter(
+      "Vessel probe IDs",
+      vessel_probe_ids,
+      "Comma-separated vessel IDs for midpoint probes. Empty selects all vessels.");
+    add_parameter(
       "Output time interval",
       time_interval,
       "Positive value sets the interval between written outputs; zero writes "
@@ -322,6 +330,12 @@ namespace MetricFlowX
       this->prm,
       Patterns::Selection("VTK|Parameters"));
     add_parameter("Terminal parameters CSV file", terminal_parameters_csv_file);
+    add_parameter(
+      "Terminal connections CSV file",
+      terminal_connections_csv_file,
+      "Optional undirected resistor graph: boundary0,boundary1,resistance. "
+      "Connects capacitor pressures (C>0) or trace pressures (C=0); "
+      "replaces the connected terminals' fixed downstream closure.");
     add_parameter("Default terminal R1", default_terminal_r1);
     add_parameter("Default terminal R2", default_terminal_r2);
     add_parameter("Default terminal C", default_terminal_c);
@@ -403,10 +417,6 @@ namespace MetricFlowX
       !viscoelastic_wall || wall_model != "Square root",
       ExcMessage(
         "Viscoelastic wall requires an ADAVN wall model and its adavn_K_m input field."));
-    AssertThrow(
-      wall_model == "Square root" || initial_state_source != "steady network",
-      ExcMessage(
-        "ADAVN walls do not support the square-root steady-network initializer; select Initial state source = rest."));
     AssertThrow(std::isfinite(time_interval) && time_interval >= 0.0,
                 ExcMessage("Output time interval must be finite and "
                            "non-negative."));
@@ -480,6 +490,15 @@ namespace MetricFlowX
       AssertThrow(false,
                   ExcMessage("Unknown numerical flux type: " +
                              numerical_flux_type_str));
+  }
+
+  template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::prescribed_inflow(const double t)
+  {
+    inflow_function.set_time(t);
+    return inflow_series.empty() ? inflow_function.value(Point<1>(0.)) :
+                                   inflow_series.value(t);
   }
 
   template <int dim, int spacedim>
@@ -579,6 +598,70 @@ namespace MetricFlowX
     for (const auto &[id, offset] : offsets)
       result.emplace(id, global[offset]);
     return result;
+  }
+
+  template <int dim, int spacedim>
+  bool
+  BloodFlowSystem<dim, spacedim>::has_admissible_wall_states(
+    const VectorType &state) const
+  {
+    TimerOutput::Scope timer(computing_timer, "check_wall_domain");
+    update_ghosted_vectors(state);
+    unsigned int invalid = 0;
+    for (const auto i : locally_owned_dofs_)
+      if (!std::isfinite(state(i)))
+        invalid = 1;
+    const auto admissible = [this, &invalid](double       a,
+                                             unsigned int vid,
+                                             double       reference) {
+      if (!std::isfinite(a) || a <= 0.)
+        return false;
+      a                    = std::max(a, 1e-10);
+      const double modulus = a * compute_pressure_derivative(a, vid, reference);
+      const bool   valid   = std::isfinite(modulus) && modulus > 0.;
+      if (!valid && invalid == 0 && verbosity > 1)
+        deallog << "Recoverable wall-domain rejection: vessel " << vid
+                << ", A/Aref=" << a / reference << ", A*dP/dA=" << modulus
+                << std::endl;
+      return valid;
+    };
+    const QGauss<dim>                quadrature(fe_->tensor_degree() + 1);
+    FEValues<dim, spacedim>          values(*fe_,
+                                   quadrature,
+                                   update_values | update_quadrature_points);
+    const FEValuesExtractors::Scalar area(0);
+    std::vector<double> areas(quadrature.size()), local(fe_->n_dofs_per_cell());
+    std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          const auto vid = cell->material_id();
+          values.reinit(cell);
+          cell->get_dof_indices(indices);
+          state.extract_subvector_to(indices, local);
+          values[area].get_function_values_from_local_dof_values(local, areas);
+          for (unsigned int q = 0; q < quadrature.size(); ++q)
+            if (!admissible(areas[q],
+                            vid,
+                            compute_a_d_at_point(cell,
+                                                 values.quadrature_point(q))))
+              invalid = 1;
+          for (const auto f : cell->face_indices())
+            {
+              Point<dim> xi;
+              xi[0]            = f;
+              double cell_area = 0.;
+              for (unsigned int i = 0; i < local.size(); ++i)
+                if (fe_->system_to_component_index(i).first == 0)
+                  cell_area += local[i] * fe_->shape_value(i, xi);
+              const auto   trace     = face_trace_dofs(indices, f);
+              const double reference = compute_a_d_at_face(cell, f);
+              if (!admissible(cell_area, vid, reference) ||
+                  !admissible(state(trace.first), vid, reference))
+                invalid = 1;
+            }
+        }
+    return Utilities::MPI::max(invalid, mpi_communicator_) == 0;
   }
 
   template <int dim, int spacedim>
@@ -973,6 +1056,27 @@ namespace MetricFlowX
     vtk.read_cell_data("L", cell_L);
     vtk.read_cell_data("r_d", cell_r_d);
 
+    cell_viscosity.reinit(0);
+    if (vtk.has_cell_data("viscosity"))
+      {
+        vtk.read_cell_data("viscosity", cell_viscosity);
+        AssertThrow(cell_viscosity.size() == cell_vessel_ids.size(),
+                    ExcMessage(
+                      "viscosity must contain one value per VTK cell."));
+        std::map<unsigned int, double> seen;
+        for (unsigned int i = 0; i < cell_viscosity.size(); ++i)
+          {
+            const double value = cell_viscosity[i];
+            AssertThrow(std::isfinite(value) && value >= 0.,
+                        ExcMessage(
+                          "VTK viscosity must be finite and nonnegative."));
+            const auto [it, inserted] = seen.emplace(cell_vessel_ids[i], value);
+            AssertThrow(
+              inserted || it->second == value,
+              ExcMessage("viscosity differs between cells sharing vessel_id."));
+          }
+      }
+
     wall_input.clear();
     if (wall_model != "Square root")
       {
@@ -1315,7 +1419,9 @@ namespace MetricFlowX
         vp.p0     = cell_p0[data_index];
         vp.a_d    = cell_a_d[data_index];
         vp.L      = cell_L[data_index];
-        vp.r_d    = cell_r_d[data_index];
+        vp.dynamic_viscosity =
+          cell_viscosity.size() ? cell_viscosity[data_index] : viscosity;
+        vp.r_d  = cell_r_d[data_index];
         vp.r_in = (cell_r_in.size() > data_index) ? cell_r_in[data_index] : 0.0;
         vp.r_out =
           (cell_r_out.size() > data_index) ? cell_r_out[data_index] : 0.0;
@@ -1760,6 +1866,135 @@ namespace MetricFlowX
             << "  n_total = " << n_total_dofs << std::endl;
   }
 
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::setup_terminal_connections()
+  {
+    terminal_links.clear();
+    terminal_ports.clear();
+    if (terminal_connections_csv_file.empty())
+      return;
+    AssertThrow(
+      outlet_type == "RCR" && !viscoelastic_wall,
+      ExcMessage(
+        "Terminal connections require RCR boundaries and elastic walls."));
+    rapidcsv::Document csv(terminal_connections_csv_file);
+    for (const auto &column : {"boundary0", "boundary1", "resistance"})
+      AssertThrow(csv.GetColumnIdx(column) >= 0,
+                  ExcMessage("Terminal connections CSV requires column " +
+                             std::string(column)));
+    std::set<std::pair<types::boundary_id, types::boundary_id>> pairs;
+    for (size_t row = 0; row < csv.GetRowCount(); ++row)
+      {
+        const auto   a = csv.GetCell<types::boundary_id>("boundary0", row);
+        const auto   b = csv.GetCell<types::boundary_id>("boundary1", row);
+        const double resistance = csv.GetCell<double>("resistance", row);
+        AssertThrow(a != b && a != 0 && b != 0 && a != 255 && b != 255 &&
+                      rcr_map.count(a) && rcr_map.count(b) &&
+                      std::isfinite(resistance) && resistance > 0.,
+                    ExcMessage("Invalid terminal connection at CSV row " +
+                               std::to_string(row + 2)));
+        AssertThrow(pairs.emplace(std::min(a, b), std::max(a, b)).second,
+                    ExcMessage("Duplicate undirected terminal connection."));
+        for (const auto bid : {a, b})
+          AssertThrow(
+            rcr_map.at(bid).C > 0. || rcr_map.at(bid).R1 == 0.,
+            ExcMessage(
+              "A connected terminal without a capacitor requires R1=0."));
+        terminal_links[a].emplace_back(b, resistance);
+        terminal_links[b].emplace_back(a, resistance);
+      }
+    std::map<types::boundary_id, TerminalPort> local;
+    unsigned int                               repeated = 0;
+    for (const auto &face : boundary_faces)
+      {
+        const auto bid = face.cell->face(face.face_no)->boundary_id();
+        if (terminal_links.count(bid))
+          if (!local
+                 .emplace(bid,
+                          TerminalPort{face.a_hat_dof,
+                                       face.u_hat_dof,
+                                       face.cell->material_id(),
+                                       compute_a_d_at_face(face.cell,
+                                                           face.face_no),
+                                       face.face_no == 1 ? 1 : -1,
+                                       face.cell->face(face.face_no)->vertex(0),
+                                       face.cell->id()})
+                 .second)
+            repeated = 1;
+      }
+    AssertThrow(Utilities::MPI::max(repeated, mpi_communicator_) == 0,
+                ExcMessage("Repeated connected terminal boundary ID."));
+    for (const auto &ports :
+         Utilities::MPI::all_gather(mpi_communicator_, local))
+      for (const auto &[bid, port] : ports)
+        AssertThrow(
+          terminal_ports.emplace(bid, port).second,
+          ExcMessage(
+            "Connected terminal must have exactly one incident cell."));
+    AssertThrow(
+      terminal_ports.size() == terminal_links.size(),
+      ExcMessage(
+        "Every connected terminal must be a degree-one mesh endpoint."));
+  }
+
+  template <int dim, int spacedim>
+  types::global_dof_index
+  BloodFlowSystem<dim, spacedim>::terminal_pressure_dof(
+    types::boundary_id bid) const
+  {
+    const auto it = rcr_pc_dof.find(bid);
+    return it == rcr_pc_dof.end() ? terminal_ports.at(bid).area : it->second;
+  }
+
+  template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::terminal_pressure_derivative(
+    types::boundary_id bid,
+    const VectorType  &y) const
+  {
+    if (rcr_pc_dof.count(bid))
+      return 1.;
+    const auto &port = terminal_ports.at(bid);
+    return compute_pressure_derivative(std::max(y(port.area), 1e-10),
+                                       port.vessel,
+                                       port.reference_area);
+  }
+
+  template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::terminal_pressure(types::boundary_id bid,
+                                                    const VectorType  &y,
+                                                    double             t) const
+  {
+    const auto it = rcr_pc_dof.find(bid);
+    if (it != rcr_pc_dof.end())
+      return y(it->second);
+    const auto &port = terminal_ports.at(bid);
+    return compute_physical_pressure(std::max(y(port.area), 1e-10),
+                                     port.vessel,
+                                     port.reference_area,
+                                     t,
+                                     port.point,
+                                     port.cell_id);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::build_terminal_connection_sparsity(
+    DynamicSparsityPattern &dsp)
+  {
+    for (const auto &face : boundary_faces)
+      {
+        const auto bid = face.cell->face(face.face_no)->boundary_id();
+        if (!terminal_links.count(bid))
+          continue;
+        const auto row = terminal_pressure_dof(bid);
+        for (const auto &[other, resistance] : terminal_links.at(bid))
+          dsp.add(row, terminal_pressure_dof(other));
+      }
+  }
+
   // ============================================================================
   // update_ghosted_vectors
   //
@@ -2049,6 +2284,7 @@ namespace MetricFlowX
     build_junction_sparsity(dsp);
     build_rcr_sparsity(dsp);
     build_trace_continuity_sparsity(dsp);
+    build_terminal_connection_sparsity(dsp);
 
     SparsityTools::distribute_sparsity_pattern(dsp,
                                                locally_owned_dofs_,
@@ -2110,6 +2346,7 @@ namespace MetricFlowX
     detect_junctions();
     build_face_dof_map();
     build_rcr_dof_map(); // sets n_total_dofs and rcr_dofs_owned
+    setup_terminal_connections();
 
     // ---- index sets ---------------------------------------------------------
     locally_owned_fe_dofs = dof_handler_.locally_owned_dofs();
@@ -2143,6 +2380,15 @@ namespace MetricFlowX
             if (it != rcr_pc_dof.end())
               locally_relevant_dofs_.add_index(it->second);
           }
+      }
+    // Resistive links can join terminals on distant mesh partitions. Import
+    // their endpoint pressures along with the ordinary geometric ghost layer.
+    for (const auto &face : boundary_faces)
+      {
+        const auto bid = face.cell->face(face.face_no)->boundary_id();
+        if (terminal_links.count(bid))
+          for (const auto &[other, resistance] : terminal_links.at(bid))
+            locally_relevant_dofs_.add_index(terminal_pressure_dof(other));
       }
     locally_relevant_dofs_.compress();
 
@@ -2437,27 +2683,22 @@ namespace MetricFlowX
   // ============================================================================
   // open_csv_files
   //
-  // One CSV per vessel, written at the vessel's arc-length midpoint.  The probe
+  // One CSV for the selected vessels' arc-length midpoints. The probe
   // cell is chosen by a global argmin over the distance to the midpoint: each
   // rank offers its best locally owned candidate and the rank holding the
-  // overall winner opens the file.  Every vessel is therefore probed exactly
-  // once, by whichever rank owns the middle of it, and no file is written by
-  // two ranks.
+  // overall winner evaluates the probe. Rank zero writes gathered snapshots
+  // ordered by vessel ID, so neither records nor files are duplicated in MPI.
   // ============================================================================
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::open_csv_files()
   {
-    const std::string dir =
-      output_directory + (output_directory.empty() ? "" : "/");
-
     // Every rank may open a vessel file, so every rank makes sure the
     // directory exists (create_directories is a no-op when it already does).
     if (!output_directory.empty())
       std::filesystem::create_directories(output_directory);
 
     close_csv_files();
-    csv_vessel.clear();
     mach_warning_active.clear();
 
     if (!output_terminal_csv_file.empty())
@@ -2539,9 +2780,39 @@ namespace MetricFlowX
         }
     });
 
+    if (output_vessel_csv_file.empty())
+      return;
+    std::set<unsigned int> selected;
+    for (const auto value : vessel_probe_ids)
+      {
+        AssertThrow(vessel_map.count(value),
+                    ExcMessage("Unknown vessel probe ID " +
+                               std::to_string(value)));
+        selected.insert(value);
+      }
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process == 0)
+        {
+          csv_vessel.open(
+            prepare_csv_path(output_directory, output_vessel_csv_file));
+          AssertThrow(csv_vessel,
+                      ExcMessage("Cannot open vessel probe CSV: " +
+                                 output_vessel_csv_file));
+          csv_write_row(csv_vessel,
+                        "time_s",
+                        "vessel_id",
+                        "pressure_Pa",
+                        "flow_m3_s",
+                        "area_m2",
+                        "velocity_m_s");
+        }
+    });
+
     for (const auto &[vid, vpp] : vessel_map)
       {
         (void)vpp;
+        if (!selected.empty() && !selected.count(vid))
+          continue;
 
         double     s_mid = 0.0;
         const auto it    = vessel_s_bounds.find(vid);
@@ -2592,15 +2863,6 @@ namespace MetricFlowX
           continue;
 
         probe_targets.emplace_back(vid, best_cell, best_xi);
-
-        std::ofstream &os = csv_vessel[vid];
-        os.open(dir + "HDG_IDA_Vessel_" + std::to_string(vid) + ".csv");
-        AssertThrow(os, ExcMessage("Cannot open vessel probe CSV."));
-        std::vector<std::string> header{
-          "time_s", "P_dynpcm2", "Q_cm3ps", "A_cm2", "U_cmps"};
-        for (const auto id : vessel_terminals[vid])
-          header.push_back("boundary_" + std::to_string(id) + "_label");
-        csv_write_record(os, header);
       }
   }
 
@@ -2697,56 +2959,70 @@ namespace MetricFlowX
         error = Utilities::MPI::broadcast(mpi_communicator_, error, 0);
         AssertThrow(error.empty(), ExcMessage(error));
       }
+    if (output_vessel_csv_file.empty())
+      return;
     const unsigned int dofs_per_cell = fe_->n_dofs_per_cell();
+    using ProbeRow = std::pair<unsigned int, std::vector<std::string>>;
+    std::vector<ProbeRow> local_probe_rows;
+    collective_csv_action(mpi_communicator_, [&]() {
+      for (const auto &[vid, cell, xi] : probe_targets)
+        {
+          const Point<dim> xi_probe =
+            (dim == 1) ? Point<dim>(xi) : Point<dim>();
 
-    for (const auto &[vid, cell, xi] : probe_targets)
-      {
-        const Point<dim> xi_probe = (dim == 1) ? Point<dim>(xi) : Point<dim>();
+          // The probe cell is locally owned, so every one of its DoFs is owned
+          // here and can be read straight out of the non-ghosted vector.
+          std::vector<types::global_dof_index> ldofs(dofs_per_cell);
+          cell->get_dof_indices(ldofs);
 
-        std::ofstream &os = csv_vessel.at(vid);
+          double A_val = 0.0, U_val = 0.0;
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+            {
+              const double       phi  = fe_->shape_value(i, xi_probe);
+              const unsigned int comp = fe_->system_to_component_index(i).first;
+              if (comp == 0)
+                A_val += sol(ldofs[i]) * phi;
+              else if (comp == 1)
+                U_val += sol(ldofs[i]) * phi;
+            }
 
-        // The probe cell is locally owned, so every one of its DoFs is owned
-        // here and can be read straight out of the non-ghosted vector.
-        std::vector<types::global_dof_index> ldofs(dofs_per_cell);
-        cell->get_dof_indices(ldofs);
-
-        double A_val = 0.0, U_val = 0.0;
-        for (unsigned int i = 0; i < dofs_per_cell; ++i)
-          {
-            const double       phi  = fe_->shape_value(i, xi_probe);
-            const unsigned int comp = fe_->system_to_component_index(i).first;
-            if (comp == 0)
-              A_val += sol(ldofs[i]) * phi;
-            else if (comp == 1)
-              U_val += sol(ldofs[i]) * phi;
-          }
-
-        const double A_cm2  = A_val * 1.0e4;
-        const double U_cmps = U_val * 1.0e2;
-
-        const Point<spacedim> x_probe =
-          cell->vertex(0) + xi * (cell->vertex(1) - cell->vertex(0));
-        const double P_Pa =
-          compute_physical_pressure(A_val,
-                                    vid,
-                                    compute_a_d_at_point(cell, x_probe),
-                                    t,
-                                    x_probe,
-                                    cell->id()) +
-          (ydot ? viscous_pressure(sol, *ydot, cell, x_probe) : 0.);
-        const double P_dynpcm2 = P_Pa * 10.0;
-
-        const double Q_cm3ps = A_val * U_val * 1.0e6;
-
-        std::vector<std::string> values{csv_cell(t),
-                                        csv_cell(P_dynpcm2),
-                                        csv_cell(Q_cm3ps),
-                                        csv_cell(A_cm2),
-                                        csv_cell(U_cmps)};
-        for (const auto id : vessel_terminals.at(vid))
-          values.push_back(rcr_map.at(id).label);
-        csv_write_record(os, values);
-      }
+          const Point<spacedim> x_probe =
+            cell->vertex(0) + xi * (cell->vertex(1) - cell->vertex(0));
+          const double P_Pa =
+            compute_physical_pressure(A_val,
+                                      vid,
+                                      compute_a_d_at_point(cell, x_probe),
+                                      t,
+                                      x_probe,
+                                      cell->id()) +
+            (ydot ? viscous_pressure(sol, *ydot, cell, x_probe) : 0.);
+          local_probe_rows.emplace_back(
+            vid,
+            std::vector<std::string>{csv_cell(t),
+                                     csv_cell(vid),
+                                     csv_cell(P_Pa),
+                                     csv_cell(A_val * U_val),
+                                     csv_cell(A_val),
+                                     csv_cell(U_val)});
+        }
+    });
+    const auto parts =
+      Utilities::MPI::gather(mpi_communicator_, local_probe_rows, 0);
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process == 0 && csv_vessel.is_open())
+        {
+          std::vector<ProbeRow> rows;
+          for (const auto &part : parts)
+            rows.insert(rows.end(), part.begin(), part.end());
+          std::sort(rows.begin(), rows.end(), [](const auto &a, const auto &b) {
+            return a.first < b.first;
+          });
+          for (const auto &row : rows)
+            csv_write_record(csv_vessel, row.second);
+          csv_vessel.flush();
+          AssertThrow(csv_vessel, ExcMessage("Cannot write vessel probe CSV."));
+        }
+    });
   }
 
   // ============================================================================
@@ -2757,9 +3033,8 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::close_csv_files()
   {
     flow_regime_log.close();
-    for (auto &kv : csv_vessel)
-      if (kv.second.is_open())
-        kv.second.close();
+    if (csv_vessel.is_open())
+      csv_vessel.close();
     if (csv_terminal.is_open())
       csv_terminal.close();
   }
@@ -3182,8 +3457,6 @@ namespace MetricFlowX
     std::vector<types::global_dof_index> ldofs(n_dofs);
 
     const double rho = density;
-    const double eta =
-      2.0 * (friction_profile + 2.0) * numbers::PI * viscosity / rho;
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
@@ -3192,6 +3465,8 @@ namespace MetricFlowX
 
         const auto         cell_id = cell->id();
         const unsigned int vid     = cell->material_id();
+        const double       eta = 2.0 * (friction_profile + 2.0) * numbers::PI *
+                           vessel_map.at(vid).dynamic_viscosity / rho;
         fev.reinit(cell);
 
         cell->get_dof_indices(ldofs);
@@ -3587,16 +3862,37 @@ namespace MetricFlowX
           }
         else if (bid == 0) // inflow
           {
-            inflow_function.set_time(t);
-            const double Q_in =
-              (inflow_series.empty() ? inflow_function.value(Point<1>(0.0)) :
-                                       inflow_series.value(t));
+            const double Q_in = prescribed_inflow(t);
             const double W2_int =
               U_int - compute_invariant(A_int, vid, a_d_local);
 
             res_A = A_hat_cur * U_hat_cur - Q_in;
             res_U =
               (U_hat_cur - compute_invariant(A_hat, vid, a_d_local)) - W2_int;
+          }
+        else if (terminal_links.count(bid))
+          {
+            const auto  &port     = terminal_ports.at(bid);
+            const double sign     = port.outward_sign;
+            const double Q        = sign * A_hat_cur * U_hat_cur;
+            const double pressure = compute_physical_pressure(
+              A_hat, vid, a_d_local, t, point, cell->id());
+            if (rcr_pc_dof.count(bid))
+              res_A = pressure - rcr_map.at(bid).R1 * Q - y(rcr_pc_dof.at(bid));
+            else
+              {
+                double conductance = 0., weighted_pressure = 0.;
+                for (const auto &[other, resistance] : terminal_links.at(bid))
+                  {
+                    conductance += 1. / resistance;
+                    weighted_pressure +=
+                      terminal_pressure(other, y, t) / resistance;
+                  }
+                res_A = pressure - (Q + weighted_pressure) / conductance;
+              }
+            res_U = U_hat_cur +
+                    sign * compute_invariant(A_hat, vid, a_d_local) - U_int -
+                    sign * compute_invariant(A_int, vid, a_d_local);
           }
         else if (outlet_type == "RCR" && rcr_map.count(bid) &&
                  (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
@@ -3655,7 +3951,8 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::assemble_rcr_capacitor_equations(
     const VectorType &y,
     const VectorType &ydot,
-    VectorType       &F)
+    VectorType       &F,
+    const double      t)
   {
     if (rcr_pc_dof.empty())
       return;
@@ -3698,9 +3995,12 @@ namespace MetricFlowX
         const types::global_dof_index pc_dof = pit->second;
         const auto &rcr = rcr_map.at(cell->face(f)->boundary_id());
 
-        const double A_hat  = y(face.a_hat_dof);
-        const double U_hat  = y(face.u_hat_dof);
-        const double Q      = A_hat * U_hat;
+        const double A_hat = y(face.a_hat_dof);
+        const double U_hat = y(face.u_hat_dof);
+        const auto   bid   = cell->face(f)->boundary_id();
+        const double sign =
+          terminal_links.count(bid) ? terminal_ports.at(bid).outward_sign : 1.;
+        const double Q      = sign * A_hat * U_hat;
         const double Pc     = y(pc_dof);
         const double Pc_dot = pc_dot_global[pc_dof - first_pc];
 
@@ -3709,7 +4009,14 @@ namespace MetricFlowX
         // itself may be owned by a *different* rank for PETSc's
         // partitioning, and the off-owner add is routed there by the
         // caller's compress(VectorOperation::add).
-        F(pc_dof) += rcr.C * Pc_dot - Q + (Pc - rcr.P_out) / rcr.R2;
+        double discharge = (Pc - rcr.P_out) / rcr.R2;
+        if (terminal_links.count(bid))
+          {
+            discharge = 0.;
+            for (const auto &[other, resistance] : terminal_links.at(bid))
+              discharge += (Pc - terminal_pressure(other, y, t)) / resistance;
+          }
+        F(pc_dof) += rcr.C * Pc_dot - Q + discharge;
       }
   }
 
@@ -4044,7 +4351,7 @@ namespace MetricFlowX
       }
 
     // RCR capacitor rows: differential, written directly in M*ydot - R form.
-    assemble_rcr_capacitor_equations(y_relevant, ydot, residual);
+    assemble_rcr_capacitor_equations(y_relevant, ydot, residual, t);
 
     residual.compress(VectorOperation::add);
     if (viscoelastic_wall)
@@ -4281,8 +4588,6 @@ namespace MetricFlowX
                                       update_normal_vectors);
 
     const double rho = density;
-    const double eta =
-      2.0 * (friction_profile + 2.0) * numbers::PI * viscosity / rho;
     (void)t;
     const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
     std::vector<double>                  local_values(n_dofs);
@@ -4306,6 +4611,9 @@ namespace MetricFlowX
           continue;
 
         const unsigned int vid = cell->material_id();
+
+        const double eta = 2.0 * (friction_profile + 2.0) * numbers::PI *
+                           vessel_map.at(vid).dynamic_viscosity / rho;
 
         fev.reinit(cell);
 
@@ -4781,6 +5089,37 @@ namespace MetricFlowX
                                     -(phi_U - 4.0 * dc_int * phi_A));
               }
           }
+        else if (terminal_links.count(bid))
+          {
+            const double sign       = terminal_ports.at(bid).outward_sign;
+            double       resistance = rcr_map.at(bid).R1;
+            if (!rcr_pc_dof.count(bid))
+              {
+                double conductance = 0.;
+                for (const auto &[other, edge_resistance] :
+                     terminal_links.at(bid))
+                  conductance += 1. / edge_resistance;
+                resistance = 1. / conductance;
+                for (const auto &[other, edge_resistance] :
+                     terminal_links.at(bid))
+                  jacobian_matrix.add(a_row,
+                                      terminal_pressure_dof(other),
+                                      -resistance / edge_resistance *
+                                        terminal_pressure_derivative(other, y));
+              }
+            jacobian_matrix.add(a_row,
+                                a_row,
+                                dPdA_hat - resistance * sign * U_hat_cur);
+            jacobian_matrix.add(a_row, u_row, -resistance * sign * A_hat_cur);
+            jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
+            jacobian_matrix.add(u_row, u_row, 1.);
+            for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
+              jacobian_matrix.add(u_row,
+                                  ldofs[j],
+                                  -fef[velocity_extractor].value(j, 0) -
+                                    sign * 4. * dc_int *
+                                      fef[area_extractor].value(j, 0));
+          }
         else if (outlet_type == "RCR" && rcr_map.count(bid) &&
                  (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
 
@@ -4896,9 +5235,26 @@ namespace MetricFlowX
         const double U_hat = y(face.u_hat_dof);
 
         // R_pc = A_hat*U_hat - (Pc - P_out)/R2
-        jacobian_matrix.add(pc_dof, face.a_hat_dof, U_hat);
-        jacobian_matrix.add(pc_dof, face.u_hat_dof, A_hat);
-        jacobian_matrix.add(pc_dof, pc_dof, -1.0 / rcr.R2);
+        const auto   bid = cell->face(f)->boundary_id();
+        const double sign =
+          terminal_links.count(bid) ? terminal_ports.at(bid).outward_sign : 1.;
+        jacobian_matrix.add(pc_dof, face.a_hat_dof, sign * U_hat);
+        jacobian_matrix.add(pc_dof, face.u_hat_dof, sign * A_hat);
+        if (terminal_links.count(bid))
+          {
+            double conductance = 0.;
+            for (const auto &[other, resistance] : terminal_links.at(bid))
+              {
+                conductance += 1. / resistance;
+                jacobian_matrix.add(pc_dof,
+                                    terminal_pressure_dof(other),
+                                    terminal_pressure_derivative(other, y) /
+                                      resistance);
+              }
+            jacobian_matrix.add(pc_dof, pc_dof, -conductance);
+          }
+        else
+          jacobian_matrix.add(pc_dof, pc_dof, -1.0 / rcr.R2);
 
         // res_A = P(Â) - R1*Q - Pc  ->  d(res_A)/dPc = -1
         jacobian_matrix.add(face.a_hat_dof, pc_dof, -1.0);
@@ -5485,9 +5841,9 @@ namespace MetricFlowX
 
             double A_hat = 0.0, U_hat = 0.0;
             get_face_trace(y_relevant, cell, f, A_hat, U_hat);
-            const double Q   = A_hat * U_hat;
-            const auto   bid = cell->face(f)->boundary_id();
-            local_net_flux += (bid == 0) ? Q : -Q;
+            const double Q            = A_hat * U_hat;
+            const double outward_sign = f == 1 ? 1. : -1.;
+            local_net_flux -= outward_sign * Q;
           }
       }
     const double net_flux =
