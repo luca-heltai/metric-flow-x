@@ -40,7 +40,7 @@ class MMSProfile:
 
 
 # These are the three exact functions used by the historical p1/p2/p3
-# convergence cases in parameters/working_parameters.  Keep their strings
+# convergence cases removed from the runnable input set. Keep their strings
 # explicit so that the source of the benchmark functions is auditable.
 PROFILES = {
     "p1": MMSProfile(

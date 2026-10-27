@@ -116,9 +116,7 @@ def main():
                     text = text.replace('@INITIAL_SOURCE@', 'steady network')
                     entries = parse(text)
                 check_transient(entries)
-                if '# Historical case migrated' in text or '01_single_vessel_mms/' in name:
-                    category = 'verification schema; physical migration pending'
-                elif entries[(SYSTEM, 'Use componentwise absolute tolerances')] == 'false':
+                if entries[(SYSTEM, 'Use componentwise absolute tolerances')] == 'false':
                     category = 'accuracy; uniform scalar tolerances'
                 elif entries[(SYSTEM, 'Tolerance ramp enabled')] == 'true':
                     category = 'transient; ramp enabled'

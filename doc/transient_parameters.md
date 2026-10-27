@@ -37,25 +37,21 @@ For the three wall-model inputs, final time is 0.001 s and the IDA output period
 is 0.005 s. There is no interior output time on which to end a ramp. They use
 native initialization and component tolerances with the ramp explicitly off.
 
-MMS and verification trajectories retain scalar tolerances throughout, with the
-ramp explicitly off, so startup relaxation cannot contaminate the error being
-measured. The current paper MMS template keeps its requested BDF5 and `1e-12`
-scalar tolerances. Other verification files retain their original scalar budgets
-and receive native initialization, IDA work limits and explicit step controls.
+The paper MMS trajectory retains scalar tolerances throughout, with the ramp
+explicitly off, so startup relaxation cannot contaminate the error being measured.
+Its template keeps the requested BDF5 and `1e-12` scalar tolerances, with native
+initialization, IDA work limits and explicit step controls.
 
-## Schema migration and remaining physical limitations
+## Removed legacy cases and schema cleanup
 
-Sixteen historical ARKode files now use IDA section names and BDF settings;
-ARKode-only flags have been removed. Obsolete global vessel constants and
-`Initial condition` settings are retained as comments, because the current
-application obtains vessel properties from VTK and constructs its own consistent
-initial state. Their old formulas are retained as evidence, not silently
-reinterpreted as a different manufactured solution. They still need a physical
-migration (mesh properties, parser constants, exact fields and compatible initial
-data) before they can be used to claim verification results. They are identified
-individually in the inventory below. The three tutorial-01 templates have the
-same pre-existing constant-map limitation; see their README. Use the canonical
-`reproducibility/parameters/mms.prm.in` for the current supported paper MMS case.
+The sixteen historical ARKode parameter cases have been removed, together with
+three tutorial-01 templates derived from the same obsolete verification setup.
+Renaming their sections to IDA did not reproduce their former vessel constants,
+initial-condition interface or manufactured fields. They are no longer offered
+as runnable or pending-migration inputs. Their earlier versions remain in Git
+history. Symbolic derivations and convergence reports remain reference artifacts.
+Use `reproducibility/parameters/mms.prm.in` and the paper runner for the current
+supported MMS experiment and degree/refinement sweep.
 
 Old `BloodFlowSystem`/`Blood Flow Parameters` names are normalized. Superseded
 inflow assignments are comments, preserving the previously effective last
@@ -104,6 +100,8 @@ are left to the author for the final rerun.
 
 ## Complete parameter-source inventory
 
+The active input set contains 41 tracked parameter sources.
+
 | Source | Policy |
 |---|---|
 | `doc/performance_data/initialization/adan56.prm` | transient; ramp enabled |
@@ -115,17 +113,10 @@ are left to the author for the final rerun.
 | `parameters/benchmark_parameters/aortic_bifurcation/aortic_bifurcation.prm.in` | transient; ramp enabled |
 | `parameters/benchmark_parameters/binary_tree_255/tree_255.prm` | transient; ramp enabled |
 | `parameters/benchmark_parameters/common_carotid_artery/commom_carotid_artery.prm.in` | transient; ramp enabled |
-| `parameters/benchmark_parameters/junctions_1.prm` | verification schema; physical migration pending |
 | `parameters/benchmark_parameters/large_network_tree/cco_network.prm` | transient; ramp enabled |
 | `parameters/benchmark_parameters/large_network_tree/network_tree.prm` | transient; ramp enabled |
-| `parameters/benchmark_parameters/single_vessel/single_vessel.prm` | verification schema; physical migration pending |
-| `parameters/benchmark_parameters/single_vessel/single_vessel_mu.prm` | verification schema; physical migration pending |
 | `parameters/benchmark_parameters/upper_thoracic_aorta/upper_thoracic_aorta.prm.in` | transient; ramp enabled |
 | `parameters/constant.prm.in` | transient; ramp enabled |
-| `parameters/jacobian_const.prm` | verification schema; physical migration pending |
-| `parameters/linear.prm` | verification schema; physical migration pending |
-| `parameters/mass_integration.prm` | verification schema; physical migration pending |
-| `parameters/mass_integration_velocity.prm` | verification schema; physical migration pending |
 | `parameters/multi_vessel.prm` | transient; ramp enabled |
 | `parameters/multi_vessel.prm.in` | transient; ramp enabled |
 | `parameters/networks_by_svv/network_100k.prm` | transient; ramp enabled |
@@ -136,19 +127,10 @@ are left to the author for the final rerun.
 | `parameters/networks_by_svv/network_40k.prm` | transient; ramp enabled |
 | `parameters/networks_by_svv/network_50k.prm` | transient; ramp enabled |
 | `parameters/networks_by_svv/network_60k.prm` | transient; ramp enabled |
-| `parameters/parameters_time.prm` | verification schema; physical migration pending |
-| `parameters/quadratic.prm` | verification schema; physical migration pending |
 | `parameters/stationary.prm.in` | stationary |
 | `parameters/wall_arterial.prm.in` | short transient; uniform component tolerances |
 | `parameters/wall_mixed.prm.in` | short transient; uniform component tolerances |
 | `parameters/wall_venous.prm.in` | short transient; uniform component tolerances |
-| `parameters/working_parameters/hll_parameters1.prm` | verification schema; physical migration pending |
-| `parameters/working_parameters/hll_parameters2.prm` | verification schema; physical migration pending |
-| `parameters/working_parameters/hll_parameters3.prm` | verification schema; physical migration pending |
-| `parameters/working_parameters/parameters_1.prm` | verification schema; physical migration pending |
-| `parameters/working_parameters/parameters_2.prm` | verification schema; physical migration pending |
-| `parameters/working_parameters/parameters_3.prm` | verification schema; physical migration pending |
-| `parameters/working_parameters/parameters_4.prm` | verification schema; physical migration pending |
 | `reproducibility/parameters/bifurcation.prm.in` | transient; ramp enabled |
 | `reproducibility/parameters/cerebral.prm.in` | transient; ramp enabled |
 | `reproducibility/parameters/liver.prm.in` | transient; ramp enabled |
@@ -156,9 +138,6 @@ are left to the author for the final rerun.
 | `reproducibility/parameters/network100k.prm.in` | transient; ramp enabled |
 | `reproducibility/parameters/network37.prm.in` | transient; ramp enabled |
 | `reproducibility/parameters/network50k.prm.in` | transient; ramp enabled |
-| `tutorials/01_single_vessel_mms/p1.prm.in` | verification schema; physical migration pending |
-| `tutorials/01_single_vessel_mms/p2.prm.in` | verification schema; physical migration pending |
-| `tutorials/01_single_vessel_mms/p3.prm.in` | verification schema; physical migration pending |
 | `tutorials/02_y_junction/parameters.prm.in` | transient; ramp enabled |
 | `tutorials/03_37_arteries/parameters.prm.in` | transient; ramp enabled |
 | `tutorials/04_adan56/parameters.prm.in` | transient; ramp enabled |

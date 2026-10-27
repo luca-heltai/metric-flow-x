@@ -1,26 +1,17 @@
 # Single-vessel manufactured-solution evidence
 
-This directory contains the reproducibility inputs that can be established from
-repository evidence. `reference/convergence.txt` is an immutable copy of the
-uploaded report; `reference/convergence.json` is produced by
-`tools/collect_convergence.py` and retains every displayed error and rate
-string. The JSON provenance records the SHA-256 checksum of the copied text.
+Current runnable paper inputs are maintained in
+[`reproducibility/parameters/mms.prm.in`](../../reproducibility/parameters/mms.prm.in).
+Use `scripts/reproduce_paper.py --suite mms` for the degree/refinement sweep;
+see [the reproduction guide](../../doc/reproducibility.md).
 
-`p1.prm.in`, `p2.prm.in`, and `p3.prm.in` are parameter templates for the
-source-backed single_vessel mesh (`@SOURCE_DIR@/parameters/single_vessel.vtk`)
-and the current IDA parameter schema. They are **not claimed runnable MMS
-cases**: the current executable's `FunctionParser` constant map exposes only
-`rho`, `mu`, `xi`, `m`, and `Rt`, while the vessel pressure law obtains
-`E`, `h_wall`, `a_d`, `p0`, and `p_d` from VTK vessel data. Those vessel-specific
-quantities cannot currently be referenced by a user RHS function. In addition,
-the local checkout has not had a clean build_and_run of these templates.
+The old p1/p2/p3 parameter templates have been removed together with the legacy
+ARKode cases. They depended on obsolete vessel-constant and initial-condition
+interfaces and did not provide reproducible MMS runs with the current solver.
 
-`tools/generate_mms_expressions.py` derives the mass and momentum sources from
-the equations in `source/blood_flow_system.cc` with SymPy. Its output uses
-FunctionParser expression syntax and records this constant-map blocker rather
-than silently using a different pressure law. The templates retain zero RHS
-values as a safe parser-backed baseline until that source interface is made
-explicit; they must not be used as claimed MMS runs.
-
-No convergence values are inferred from local runs. The report values are
-reference evidence only.
+`reference/convergence.txt` retains the supplied report;
+`reference/convergence.json` records its displayed error/rate strings and SHA-256
+provenance. These are earlier reference evidence, not results of current runs.
+`reference/mms_expressions.json` and `tools/generate_mms_expressions.py` retain
+symbolic derivations for the historical profiles. They are mathematical reference
+artifacts, not parameter inputs for the current paper experiment.
