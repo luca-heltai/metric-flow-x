@@ -44,6 +44,10 @@ test()
             return 100. + 10. * point.time + 20. * point.point[0];
           });
           flow.n_global_refinements = degree == 2 ? 1 : 0;
+          // Both fixtures have three cells. Native MUMPS needs a nonempty
+          // partition on every rank; retain empty ranks in the iterative case.
+          if (direct && Utilities::MPI::n_mpi_processes(comm) > 3)
+            flow.n_global_refinements = 1;
           flow.setup();
           if (degree == 2)
             {
@@ -176,6 +180,6 @@ int
 main(int argc, char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi(argc, argv, 1);
-  initlog();
+  mpi_initlog();
   test();
 }

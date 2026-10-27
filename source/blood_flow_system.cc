@@ -794,6 +794,9 @@ namespace MetricFlowX
                 continue;
               }
             check(PCFactorSetShiftType(subpc, MAT_SHIFT_NONZERO));
+            // A near-zero shift can leave singular local DAE blocks with
+            // enormous inverse entries and cause GMRES breakdown.
+            check(PCFactorSetShiftAmount(subpc, 1e-5));
             // The coupled vessel equations need fill beyond their original
             // sparsity pattern for a useful local approximation.
             if (n_mpi_processes > 1 && std::string(type) == PCILU)

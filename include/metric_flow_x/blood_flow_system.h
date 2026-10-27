@@ -135,7 +135,25 @@ namespace MetricFlowX
       using SparseMatrix    = dealii::PETScWrappers::MPI::SparseMatrix;
       using PreconditionILU = dealii::PETScWrappers::PreconditionILU;
     } // namespace MPI
-    using SolverGMRES = dealii::PETScWrappers::SolverGMRES;
+    class SolverGMRES : public dealii::PETScWrappers::SolverGMRES
+    {
+    public:
+      using dealii::PETScWrappers::SolverGMRES::SolverGMRES;
+
+    protected:
+      void
+      set_solver_type(KSP &ksp) const override
+      {
+        dealii::PETScWrappers::SolverGMRES::set_solver_type(ksp);
+        // Classical Gram-Schmidt can lose orthogonality on the scaled DAE
+        // systems. PETSc options are applied after these defaults.
+        const auto error = KSPGMRESSetOrthogonalization(
+          ksp, KSPGMRESModifiedGramSchmidtOrthogonalization);
+        AssertThrow(error == 0,
+                    dealii::ExcMessage("PETSc GMRES setup error " +
+                                       std::to_string(error)));
+      }
+    };
 #elif defined(DEAL_II_WITH_TRILINOS)
     namespace MPI
     {
