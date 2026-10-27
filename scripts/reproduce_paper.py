@@ -41,6 +41,33 @@ def timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def smoke_ramp_settings(text: str, final_time: float) -> dict[str, str]:
+    """Fit the template's startup fractions to an explicitly shortened run."""
+    def value(key: str) -> str:
+        matches = re.findall(rf"(?m)^\s*set {re.escape(key)}\s*=\s*([^\n#]+)", text)
+        if len(matches) != 1:
+            raise ValueError(f"Expected one setting {key!r}; found {len(matches)}")
+        return matches[0].strip()
+
+    if value("Tolerance ramp enabled") != "true":
+        return {}
+    initial = float(value("Initial time"))
+    duration = float(value("Final time")) - initial
+    output_period = float(value("Time interval between each output"))
+    scale = (final_time - initial) / duration
+    cutoff_steps = math.floor(
+        (float(value("Tolerance ramp end time")) - initial) * scale / output_period
+        + 1e-10
+    )
+    cutoff = initial + cutoff_steps * output_period
+    if cutoff_steps < 1 or cutoff >= final_time:
+        return {"Tolerance ramp enabled": "false"}
+    hold = min(float(value("Tolerance ramp hold duration")) * scale,
+               (cutoff - initial) / 2)
+    return {"Tolerance ramp hold duration": format(hold, ".12g"),
+            "Tolerance ramp end time": format(cutoff, ".12g")}
+
+
 def verify_executable_revision(required: str, actual: str | None, root: Path = ROOT) -> None:
     """Check the explicitly attested build revision against the MMS prerequisite."""
     if actual is None or re.fullmatch(r"[0-9a-fA-F]{40}", actual) is None:
@@ -74,6 +101,7 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
     text = template.read_text()
     settings = dict(case["settings"])
     if args.final_time is not None:
+        settings.update(smoke_ramp_settings(text, args.final_time))
         settings["Final time"] = str(args.final_time)
     for key, value in settings.items():
         text = replace_setting(text, key, value)

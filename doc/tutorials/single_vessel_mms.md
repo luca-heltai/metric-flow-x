@@ -1,185 +1,53 @@
 # Single-vessel manufactured solution (MMS)
 
-## Problem solved
+## Current paper experiment
 
-This tutorial prepares a one-vessel manufactured-solution (MMS) convergence
-study for the current `BloodFlowSystem<1, 3>` implementation. The checked-in
-assets contain three exact-solution/RHS profiles (`p1`, `p2`, and `p3`), three
-polynomial degrees, a one-cell single_vessel VTK input, and an immutable TXT
-reference report. The purpose of this page is to make those inputs and their
-provenance reproducible.
+The supported MMS input is
+[`reproducibility/parameters/mms.prm.in`](../../reproducibility/parameters/mms.prm.in).
+The [paper manifest](../../reproducibility/manifest.json) defines independent
+runs for polynomial degrees 1–3 and successive mesh refinements. The template
+provides numerical vessel constants in its exact fields and forcing, Dirichlet
+traces at both ends, native consistent initialization, BDF5 and uniform scalar
+absolute/relative tolerances of `1e-12`. Startup tolerance relaxation is disabled
+so it cannot contaminate the measured errors.
 
-The reference tables below are parsed from `convergence.txt`.
-
-## Mathematical model and active assumptions
-
-The source-backed generator derives sources from the volume equations assembled
-in [`source/blood_flow_system.cc`](../../source/blood_flow_system.cc):
-
-\[
-  A_t + (A U)_x = f_A,
-  \qquad
-  U_t + \left(\frac{U^2}{2} + \frac{p(A)}{\rho}\right)_x
-      - \eta\frac{U}{A} = f_U,
-\]
-
-with
-
-\[
-  \eta = \frac{2(\xi+2)\pi\mu}{\rho},
-  \qquad
-  p(A) = p_0 + p_d
-      + \frac{4\sqrt{\pi}E h_{wall}}{3a_d}
-        (\sqrt{A}-\sqrt{a_d}).
-\]
-
-This is a description of the equations currently implemented. The SymPy implementation and its
-FunctionParser rendering are in
-[`tools/generate_mms_expressions.py`](../../tools/generate_mms_expressions.py).
-The generated JSON records the expressions and the pressure law without
-silently replacing vessel data with another set of constants.
-
-The three exact fields in the parameter templates are:
-
-| Profile | Exact area `A(x,t)` | Exact velocity `U(x,t)` |
-|---|---|---|
-| `p1` | `0.1*a0*sin(2*PI*x)*cos(2*PI*t/5) + a0` | `-0.02*a0*sin(2*PI*t/5)*cos(2*PI*x)` |
-| `p2` | `t*sin(2*PI*x) + 4` | `cos(2*PI*x)/(2*PI*(t*sin(2*PI*x) + 4))` |
-| `p3` | `1 - 0.005*sin(9.42*t - 6.28*x)` | `0.05*sin(6.28*x)` |
-
-These expressions are source-backed inputs.
-In particular, the symbolic `a0`, `E`, `h_wall`, `a_d`, `p0`, and `p_d` terms
-in the generated RHS require a source interface that the current user
-`FunctionParser` does not have.
-
-## Network and physical data
-
-[`tutorials/01_single_vessel_mms`](../../tutorials/01_single_vessel_mms)
-contains the three parameter templates and the reference artifacts. The mesh
-used by the templates is
-[`parameters/single_vessel.vtk`](../../parameters/single_vessel.vtk): two
-points, one line cell, and one vessel (`vessel_id = 0`). Its source-backed cell
-values are `a0 = 3.0605e-4`, `a_d = 4.5239e-4`, `E = 4e5`,
-`h_wall = 1.2e-3`, `p_d = 9.46e3`, `p0 = 0`, `L = 0.24137`, and
-`r_d = 0.012`. The point data provide boundary IDs and RCR values.
-
-The physical-unit interpretation used by the implementation is SI for the
-state and material quantities: axial coordinate and length in metres (m), time
-in seconds (s), area in square metres (m²), velocity in metres per second
-(m/s), pressure and Young's modulus in pascals (Pa), wall thickness and radius
-in metres, density in kg/m³, and viscosity in Pa·s. The VTK file has no unit
-metadata, so these are documented assumptions based on the source conversions.
-The literal profile constants above must
-be interpreted consistently with those assumptions before a dimensional MMS
-run is attempted.
-
-## Boundary and initial conditions
-
-Each template sets `Initial time = 0`, `Final time = 0.1`, and the initial
-condition corresponding to its exact profile (see the linked `.prm.in` files).
-The templates select `RCR` at the outlet and use the boundary/RCR records in
-the VTK input. The boundary conditions correspond to the exact fields at both
-ends.
-
-The template RHS is intentionally `0.0; 0.0` as a safe parser-backed baseline.
-The generated nonzero source terms must not be substituted until vessel
-constants can be passed to the RHS parser. The current code's parser constant
-map exposes `rho`, `mu`, `xi`, `m`, and `Rt`, while the pressure law also reads
-`E`, `h_wall`, `a_d`, `p0`, and `p_d` from VTK data. This mismatch is the
-source-backed blocker for a runnable MMS case.
-
-## Parameter file
-
-The three templates differ in polynomial degree only:
-
-- [`p1.prm.in`](../../tutorials/01_single_vessel_mms/p1.prm.in), degree 1;
-- [`p2.prm.in`](../../tutorials/01_single_vessel_mms/p2.prm.in), degree 2;
-- [`p3.prm.in`](../../tutorials/01_single_vessel_mms/p3.prm.in), degree 3.
-
-They set `Number of global refinement = 2` and `Number of refinement cycles =
-5`. This is the separate **four-cell/five-cycle mesh plan**: starting from the
-one-cell VTK and two global refinements, the intended cell counts are 4, 8,
-16, 32, and 64.
-
-That cell plan must not be confused with the `DoFs` column in the reference
-report. `DoFs` are total degrees of freedom reported by the reference study;
-they are not cell counts and are not to be replaced by the four-cell sequence.
-The immutable report gives DoF sequences of 32, 64, 128, 256, 512 (degree 1),
-40, 80, 160, 320, 640 (degree 2), and 48, 96, 192, 384, 768 (degree 3).
-No additional mapping between these two sequences is asserted here.
-
-## Configure and build
-
-From a clean checkout, the source-backed preparation commands are:
+Prepare the current sweep without launching a solver:
 
 ```bash
-cmake -S . -B build
-cmake --build build
+scripts/download_datasets.sh .
+python3 scripts/reproduce_paper.py --suite mms --prepare-only
 ```
 
-CMake configures the repository's normal parameter templates under
-`build/parameters/`. A runnable preparation can expand `@SOURCE_DIR@` into a
-working copy, for example:
+For execution, supply a `blood_flow` executable and its full source revision;
+see [the reproduction guide](../reproducibility.md) for build provenance,
+serial/MPI execution and output collection. Use a fresh output root for each
+preparation or execution. The runner records the effective parameters and mesh
+checksums for every case. Current errors and convergence rates must be obtained
+from those new runs before the paper is finalized.
 
-```bash
-sed "s|@SOURCE_DIR@|$(pwd)|g" \
-  tutorials/01_single_vessel_mms/p1.prm.in > /tmp/single_vessel-p1.prm
-```
+## Removed ARKode-derived inputs
 
-This command prepares a parameter file.
+The historical p1/p2/p3 tutorial templates and the old ARKode parameter cases
+have been removed. They used vessel constants and initial data unavailable
+through the current parameter interface; a section rename to IDA was insufficient
+to make them reproducible. They remain accessible in Git history.
 
-## Run in serial
+[`tools/generate_mms_expressions.py`](../../tools/generate_mms_expressions.py)
+and the symbolic JSON in tutorial 01 retain mathematical derivations for the
+historical profiles. They are reference artifacts, not alternative runnable
+paper inputs. In particular, symbolic vessel constants in those expressions
+cannot be passed directly through the current user FunctionParser constant map.
 
-The eventual serial invocation has the normal executable shape:
+## Earlier reference evidence
 
-```bash
-./build/metric_flow_x /tmp/single_vessel-p1.prm
-```
-
-The executable accepts the resulting parameter file as its input.
-
-## Run with MPI
-
-After the same implementation blockers are resolved, the corresponding MPI
-shape is:
-
-```bash
-mpirun -np 2 ./build/metric_flow_x /tmp/single_vessel-p1.prm
-```
-
-This is recorded for reproducibility preparation only.
-
-## Expected files and units
-
-The current executable's output behavior is described in
-[`doc/outputs.md`](../outputs.md). A successful ordinary run is expected to
-write visualization files, `last_used_parameters.prm`, and the consolidated
-probe CSV `vessel_probes.csv`; the exact runtime output has not
-been established for these MMS templates.
-
-The probe CSV header is source-backed and uses these units/conversions:
-
-| Column | Unit |
-|---|---|
-| `time_s` | s |
-| `vessel_id` | dimensionless |
-| `pressure_Pa` | Pa |
-| `flow_m3_s` | m³/s |
-| `area_m2` | m² |
-| `velocity_m_s` | m/s |
-
-The current consolidated output uses SI directly. Historical per-vessel CSV
-artifacts used dyn/cm², cm³/s, cm² and cm/s.
-
-## Post-processing commands
-
-The immutable report is
+The supplied report is retained as
 [`reference/convergence.txt`](../../tutorials/01_single_vessel_mms/reference/convergence.txt).
-The adjacent
-[`reference/convergence.json`](../../tutorials/01_single_vessel_mms/reference/convergence.json)
-is its canonical TXT-derived JSON and records SHA-256
-`7789933cabd07a015fbbd50d8ff14d293f0831a6f436bfd64b308d76e7e1d3a5`.
-Generate the canonical JSON and Markdown table with the checked-in collector:
+Its adjacent JSON records the original SHA-256 and preserves all displayed
+errors and rates. These tables describe that earlier report and do not assert
+that the current paper experiment reproduces its values. `DoFs` denotes the
+report's total degrees of freedom.
+
+Regenerate the reference JSON or table without a solver:
 
 ```bash
 python3 tools/collect_convergence.py \
@@ -189,39 +57,6 @@ python3 tools/collect_convergence.py \
   tutorials/01_single_vessel_mms/reference/convergence.txt \
   --format markdown --output /tmp/convergence.md
 ```
-
-The collector retains displayed error and rate strings verbatim. The table in
-this page is the collector output. Generate
-the source-backed SymPy expressions with:
-
-```bash
-python3 tools/generate_mms_expressions.py \
-  --output /tmp/mms_expressions.json
-```
-
-The generator requires SymPy.
-
-## Validation criteria
-
-blockers are addressed, are:
-
-1. all three cases complete without NaN, negative area, unhandled solver
-   failure, or missing output;
-2. the generated table preserves the exact reference DoF counts;
-3. the final two L2 rates are within 0.10 of `p+1`, and the final two H1 rates
-   are within 0.10 of `p` for each degree;
-4. numerical errors are compared with the supplied reference using a tolerance
-   justified by at least two supported build configurations;
-5. the generated documentation table and TXT-derived table are byte-for-byte
-   consistent after the documented normalization; and
-6. all stated units match parser inputs and output conversions.
-
-## Reference results and provenance
-
-The following three tables are generated from the TXT report via the collector
-and canonical JSON described above. `DoFs` remains the
-report's total-DoF column and is intentionally separate from the four-cell/
-five-cycle mesh plan.
 
 ### Polynomial degree 3
 
@@ -257,25 +92,6 @@ The JSON provenance records the TXT checksum and identifies the report as the
 source of every displayed string. The reference numbers are retained from the
 source report.
 
-## Troubleshooting
 
-- **The generator exits with “SymPy is required”.** Install SymPy in the
-  interpreter used for the command, then rerun the generator.
-- **The generated RHS contains `E`, `h_wall`, `a_d`, `p0`, or `p_d`.** These
-  values come from VTK, while the current user RHS parser exposes the constants
-  listed in the parameter documentation.
-- **The executable appears to run as an ordinary case.** Its output uses the
-  formats described in [`doc/outputs.md`](../outputs.md).
-- **DoFs do not equal 4, 8, 16, 32, 64.** That is expected: those are cell
-  counts in the separate mesh plan, whereas the report's `DoFs` column is total
-  degrees of freedom.
-- **Documentation build.** This page is MyST Markdown and is included in the
-  documentation navigation below.
-
-## Literature
-
-For the repository's implementation crosswalk and model caveats, see
-[`doc/math.md`](../math.md) and [`doc/background.md`](../background.md). The
-repository bibliography is indexed by [`doc/references.md`](../references.md).
-This WP-08 page records the source-backed implementation inputs and reference
-provenance.
+See [the output reference](../outputs.md) for current CSV units and
+[the transient policy](../transient_parameters.md) for the active input inventory.

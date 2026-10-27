@@ -37,7 +37,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="metric-flow-wall-") as temporary:
         for model in ("arterial", "venous"):
             original = (
-                executable.parent / "parameters" / f"wall_{model}.prm"
+                executable.parent / "tests" / "parameters" / f"wall_{model}.prm"
             ).read_text()
             for viscous in (False, True):
                 cases = [("native", n) for n in (args.mpi_ranks if args.mpi else (1,))]

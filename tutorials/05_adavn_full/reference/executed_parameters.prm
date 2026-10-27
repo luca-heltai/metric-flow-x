@@ -1,3 +1,5 @@
+# Current rerun input; substitute @DATA_DIR@ with a fresh prepared data directory.
+# Earlier numerical receipts must be regenerated with this configuration.
 # Open-loop full arterial-venous model. Read README.md for the explicit
 # reductions relative to the closed-loop physiological model of Müller 2023.
 subsection Metric Flow Parameters
@@ -7,14 +9,14 @@ subsection Metric Flow Parameters
 end
 subsection Functions
   # Smooth nonnegative prescribed pulse, period 0.8 s and exact mean 96.36 ml/s.
-  # Mean((1+cos)^8) = binomial(16,8)/2^8 = 50.2734375.
+  # Cosine modulation amplitude 80%; mean flow is unchanged.
   # This is an analytic forcing, not the paper's closed-loop heart model.
   set Inflow function = 96.36e-6*(1-0.8*cos(2*3.141592653589793*t/0.8))
 end
 subsection MetricFlowSystem<1, 3>
   set Run mode = transient
-  set Vtk file path for mesh input = /data/home/lheltai/codes/metric-flow-x-adan-full/build/adavn_beds/adavn_full.vtk
-  set Terminal connections CSV file = /data/home/lheltai/codes/metric-flow-x-adan-full/build/adavn_beds/connections.csv
+  set Vtk file path for mesh input = @DATA_DIR@/adavn_full.vtk
+  set Terminal connections CSV file = @DATA_DIR@/connections.csv
   set Wall model = ADAVN mixed
   set Viscoelastic wall = false
   set Initial state source = steady network
@@ -32,7 +34,7 @@ subsection MetricFlowSystem<1, 3>
   set Area absolute tolerance fraction = 1e-6
   set Velocity absolute tolerance = 1e-6
   set Capacitor pressure absolute tolerance = 0.01
-  set Output directory = /data/home/lheltai/codes/metric-flow-x-adan-full/build/adavn_beds/transient_p2
+  set Output directory = @DATA_DIR@/transient_10cycles
   set Output filename = adavn_full
   # Aortic source row 815 and the three central venous drainage rows.
   # Each source row has two cells with distinct material IDs.
