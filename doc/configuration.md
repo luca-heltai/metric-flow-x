@@ -24,6 +24,10 @@ The following entries are registered by `BloodFlowSystem` in `include/metric_flo
 | `Numerical flux type` | Exactly `HLL`, `HLL_HDG`, or `LAX_FRIEDRICHS`. Other strings are rejected. |
 | `Use Riemann Invariants` | Select the configured boundary treatment using Riemann invariants. |
 | `Outlet boundary condition type` | `RCR` or `Reflection` for characteristic boundaries; `Dirichlet` prescribes area and velocity from the first two `Exact solution` components at every physical endpoint, including the inlet, and allocates no capacitor unknowns. |
+| `Mesh partitioning` | `graph` uses a weighted vessel graph and requires METIS; it is the default when available. `zorder` selects the legacy scheme and is the default without METIS. See [partitioning](partitioning.md). |
+| `Partition junction weight` | Positive graph edge weight at shared mesh vertices; default 4. |
+| `Partition terminal connection weight` | Positive graph edge weight for each peripheral connection; default 1. |
+| `Partition imbalance tolerance` | Allowed maximum vertex-weight load excess over the mean; default 0.03. Atomic vessels can make this target infeasible. |
 | `Use junction mesh` | Select the mesh construction mode for network junctions. |
 | `Vtk file path for mesh input` | Legacy VTK network mesh read during setup. |
 

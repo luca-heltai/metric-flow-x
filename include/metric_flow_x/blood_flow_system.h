@@ -143,7 +143,7 @@ namespace MetricFlowX
       using SparseMatrix    = dealii::TrilinosWrappers::SparseMatrix;
       using PreconditionILU = dealii::TrilinosWrappers::PreconditionILU;
     } // namespace MPI
-    using SolverGMRES = dealii::SolverGMRES<MPI::Vector>;
+    using SolverGMRES             = dealii::SolverGMRES<MPI::Vector>;
 #else
 #  error DEAL_II_WITH_PETSC or DEAL_II_WITH_TRILINOS required
 #endif
@@ -160,7 +160,7 @@ namespace MetricFlowX
   // Every unknown of the system is a DoF of `dof_handler_` (components 0,1
   // carry the cell values A, U; components 2,3 carry the face traces A_hat,
   // U_hat), with the sole exception of the RCR capacitor pressures, which
-  // occupy the index range appended after dof_handler_.n_dofs().  Ownership of
+  // follow each rank's FE entries in the coupled system vector. Ownership of
   // an unknown is consequently the ownership of the cell that carries it, as
   // determined by the Triangulation partitioning, and this class defines no
   // second ownership rule.
@@ -433,6 +433,30 @@ namespace MetricFlowX
 
     const FiniteElement<dim, spacedim> &
     finite_element() const;
+
+    /** Convert a native DoFHandler index to the coupled system numbering. */
+    types::global_dof_index
+    system_dof_index(const types::global_dof_index fe_index) const
+    {
+      AssertIndexRange(fe_index, dof_handler_.n_dofs());
+      const auto owner = std::upper_bound(fe_rank_offsets_.begin(),
+                                          fe_rank_offsets_.end(),
+                                          fe_index) -
+                         fe_rank_offsets_.begin() - 1;
+      return fe_index + capacitor_rank_offsets_[owner];
+    }
+
+    /** Get cell indices for use with make_state() and system matrices. */
+    template <typename CellIterator>
+    void
+    get_system_dof_indices(const CellIterator                   &cell,
+                           std::vector<types::global_dof_index> &indices) const
+    {
+      cell->get_dof_indices(indices);
+      for (auto &index : indices)
+        index = system_dof_index(index);
+    }
+
 
     const AffineConstraints<double> &
     constraints() const;
@@ -861,6 +885,19 @@ namespace MetricFlowX
     void
     build_global_vessel_data();
 
+    void
+    partition_vessels(Triangulation<dim, spacedim> &mesh) const;
+
+#ifdef DEAL_II_WITH_METIS
+    std::string mesh_partitioning = "graph";
+#else
+    std::string mesh_partitioning = "zorder";
+#endif
+    unsigned int partition_junction_weight = 4;
+    unsigned int partition_terminal_weight = 1;
+    double       partition_imbalance       = 0.03;
+
+
     // -----------------------------------------------------------------------
     // Mesh and FE space
     //
@@ -868,15 +905,27 @@ namespace MetricFlowX
     //             FE_DGQ(1),        2 )   -> components 2,3 : trace A_hat,
     //             U_hat
     //
-    // Solution vector layout: [ FE range | capacitor pressures ], the FE range
-    // being numbered by dof_handler_ and the capacitor block occupying the
-    // n_rcr_dofs indices starting at dof_handler_.n_dofs().
+    // Each rank owns a contiguous system block [local FE DoFs | local Pc].
+    // DoFHandler and FE evaluation vectors retain their native numbering;
+    // system_dof_index() inserts preceding ranks' capacitor blocks.
     // -----------------------------------------------------------------------
     parallel::fullydistributed::Triangulation<dim, spacedim> triangulation_;
     DoFHandler<dim, spacedim>                                dof_handler_;
     std::unique_ptr<FiniteElement<dim, spacedim>>            fe_;
 
-    types::global_dof_index n_total_dofs = 0;
+    types::global_dof_index              n_total_dofs = 0;
+    std::vector<types::global_dof_index> fe_rank_offsets_;
+    std::vector<types::global_dof_index> capacitor_rank_offsets_;
+
+    IndexSet
+    system_index_set(const IndexSet &fe_indices) const
+    {
+      IndexSet result(n_total_dofs);
+      for (const auto index : fe_indices)
+        result.add_index(system_dof_index(index));
+      result.compress();
+      return result;
+    }
 
     // -----------------------------------------------------------------------
     // Index sets
@@ -1066,7 +1115,7 @@ namespace MetricFlowX
       if (!viscoelastic_wall)
         return 0.;
       std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
-      cell->get_dof_indices(indices);
+      get_system_dof_indices(cell, indices);
       const auto delta = cell->vertex(1) - cell->vertex(0);
       Point<dim> xi;
       xi[0] =

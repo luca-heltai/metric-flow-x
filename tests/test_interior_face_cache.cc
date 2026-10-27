@@ -58,7 +58,7 @@ test()
                       ExcInternalError());
           std::vector<types::global_dof_index> dofs(
             flow.fe_->n_dofs_per_cell());
-          face.cell->get_dof_indices(dofs);
+          flow.get_system_dof_indices(face.cell, dofs);
           const auto [area, velocity] =
             flow.face_trace_dofs(dofs, face.face_no);
           AssertThrow(face.a_hat_dof == area && face.u_hat_dof == velocity,

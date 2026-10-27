@@ -29,7 +29,7 @@ namespace MetricFlowX
       if (!locally_owned_dofs_.is_element(row))
         return;
       std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
-      cell->get_dof_indices(indices);
+      get_system_dof_indices(cell, indices);
       Point<dim> xi;
       const auto delta = cell->vertex(1) - cell->vertex(0);
       xi[0] =
@@ -70,7 +70,7 @@ namespace MetricFlowX
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
-          cell->get_dof_indices(indices);
+          get_system_dof_indices(cell, indices);
           values.reinit(cell);
           const auto tangent = compute_directional_vector(cell);
           for (unsigned int q = 0; q < quadrature.size(); ++q)
@@ -115,7 +115,7 @@ namespace MetricFlowX
       for (unsigned int i = 1; i < junction.n_vessels(); ++i)
         {
           const auto &row_half = junction.half_faces[i - 1];
-          row_half.cell->get_dof_indices(indices);
+          get_system_dof_indices(row_half.cell, indices);
           const auto trace = face_trace_dofs(indices, row_half.face_no);
           add(trace.second,
               -1. / density,

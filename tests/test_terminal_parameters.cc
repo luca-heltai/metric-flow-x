@@ -238,7 +238,7 @@ test()
       for (const auto &cell : flow.dof_handler_.active_cell_iterators())
         if (cell->is_locally_owned())
           {
-            cell->get_dof_indices(indices);
+            flow.get_system_dof_indices(cell, indices);
             for (unsigned int i = 0; i < indices.size(); ++i)
               y(indices[i]) =
                 flow.fe_->system_to_component_index(i).first % 2 == 0 ?

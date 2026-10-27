@@ -322,7 +322,7 @@ namespace MetricFlowX
               const double sign =
                 compute_directional_vector(cell) * tangent >= 0. ? 1. : -1.;
               const auto &v = vessel_map.at(edge.vessel_id);
-              cell->get_dof_indices(ldofs);
+              get_system_dof_indices(cell, ldofs);
               for (unsigned int i = 0; i < ldofs.size(); ++i)
                 {
                   const auto   point = support_point(cell, i);
@@ -418,7 +418,7 @@ namespace MetricFlowX
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
-          cell->get_dof_indices(ldofs);
+          get_system_dof_indices(cell, ldofs);
           for (unsigned int i = 0; i < ldofs.size(); ++i)
             {
               const auto   component = fe_->system_to_component_index(i).first;
@@ -589,7 +589,7 @@ namespace MetricFlowX
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
-          cell->get_dof_indices(ldofs);
+          get_system_dof_indices(cell, ldofs);
           residual.extract_subvector_to(ldofs.begin(),
                                         ldofs.end(),
                                         local.begin());
@@ -661,7 +661,7 @@ namespace MetricFlowX
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
-          cell->get_dof_indices(ldofs);
+          get_system_dof_indices(cell, ldofs);
           residual.extract_subvector_to(ldofs.begin(),
                                         ldofs.end(),
                                         local.begin());
@@ -748,7 +748,7 @@ namespace MetricFlowX
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
-          cell->get_dof_indices(indices);
+          get_system_dof_indices(cell, indices);
           for (unsigned int j = 0; j < indices.size(); ++j)
             {
               const auto   component = fe_->system_to_component_index(j).first;
@@ -941,7 +941,7 @@ namespace MetricFlowX
             for (const auto &cell : dof_handler_.active_cell_iterators())
               if (cell->is_locally_owned())
                 {
-                  cell->get_dof_indices(indices);
+                  get_system_dof_indices(cell, indices);
                   const auto &vp = vessel_map.at(cell->material_id());
                   for (unsigned int j = 0; j < indices.size(); ++j)
                     if (fe_->system_to_component_index(j).first % 2 == 0)

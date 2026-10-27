@@ -39,7 +39,7 @@ main(int argc, char **argv)
   for (const auto &cell : flow.dof_handler().active_cell_iterators())
     if (cell->is_locally_owned())
       {
-        cell->get_dof_indices(indices);
+        flow.get_system_dof_indices(cell, indices);
         for (unsigned int i = 0; i < indices.size(); ++i)
           {
             const auto component =
@@ -99,6 +99,15 @@ main(int argc, char **argv)
     Utilities::MPI::gather(flow.mpi_communicator(), owned_cells, 0);
   const auto ghosts =
     Utilities::MPI::gather(flow.mpi_communicator(), ghost_cells, 0);
+  const auto owned_dofs =
+    Utilities::MPI::gather(flow.mpi_communicator(),
+                           flow.locally_owned_dofs().n_elements(),
+                           0);
+  const auto capacitor_dofs =
+    Utilities::MPI::gather(flow.mpi_communicator(),
+                           flow.locally_owned_dofs().n_elements() -
+                             flow.dof_handler().n_locally_owned_dofs(),
+                           0);
   const auto json_array = [](const auto &values) {
     std::ostringstream out;
     out << std::setprecision(17) << '[';
@@ -122,6 +131,8 @@ main(int argc, char **argv)
               << Utilities::MPI::n_mpi_processes(flow.mpi_communicator())
               << ",\"cells\":" << flow.triangulation().n_global_active_cells()
               << ",\"dofs\":" << y.size() << ",\"startup_s\":" << startup
+              << ",\"owned_dofs_per_rank\":" << json_array(owned_dofs)
+              << ",\"capacitor_dofs_per_rank\":" << json_array(capacitor_dofs)
               << ",\"owned_cells_per_rank\":" << json_array(owned)
               << ",\"ghost_cells_per_rank\":" << json_array(ghosts)
               << ",\"residual_rank_median_s\":" << json_array(rank_residual)
@@ -149,7 +160,7 @@ main(int argc, char **argv)
           for (const auto &cell : flow.dof_handler().active_cell_iterators())
             if (cell->is_locally_owned())
               {
-                cell->get_dof_indices(indices);
+                flow.get_system_dof_indices(cell, indices);
                 for (unsigned int i = 0; i < indices.size(); ++i)
                   {
                     const auto component =

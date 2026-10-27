@@ -75,6 +75,15 @@ test()
       AssertThrow(flow.vessel_map.at(0).dynamic_viscosity == .001 &&
                     flow.vessel_map.at(1).dynamic_viscosity == .004,
                   ExcMessage("Per-vessel viscosity was not preserved."));
+      for (const auto &face : flow.boundary_faces)
+        {
+          const auto pc =
+            flow.rcr_pc_dof.find(face.cell->face(face.face_no)->boundary_id());
+          if (pc != flow.rcr_pc_dof.end())
+            AssertThrow(flow.locally_owned_dofs_.is_element(pc->second),
+                        ExcMessage(
+                          "Capacitor must be owned by its terminal cell."));
+        }
       auto y = flow.make_state(), rate = flow.make_state();
       flow.compute_initial_solution(y, 0.);
       AssertThrow(flow.has_admissible_wall_states(y),
@@ -86,7 +95,7 @@ test()
           {
             std::vector<types::global_dof_index> indices(
               flow.fe_->n_dofs_per_cell());
-            cell->get_dof_indices(indices);
+            flow.get_system_dof_indices(cell, indices);
             for (unsigned int k = 0; k < indices.size(); ++k)
               if (flow.fe_->system_to_component_index(k).first == 0)
                 invalid_trial(indices[k]) = 100 * flow.vessel_map.at(0).a_d;
@@ -102,7 +111,7 @@ test()
           {
             std::vector<types::global_dof_index> indices(
               flow.fe_->n_dofs_per_cell());
-            cell->get_dof_indices(indices);
+            flow.get_system_dof_indices(cell, indices);
             for (unsigned int k = 0; k < indices.size(); ++k)
               {
                 const auto component =

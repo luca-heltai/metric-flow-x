@@ -71,6 +71,7 @@ endforeach()
 
 set(METRIC_FLOW_X_SOURCES
   source/blood_flow_system.cc
+  source/vessel_partitioning.cc
   source/viscous_wall.cc
   source/blood_flow_initialization.cc
   source/inflow_series.cc

@@ -228,7 +228,7 @@ test()
       {
         std::vector<types::global_dof_index> ldofs(
           problem.fe_->n_dofs_per_cell());
-        cell->get_dof_indices(ldofs);
+        problem.get_system_dof_indices(cell, ldofs);
         const double expected_external =
           17.0 + 100.0 * cell->center()[0] +
           3.0 * static_cast<double>(cell->material_id());

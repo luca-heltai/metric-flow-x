@@ -48,7 +48,7 @@ test()
           {
             std::vector<types::global_dof_index> dofs(
               flow.fe_->n_dofs_per_cell());
-            cell->get_dof_indices(dofs);
+            flow.get_system_dof_indices(cell, dofs);
             const auto &vessel = flow.vessel_map.at(cell->material_id());
             for (unsigned int i = 0; i < dofs.size(); ++i)
               if (flow.fe_->system_to_component_index(i).first == 0)

@@ -65,7 +65,7 @@ test()
         {
           std::vector<types::global_dof_index> indices(
             p.fe_->n_dofs_per_cell());
-          cell->get_dof_indices(indices);
+          p.get_system_dof_indices(cell, indices);
           for (unsigned int k = 0; k < indices.size(); ++k)
             {
               const auto i = indices[k];
@@ -88,7 +88,7 @@ test()
         {
           std::vector<types::global_dof_index> indices(
             p.fe_->n_dofs_per_cell());
-          cell->get_dof_indices(indices);
+          p.get_system_dof_indices(cell, indices);
           for (unsigned int k = 0; k < indices.size(); ++k)
             if (p.fe_->system_to_component_index(k).first == 0)
               {

@@ -105,7 +105,7 @@ test()
           for (const auto &cell : flow.dof_handler_.active_cell_iterators())
             if (cell->is_locally_owned())
               {
-                cell->get_dof_indices(indices);
+                flow.get_system_dof_indices(cell, indices);
                 Vector<double> local(indices.size()), mass_rate(indices.size());
                 rate.extract_subvector_to(indices.begin(),
                                           indices.end(),

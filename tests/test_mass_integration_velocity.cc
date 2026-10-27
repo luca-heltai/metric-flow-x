@@ -66,7 +66,7 @@ test()
         continue;
 
       std::vector<types::global_dof_index> ldofs(n_dofs);
-      cell->get_dof_indices(ldofs);
+      problem.get_system_dof_indices(cell, ldofs);
       for (unsigned int i = 0; i < n_dofs; ++i)
         {
           // Only set the area component (component 0) DOFs to 1
@@ -87,7 +87,7 @@ test()
         continue;
 
       std::vector<types::global_dof_index> ldofs(n_dofs);
-      cell->get_dof_indices(ldofs);
+      problem.get_system_dof_indices(cell, ldofs);
 
       for (unsigned int i = 0; i < n_dofs; ++i)
         local_v(i) = v(ldofs[i]);
