@@ -1,0 +1,44 @@
+{
+  "mpi_ranks": 32,
+  "threads_per_rank": 1,
+  "serial_integration_s": 751.643219593,
+  "parallel_integration_s": 130.419368246,
+  "speedup": 5.763279102650102,
+  "probe_max_absolute_difference": {
+    "pressure_Pa": 5.4569682106375694e-11,
+    "flow_m3_s": 3.2729353081906165e-18,
+    "area_m2": 2.0599841277224584e-18,
+    "velocity_m_s": 4.076600168545497e-15
+  },
+  "probe_max_difference_over_serial_peak": {
+    "pressure_Pa": 4.38904423615066e-15,
+    "flow_m3_s": 1.8940533480760627e-14,
+    "area_m2": 2.3541543439524667e-15,
+    "velocity_m_s": 1.5260800912354537e-14
+  },
+  "probe_samples": 3208,
+  "cycle10": {
+    "cycle": 10,
+    "MAP_mmHg": 89.07273483957643,
+    "mean_aortic_flow_ml_s": 96.34758161219047,
+    "systolic_pressure_mmHg": 93.24025579458863,
+    "diastolic_pressure_mmHg": 84.84351095774441,
+    "mean_total_central_probe_flow_ml_s": 79.17658763798167
+  },
+  "serial_solver": "UMFPACK",
+  "parallel_solver": "native deal.II MUMPS LP64",
+  "comparison_note": "Different direct solver and dependency build; shared node. This is an observed end-to-end speedup, not a controlled strong-scaling measurement.",
+  "parallel_process_elapsed_s": 140.73,
+  "slurm_job_id": 47936,
+  "node": "gpu04",
+  "final_time_s": 8.0,
+  "output_times": 401,
+  "ida_steps": 1005,
+  "newton_iterations": 6036,
+  "jacobian_setups": 13,
+  "final_relative_ramp_factor": 1.0,
+  "final_absolute_ramp_factor": 1.0,
+  "output_results_s": 39.06,
+  "linear_solve_s": 39.58,
+  "source_mesh_sha256": "09992b0c892a7d24ac0d12550ae99553f682d16deac4a3dae538f85c98cad563"
+}

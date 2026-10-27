@@ -866,19 +866,40 @@ namespace MetricFlowX
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
             PETScWrappers::SparseDirectMUMPS solver(control);
             solver.solve(linear_system_matrix, update, rhs);
-#  elif defined(DEAL_II_WITH_UMFPACK)
-            AssertThrow(
-              n_mpi_processes == 1,
-              ExcMessage(
-                "Native viscoelastic parallel direct initialization requires PETSc with MUMPS; set Use direct solver = false."));
-            SerialDirectSolver solver;
-            solver.initialize(linear_system_matrix);
-            solver.vmult(update, rhs);
 #  else
-            AssertThrow(
-              false,
-              ExcMessage(
-                "Native viscoelastic direct initialization needs UMFPACK or MUMPS; set Use direct solver = false."));
+#    if defined(DEAL_II_WITH_MUMPS) && DEAL_II_VERSION_GTE(9, 7, 0)
+            if (n_mpi_processes > 1)
+              {
+                AssertThrow(
+                  Utilities::MPI::min(
+                    locally_owned_dofs_.n_elements(),
+                    linear_system_matrix.get_mpi_communicator()) > 0,
+                  ExcMessage(
+                    "Native deal.II MUMPS requires an owned DoF on every rank. Use fewer MPI ranks, PETSc MUMPS, or Use direct solver = false."));
+                SparseDirectMUMPS solver(
+                  SparseDirectMUMPS::AdditionalData(),
+                  linear_system_matrix.get_mpi_communicator());
+                solver.initialize(linear_system_matrix);
+                solver.vmult(update, rhs);
+              }
+            else
+#    endif
+              {
+#    ifdef DEAL_II_WITH_UMFPACK
+                AssertThrow(
+                  n_mpi_processes == 1,
+                  ExcMessage(
+                    "Native viscoelastic parallel direct initialization requires native deal.II MUMPS or PETSc with MUMPS; set Use direct solver = false."));
+                SerialDirectSolver solver;
+                solver.initialize(linear_system_matrix);
+                solver.vmult(update, rhs);
+#    else
+              AssertThrow(
+                false,
+                ExcMessage(
+                  "Native viscoelastic direct initialization needs UMFPACK or MUMPS; set Use direct solver = false."));
+#    endif
+              }
 #  endif
 #else
             TrilinosWrappers::SolverDirect solver(control);

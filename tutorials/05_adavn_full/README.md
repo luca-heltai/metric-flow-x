@@ -138,8 +138,33 @@ The generated `$ADAVN_DATA_DIR/transient.prm` is a complete parameter file.
 Its template is [hdg.prm.in](hdg.prm.in). Run it in a serial Slurm task with the
 same environment as the build. The example uses a direct solver; a serial
 UMFPACK build is sufficient. MPI time integration with a direct solver needs a
-compatible parallel solver such as MUMPS. MPI assembly benchmarking does not
+compatible parallel solver such as MUMPS. With the PETSc backend, native
+deal.II MUMPS (deal.II 9.7 or newer) is also supported when PETSc itself lacks
+MUMPS; keep
+`Use direct solver = true`. MPI assembly benchmarking does not
 need such a factorization.
+
+To repeat the prepared case on 32 CPU cores, copy `transient.prm` to a new
+run directory and change its `Output directory` to a fresh absolute path there.
+Keep `Use direct solver = true` and the physical and time-integration settings.
+With a working parallel MUMPS build, submit from the repository root:
+
+```sh
+export ADAVN_BLOOD_FLOW_EXECUTABLE="$PWD/build-gpu-mumps/blood_flow"
+export ADAVN_PARAMETERS="$PWD/build/adavn_anatomical_mpi32/parameters.prm"
+export MPIEXEC=/path/to/matching/openmpi/bin/mpiexec
+sbatch --output="$PWD/build/adavn_anatomical_mpi32/run.log" \
+  tutorials/05_adavn_full/run_transient_mpi.sbatch
+```
+
+The script requests 32 MPI ranks on one node, one thread per rank, with core
+binding. It runs an existing parameter file and writes to its configured output
+directory. Validate the installed MUMPS stack at runtime before benchmarking:
+MUMPS integer width is independent of deal.II global index width. The native
+wrapper currently requires at least one owned DoF per rank; the driver reports
+this restriction before solving. Use fewer ranks, PETSc MUMPS or the iterative
+solver for cases with empty ranks. The full network satisfies this requirement
+at 32 ranks.
 
 The transient uses degree two, HLL_HDG flux and the coupled resistive graph
 as its initial seed. Degree two represents the linearly tapered reference radius
@@ -277,6 +302,36 @@ below. The local output paths are `build/adavn_anatomical/adavn_full.vtk` for
 the input and `build/adavn_anatomical/arteries_veins_hdg.vtk` for the completed
 result; the tutorial commands regenerate them in `ADAVN_DATA_DIR`.
 
+A separate **32-rank anatomical run** on `gpu04` completed the same ten cycles
+with native deal.II MUMPS (LP64), one thread per rank and core binding:
+
+| CPU cores | Direct solver | Integration time |
+| --- | --- | --- |
+| 1 | UMFPACK | 751.64 s |
+| 32 | Native deal.II MUMPS | 130.42 s |
+
+The observed speedup is **5.76×**; the complete parallel process took **140.73 s**.
+Both runs took exactly 1,005 steps and 6,036 Newton iterations, with 401 output
+times and final tolerance ramp factors one. Across all 3,208 probe rows, maximum
+pressure difference was 5.46e-11 Pa and maximum flow difference 3.28e-18 m³/s.
+The solver and dependency builds differ and the node was shared, so this is an
+observed end-to-end comparison, not a controlled strong-scaling experiment.
+The parallel root timer attributes 39.06 s (29.7%) to output and 39.58 s (30.1%)
+to linear solves. Writing the unchanged 401 snapshots creates 12,832 VTU pieces;
+output therefore remains a substantial cost at 32 ranks.
+
+The separate local result is
+`build/adavn_anatomical_mpi32/arteries_veins_hdg.vtk`, with native time-series
+files under `build/adavn_anatomical_mpi32/output/`. A portable summary is in
+[anatomical_mpi32_performance.json](reference/anatomical_mpi32_performance.json).
+The LP64 stack passed ten arterial/venous elastic/viscoelastic native/IDA
+integration cases at one and two ranks. The empty-rank rejection was separately
+verified; the native wrapper's empty-rank result-copy defect is not bypassed
+silently. The supported-layout check is reproducible with
+`python3 tests/test_wall_integration.py --executable build-gpu-mumps/blood_flow --mpi --mpi-ranks 1 2`.
+The older 64-bit-MUMPS installation stalled in the two-rank runtime
+check; compilation alone did not establish that installation's usability.
+
 ## Verified synthetic-metric reference execution
 
 The published snapshots in this section used the explicit **metric geometry**
@@ -293,7 +348,8 @@ transient and the exclusive-node MPI benchmark are separate measurements.
 The build reused the working `build-gpu` OpenMPI 5.0.10/deal.II 9.8.0 Spack
 installation, PETSc backend, `-Wno-cpp`, and a DebugRelease build's Release
 executable. Direct serial solves used UMFPACK; this installation has no PETSc
-MUMPS support, so end-to-end MPI integration speedup was not measured.
+MUMPS support. These original reference runs predate the native deal.II MUMPS
+fallback and did not measure end-to-end MPI integration speedup.
 
 All 4,402 rows are present in the final connected VTK. The quadratic HDG system
 has **8,804 cells and 89,616 DoFs**, including 1,576 compartment pressures.

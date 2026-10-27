@@ -409,14 +409,20 @@ namespace MetricFlowX
             return 0;
           };
 
-          std::unique_ptr<SerialDirectSolver> serial_direct;
+          struct DirectFactors
+          {
+            std::unique_ptr<SerialDirectSolver> serial;
+#if defined(DEAL_II_WITH_MUMPS) && DEAL_II_VERSION_GTE(9, 7, 0)
+            std::unique_ptr<SparseDirectMUMPS> native;
+#endif
+          } direct_factors;
           ida.setup_jacobian = [&problem,
                                 &initial_output_seen,
                                 &ic_jacobian_setups,
-                                &serial_direct](const double      t,
-                                                const VectorType &y,
-                                                const VectorType &ydot,
-                                                const double alpha) -> int {
+                                &direct_factors](const double      t,
+                                                 const VectorType &y,
+                                                 const VectorType &ydot,
+                                                 const double alpha) -> int {
             if (!initial_output_seen)
               ++ic_jacobian_setups;
             ++problem.ida_jacobian_evaluations;
@@ -429,6 +435,33 @@ namespace MetricFlowX
 
             if (problem.use_direct_solver)
               {
+#if defined(METRIC_FLOW_X_WITH_PETSC) && defined(DEAL_II_WITH_MUMPS) && \
+  !defined(DEAL_II_PETSC_WITH_MUMPS) && DEAL_II_VERSION_GTE(9, 7, 0)
+                // deal.II's native MUMPS accepts the distributed PETSc
+                // operator even when PETSc itself was built without MUMPS.
+                if (problem.n_mpi_processes > 1)
+                  {
+                    if (!direct_factors.native)
+                      problem.pcout
+                        << "Parallel direct solver: native deal.II MUMPS ("
+                        << problem.n_mpi_processes << " MPI ranks).\n";
+                    // The native wrapper's result scatter dereferences the
+                    // first owned index; reject empty ranks before entering it.
+                    AssertThrow(
+                      Utilities::MPI::min(
+                        problem.locally_owned_dofs_.n_elements(),
+                        problem.linear_system_matrix.get_mpi_communicator()) >
+                        0,
+                      ExcMessage(
+                        "Native deal.II MUMPS requires an owned DoF on every rank. Use fewer MPI ranks, PETSc MUMPS, or Use direct solver = false."));
+                    direct_factors.native = std::make_unique<SparseDirectMUMPS>(
+                      SparseDirectMUMPS::AdditionalData(),
+                      problem.linear_system_matrix.get_mpi_communicator());
+                    direct_factors.native->initialize(
+                      problem.linear_system_matrix);
+                    return 0;
+                  }
+#endif
 #ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
                 problem.direct_solver =
@@ -438,11 +471,12 @@ namespace MetricFlowX
                 AssertThrow(
                   problem.n_mpi_processes == 1,
                   ExcMessage(
-                    "Parallel direct solves require PETSc with MUMPS. Set Use direct solver = false."));
+                    "Parallel direct solves require native deal.II MUMPS or PETSc with MUMPS. Set Use direct solver = false."));
 #    ifdef DEAL_II_WITH_UMFPACK
-                if (!serial_direct)
-                  serial_direct = std::make_unique<SerialDirectSolver>();
-                serial_direct->initialize(problem.linear_system_matrix);
+                if (!direct_factors.serial)
+                  direct_factors.serial =
+                    std::make_unique<SerialDirectSolver>();
+                direct_factors.serial->initialize(problem.linear_system_matrix);
 #    else
                 AssertThrow(
                   false,
@@ -469,8 +503,12 @@ namespace MetricFlowX
           };
 
           ida.solve_with_jacobian =
-            [&problem, &initial_output_seen, &ic_linear_solves, &serial_direct](
-              const VectorType &r, VectorType &z, const double /*tol*/) -> int {
+            [&problem,
+             &initial_output_seen,
+             &ic_linear_solves,
+             &direct_factors](const VectorType &r,
+                              VectorType       &z,
+                              const double /*tol*/) -> int {
             if (!initial_output_seen)
               ++ic_linear_solves;
             ++problem.ida_linear_solves;
@@ -479,6 +517,14 @@ namespace MetricFlowX
 
             if (problem.use_direct_solver)
               {
+#if defined(METRIC_FLOW_X_WITH_PETSC) && defined(DEAL_II_WITH_MUMPS) && \
+  !defined(DEAL_II_PETSC_WITH_MUMPS) && DEAL_II_VERSION_GTE(9, 7, 0)
+                if (direct_factors.native)
+                  {
+                    direct_factors.native->vmult(z, r);
+                    return 0;
+                  }
+#endif
 #ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
                 problem.direct_solver->solve(problem.linear_system_matrix,
@@ -486,7 +532,7 @@ namespace MetricFlowX
                                              r);
 #  else
 #    ifdef DEAL_II_WITH_UMFPACK
-                serial_direct->vmult(z, r);
+                direct_factors.serial->vmult(z, r);
 #    else
                 AssertThrow(false,
                             ExcMessage(

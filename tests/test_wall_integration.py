@@ -16,7 +16,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("--mpi", action="store_true")
+    parser.add_argument("--mpi-ranks", type=int, nargs="+", default=[1, 2, 4])
     args = parser.parse_args()
+    if 1 not in args.mpi_ranks or any(n < 1 for n in args.mpi_ranks):
+        parser.error("--mpi-ranks requires rank 1 and positive counts")
     executable = args.executable.resolve()
     launcher = shutil.which("mpirun")
     if args.mpi and launcher is None:
@@ -37,7 +40,7 @@ def main():
                 executable.parent / "parameters" / f"wall_{model}.prm"
             ).read_text()
             for viscous in (False, True):
-                cases = [("native", n) for n in ((1, 2, 4) if args.mpi else (1,))]
+                cases = [("native", n) for n in (args.mpi_ranks if args.mpi else (1,))]
                 if viscous:
                     cases += [("IDA", 1)]
                 for policy, ranks in cases:
@@ -115,7 +118,9 @@ def main():
             ), results
             if args.mpi:
                 for viscous in (False, True):
-                    for ranks in (2, 4):
+                    for ranks in args.mpi_ranks:
+                        if ranks == 1:
+                            continue
                         assert math.isclose(
                             results[model, viscous, "native", 1],
                             results[model, viscous, "native", ranks],

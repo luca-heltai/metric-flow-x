@@ -152,8 +152,9 @@ Jacobians; it does not approximate $F_{\dot y}$ by the block mass matrix.
 Physical column scales and equation sensitivity to final IDA error weights
 normalize the global sparse Newton system. It uses `Use direct solver` and the
 existing backend-specific direct or preconditioned GMRES solvers. Direct MPI
-solves with PETSc require MUMPS, as in the time integrator; otherwise select the
-iterative solver. No dense network-sized matrix is gathered to a root rank.
+solves with PETSc support either PETSc MUMPS or native deal.II MUMPS, as in the
+time integrator; otherwise select the iterative solver. Native deal.II MUMPS
+requires deal.II 9.7 or newer and nonempty DoF ownership on every rank. No dense network-sized matrix is gathered to a root rank.
 
 Backtracking requires a decreasing complete scaled residual and finite positive
 areas with positive elastic wave-speed modulus. The final check uses the same
