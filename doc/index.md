@@ -68,6 +68,7 @@ wall_models
 initialization
 transient_parameters
 stationary
+partitioning
 results
 performance
 performance_campaign
