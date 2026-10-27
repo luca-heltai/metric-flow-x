@@ -36,6 +36,10 @@ exactly the original 2.4/4.8 s schedule over 8 s.
 For the three wall-model inputs, final time is 0.001 s and the IDA output period
 is 0.005 s. There is no interior output time on which to end a ramp. They use
 native initialization and component tolerances with the ramp explicitly off.
+For MPI partitions with empty ranks, component tolerances require the
+[deal.II SUNDIALS minimum-reduction fix](https://github.com/dealii/dealii/pull/20307).
+The CI SDK (deal.II 9.7.1) predates that fix, so the tiny wall MPI regression
+retains its scalar-tolerance fixture, including the empty-rank coverage.
 
 The paper MMS trajectory retains scalar tolerances throughout, with the ramp
 explicitly off, so startup relaxation cannot contaminate the error being measured.
@@ -104,8 +108,8 @@ The active application input set contains 41 tracked parameter sources. Six
 additional library regression fixtures live in `tests/parameters/` and are
 configured into `build/tests/parameters/`. They retain the pre-rollout inputs
 for assembly, constitutive and API checks, without standalone IDA-runner
-settings. The inflow, output-schedule and work-limit integration checks also
-start from the constant fixture and apply their own time/solver controls.
+settings. The inflow, wall, output-schedule and work-limit integration checks also
+start from these fixtures and apply their own time/solver controls.
 The audit reports these separately as `library regression fixture` (47 total
 tracked sources).
 
