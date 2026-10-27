@@ -15,7 +15,7 @@ def validate(executable, source_dir, destination):
     destination.mkdir(parents=True, exist_ok=True)
     parameter_file = destination / "input.prm"
     output = destination / "output"
-    text = (source_dir / "tutorials/04_adan56/parameters.prm.in").read_text()
+    text = (source_dir / "tests/parameters/adan56.prm.in").read_text()
     text = text.replace("@SOURCE_DIR@", str(source_dir))
     import re
     for key, value in {

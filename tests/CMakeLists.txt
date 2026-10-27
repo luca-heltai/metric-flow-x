@@ -1,6 +1,6 @@
 # Library regressions use fixed inputs without standalone IDA-runner controls.
 # Keep these separate from the evolving tutorial and paper startup policy.
-foreach(_fixture constant aortic multi_vessel wall_arterial wall_venous wall_mixed)
+foreach(_fixture adan56 constant aortic multi_vessel wall_arterial wall_venous wall_mixed)
   configure_file("parameters/${_fixture}.prm.in"
     "parameters/${_fixture}.prm" @ONLY)
 endforeach()

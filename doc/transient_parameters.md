@@ -104,13 +104,13 @@ are left to the author for the final rerun.
 
 ## Complete parameter-source inventory
 
-The active application input set contains 41 tracked parameter sources. Six
-additional library regression fixtures live in `tests/parameters/` and are
+The active application input set contains 41 tracked parameter sources. Seven
+additional regression fixtures live in `tests/parameters/` and are
 configured into `build/tests/parameters/`. They retain the pre-rollout inputs
 for assembly, constitutive and API checks, without standalone IDA-runner
-settings. The inflow, wall, output-schedule and work-limit integration checks also
-start from these fixtures and apply their own time/solver controls.
-The audit reports these separately as `library regression fixture` (47 total
+settings. The inflow, wall, ADAN iterative, output-schedule and work-limit integration
+checks also start from these fixtures and apply their own time/solver controls.
+The audit reports these separately as `library regression fixture` (48 total
 tracked sources).
 
 | Source | Policy |
