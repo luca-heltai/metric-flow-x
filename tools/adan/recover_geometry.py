@@ -12,7 +12,7 @@ import heapq
 import json
 import math
 import re
-from collections import defaultdict, deque
+from collections import defaultdict
 from pathlib import Path
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "build/adan"
@@ -128,52 +128,10 @@ def recover(root=DEFAULT_DATA_DIR):
                 "distal_surface_radius_cm": radii[-1],
             }
         )
-    # Shared source node IDs resolve the two possible surface orientations.
-    # Use all shared nodes, including side branches along an anatomical artery.
-    flips = {"A_aortic_arch_C": 0}
-    queue = deque(flips)
-    while queue:
-        name = queue.popleft()
-        for node in candidates[name][flips[name]]:
-            for other in incident[node]:
-                if other in flips:
-                    continue
-                costs = []
-                for flip in (0, 1):
-                    cost = 0.0
-                    for common, p in candidates[other][flip].items():
-                        for known in incident[common]:
-                            if known in flips:
-                                cost += (
-                                    math.dist(
-                                        p, candidates[known][flips[known]][common]
-                                    )
-                                    ** 2
-                                )
-                    costs.append(cost)
-                flips[other] = min(range(2), key=costs.__getitem__)
-                queue.append(other)
-    if len(flips) != len(groups):
-        raise ValueError("Arterial network has disconnected anatomical groups")
-    # Coordinate descent resolves conflicting first-visit orientation evidence.
-    for iteration in range(20):
-        changed = 0
-        for name in groups:
-            costs = []
-            for flip in (0, 1):
-                cost = sum(
-                    math.dist(point, candidates[other][flips[other]][node]) ** 2
-                    for node, point in candidates[name][flip].items()
-                    for other in incident[node]
-                    if other != name
-                )
-                costs.append(cost)
-            chosen = min(range(2), key=costs.__getitem__)
-            if chosen != flips[name]:
-                flips[name] = chosen
-                changed += 1
-        if not changed:
-            break
+    # Shared nodes determine surface direction globally. A greedy first visit
+    # can misorient long chains and move whole branches far from the atlas.
+    from recover_full import orient
+    flips, optimization = orient(candidates, incident)
     points = {}
     disagreements = []
     for node, names in incident.items():
@@ -185,6 +143,7 @@ def recover(root=DEFAULT_DATA_DIR):
         disagreements.append({"node": node, "spread_cm": spread, "arteries": names})
     report = {
         "mode": "anatomical",
+        "orientation_optimization": optimization,
         "arteries": diagnostics,
         "orientation_reversed": [name for name in flips if flips[name]],
         "node_disagreements": sorted(

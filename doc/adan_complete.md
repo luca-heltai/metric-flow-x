@@ -103,6 +103,10 @@ graph in a format the solver can import.
 
 ### Optional anatomical reconstruction
 
+This mode also requires NumPy and SciPy (`pip install numpy scipy`). The
+[full-network tutorial](../tutorials/05_adavn_full/README.md) additionally uses
+the venous atlas and supports all 4,402 source rows.
+
 **Use this mode only with the written permission required for your intended
 HeMoLab use.** `--atlas-permission` records an explicit choice to use this
 restricted source; it does not grant rights or obtain permission for you.
@@ -157,13 +161,14 @@ sets the midpoint radius to their arithmetic mean.
 
 In anatomical mode, centers of circular 12-vertex rings are extracted from
 the surface tubes. Ring regularity is checked; orientation is resolved using
-shared source nodes and a local least-squares consistency procedure. Internal
+shared source nodes and a global binary least-squares optimization (SciPy/HiGHS). Internal
 CSV nodes are sampled at normalized arclength fractions along the recovered
 polylines. Shared-node estimates are averaged. An iterative chord constraint
 projection then enforces $d_e\le L_e$, and the same midpoint formula restores
 each published length. The perpendicular direction follows the recovered
 curve where possible. This is an approximate reconstruction, not recovery of
-the original splines or a proof of globally optimal orientation alignment.
+the original splines or a guarantee of anatomical accuracy. The reported
+orientation optimum concerns the sampled shared-node objective.
 
 The source atlas and the table have different sampling and sometimes different
 lengths. In the local full anatomical reconstruction, shared-node estimates

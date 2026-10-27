@@ -174,7 +174,7 @@ def write_csv(path, records):
         writer.writerows(records)
 
 
-def prepare(root, output, venous_wave_speed=2.):
+def prepare(root, output, venous_wave_speed=2., geometry="anatomical"):
     if not math.isfinite(venous_wave_speed) or venous_wave_speed <= 0:
         raise ValueError("Venous reference wave speed must be finite and positive")
     source = root / "source/data_sheet_1.csv"
@@ -184,8 +184,16 @@ def prepare(root, output, venous_wave_speed=2.):
         raise ValueError("Full ADAVN preparation requires the checksum-pinned source CSV")
     rows = read_rows(root, include_veins=True)
     edges, inlet, drains, degree = hydraulic_graph(rows, venous_wave_speed)
-    nodes = metric_geometry(rows, inlet, drains)
     output.mkdir(parents=True, exist_ok=True)
+    if geometry == "anatomical":
+        from recover_full import recover
+        nodes, hints, geometry_report = recover(rows, root, output/"geometry_report.json")
+    elif geometry == "metric":
+        nodes = metric_geometry(rows, inlet, drains)
+        hints = {}
+        geometry_report = None
+    else:
+        raise ValueError("Unknown geometry mode: "+geometry)
     node_ids = sorted(nodes)
     index = {node: i for i, node in enumerate(node_ids)}
     # The native graph indexes nodes consecutively. Keep original IDs in all
@@ -198,7 +206,7 @@ def prepare(root, output, venous_wave_speed=2.):
     for i, row in enumerate(rows):
         a, b = int(row[1]), int(row[2])
         length = float(row[3]) * 0.01
-        hint = tuple((x+y)/2 for x, y in zip(nodes[a], nodes[b]))
+        hint = hints.get(i, tuple((x+y)/2 for x, y in zip(nodes[a], nodes[b])))
         mid = len(points)
         points.append(midpoint(nodes[a], nodes[b], length, hint))
         radii = [float(row[4])*.01,
@@ -267,7 +275,8 @@ def prepare(root, output, venous_wave_speed=2.):
         point_data["R1"][index[data["node"]]] = data["resistance"]
         point_data["C"][index[data["node"]]] = data["compliance"]
     write_vtk(output / "adavn_full.vtk", points, cells, cell_data, point_data,
-              description="ADAVN full arterial-venous metric graph")
+              anatomical=geometry == "anatomical",
+              description="ADAVN full arterial-venous "+geometry+" graph")
     write_csv(output / "edges.csv", edges)
     write_csv(output / "connections.csv", [dict(boundary0=boundary_ids[terminal_node(rows[edge["source_row"]], degree)],
                boundary1=boundary_ids[terminal_node(rows[edge["draining_source_row"]], degree)], resistance=edge["resistance_Pa_s_m3"])
@@ -294,7 +303,8 @@ def prepare(root, output, venous_wave_speed=2.):
                     peripheral_connections=sum(edge["kind"] == "connection" for edge in edges),
                     hydraulic_nodes=max(max(edge["node0"], edge["node1"]) for edge in edges)+1,
                     max_relative_cell_length_error=max_length_error,
-                    geometry="Nonanatomical metric embedding of four source 1D components; peripheral graph edges carry no spatial geometry.",
+                    geometry=("Surface-derived anatomical embedding of all arterial and venous vessels; see geometry_report.json for adaptations." if geometry == "anatomical" else "Nonanatomical metric embedding of four source 1D components; peripheral graph edges carry no spatial geometry."),
+                    geometry_mode=geometry,
                     duplicates_in_source_names=len(rows)-len(set(row[0] for row in rows)),
                     mean_model="Reference-geometry Poiseuille vessels, 15% source peripheral R before each arterial compartment, remaining 85% split in parallel by draining-vein endpoint radius cubed, venous endpoint impedances, prescribed CO and right-atrial reservoir pressure.",
                     omitted_physics=["compliant vessel area response", "heart and pulmonary circulation", "pulsatile inertia", "peripheral storage", "coronary intramyocardial forcing", "intracranial-pressure feedback", "valves and Starling resistors"],
@@ -305,8 +315,13 @@ def prepare(root, output, venous_wave_speed=2.):
                     coronary_reduction="General-bed terminal model also used for coronary ends; no layered myocardial model.",
                     hdg_dural_classification="Venous name contains sinus, excluding coronary_sinus; explicit approximation, not an additional source-table label.",
                     hdg_omissions=["Kelvin-Voigt wall viscosity", "radius-dependent venous reference wave speed", "heart/pulmonary closed loop", "coronary bed forcing", "ICP feedback", "venous valves/Starling resistors"])
+    if geometry_report is not None:
+        manifest["geometry_source_license"] = metadata["atlas"]["license"]
+        manifest["geometry_terms_url"] = metadata["atlas"]["terms_url"]
+        manifest["geometry_report_sha256"] = hashlib.sha256((output/"geometry_report.json").read_bytes()).hexdigest()
+        manifest["geometry_node_adjustment"] = geometry_report["length_reconciliation"]
     manifest["generator_sha256"] = {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
-                                       for name in ("prepare_full.py", "build_vtk.py", "recover_geometry.py")}
+                                       for name in ("prepare_full.py", "build_vtk.py", "recover_geometry.py", "recover_full.py")}
     manifest["sha256"] = {name: hashlib.sha256((output/name).read_bytes()).hexdigest()
                           for name in ("adavn_full.vtk", "edges.csv", "outlets.csv", "mapping.json", "connections.csv")}
     (output / "provenance.json").write_text(json.dumps(manifest, indent=2)+"\n")
@@ -319,6 +334,8 @@ if __name__ == "__main__":
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--output-dir", type=Path, default=Path("build/adavn_full"))
     parser.add_argument("--venous-wave-speed", type=float, default=2.,
-                        help="Explicit constant c_ven for the HDG model [m/s]; does not affect the resistive mean calculation")
+                        help="Constant venous reference wave speed [m/s] for wall stiffness, venous impedance and residual compliance")
+    parser.add_argument("--geometry", choices=("anatomical", "metric"), default="anatomical",
+                        help="Anatomical uses both authorized atlases; metric is an explicit synthetic alternative")
     args = parser.parse_args()
-    prepare(args.data_dir, args.output_dir, args.venous_wave_speed)
+    prepare(args.data_dir, args.output_dir, args.venous_wave_speed, args.geometry)

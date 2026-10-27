@@ -6,13 +6,34 @@ into a connected haemodynamic model: 4,041 arterial and 361 venous segments.
 It supplies a native transient HDG calculation, an inexpensive resistive
 mean-flow comparison, and a CPU/MPI assembly scaling experiment.
 
-The source table has connectivity, lengths and radii, but no spatial coordinates.
-The generated VTK is a **nonanatomical metric embedding**, with exact source
-lengths, rather than an anatomical reconstruction. No HeMoLab atlas is required.
+The default creates an **anatomical 1D VTK embedded in 3D**, using the HeMoLab
+arterial and venous surface atlases. All **2,184 arterial and 189 venous names**
+in the table have matching surfaces. These are anatomical centerline
+approximations extracted from surface rings, not the original unpublished
+splines or a volumetric mesh for 3D flow.
+
 The full input contains 8,804 straight cells (two per source row), 8,448 points,
 and 1,679 resistive connections between arterial and venous endpoints. These
 connections couple the four geometrical components through the residual and
-Jacobian; they are not extra 1D vessels drawn in the VTK.
+Jacobian; they are not extra 1D vessels drawn in the VTK. Original source-row
+IDs and lengths are retained. In ParaView, colour by `source_row` for the
+4,402 table segments; `vessel_id` denotes the 8,804 computational material IDs.
+
+`recover_full.py` orders split venous chains by connectivity, chooses surface
+orientations through global binary least squares, averages shared-node estimates,
+and projects node coordinates onto the source chord-length constraints. A bend
+near the recovered centerline restores each source segment's exact length. The
+coarse two-cell representation can differ visibly from the full surface curve.
+In the checked reconstruction, maximum shared-node disagreement is 12.16 mm;
+source-length reconciliation moves averaged nodes by at most 3.10 mm. These
+are adaptation diagnostics, not guarantees of anatomical accuracy.
+
+The atlases have separate HeMoLab terms. Run the anatomical workflow only with
+the written permission required for your intended use. `ADAVN_ATLAS_PERMISSION=1`
+records that confirmation; it does not grant permission. Downloaded surfaces,
+anatomical VTKs and anatomical preview images remain local, outside Git.
+An explicit `ADAVN_GEOMETRY=metric` alternative reproduces the earlier synthetic
+embedding without atlas access; there is no automatic fallback to it.
 
 ## Model and comparison with the article
 
@@ -74,14 +95,25 @@ A Release build is appropriate for timings. For example:
 cmake -S . -B build-gpu -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -Ddeal.II_DIR="$DEAL_II_DIR" -DCMAKE_CXX_COMPILER="$CXX"
 cmake --build build-gpu --target blood_flow adavn_mean_flow benchmark_assembly -j8
+python3 -m venv build/analysis-env
+build/analysis-env/bin/pip install -r tools/adan/requirements_anatomical.txt
+export ADAVN_PYTHON="$PWD/build/analysis-env/bin/python"
+export ADAVN_DATA_DIR="$PWD/build/adavn_anatomical"
+# Set this only when you hold the required atlas permission.
+export ADAVN_ATLAS_PERMISSION=1
 tutorials/05_adavn_full/run.sh prepare
+"$ADAVN_PYTHON" tools/adan/preview_full.py \
+  --vtk "$ADAVN_DATA_DIR/adavn_full.vtk" \
+  --output "$ADAVN_DATA_DIR/anatomical_preview.png"
 ```
 
-The script downloads the already archived, checksum-pinned source CSV and
-creates `build/adavn_full/adavn_full.vtk`, `connections.csv`, resistive graph
-CSVs, `mapping.json`, `provenance.json` and rendered parameter files. Set
-`ADAVN_DATA_DIR` to relocate the generated files. Python's standard library is
-sufficient for generation and the mean analysis.
+The script verifies the archived CSV and all 2,373 atlas surfaces against the
+pinned checksums, then creates `adavn_full.vtk`, `connections.csv`, graph CSVs,
+`mapping.json`, `geometry_report.json`, `provenance.json` and rendered parameter
+files under `ADAVN_DATA_DIR` (default `build/adavn_full`). NumPy and SciPy are
+required for anatomical reconstruction; the mean analysis itself uses the
+standard library. Inspect the preview or the VTK in ParaView before simulation.
+A missing or changed surface is an error, rather than a synthetic substitute.
 
 `mapping.json` maps every original row to its two cell/material IDs, `2*row`
 and `2*row+1`. Names alone are not identifiers: the published venous table has
@@ -97,7 +129,7 @@ ADAVN_BLOOD_FLOW_EXECUTABLE="$PWD/build-gpu/blood_flow" \
   tutorials/05_adavn_full/run.sh transient
 ```
 
-The generated `build/adavn_full/transient.prm` is a complete parameter file.
+The generated `$ADAVN_DATA_DIR/transient.prm` is a complete parameter file.
 Its template is [hdg.prm.in](hdg.prm.in). Run it in a serial Slurm task with the
 same environment as the build. The example uses a direct solver; a serial
 UMFPACK build is sufficient. MPI time integration with a direct solver needs a
@@ -138,7 +170,7 @@ After successful completion, compare cycles seven through ten and report the
 cycle-ten versus cycle-nine differences for every selected probe:
 
 ```sh
-python3 tools/adan/analyze_cycles.py --run-dir build/adavn_full/transient_10cycles
+"$ADAVN_PYTHON" tools/adan/analyze_cycles.py --run-dir "$ADAVN_DATA_DIR/transient_10cycles"
 ```
 
 This requires all 401 output times and a completed solver receipt with final
@@ -150,11 +182,10 @@ opened in ParaView. Native HDG output retains discontinuities. To export the
 last completed native result on the connected source geometry:
 
 ```sh
-python3 -m venv build/analysis-env
-build/analysis-env/bin/pip install numpy meshio matplotlib
-build/analysis-env/bin/python tools/adan/export_full_result.py \
-  --run-dir build/adavn_full/transient_10cycles \
-  --output build/adavn_full/arteries_veins_hdg.vtk
+"$ADAVN_PYTHON" tools/adan/export_full_result.py \
+  --data-dir "$ADAVN_DATA_DIR" \
+  --run-dir "$ADAVN_DATA_DIR/transient_10cycles" \
+  --output "$ADAVN_DATA_DIR/arteries_veins_hdg.vtk"
 ```
 
 The exporter requires the expected final time (8 s by default) and exactly
@@ -174,7 +205,7 @@ ADAVN_BLOOD_FLOW_EXECUTABLE="$PWD/build-gpu/blood_flow" \
 
 The first command invokes the native `solve_steady_network` on 5,622 hydraulic nodes and
 7,657 edges (including 1,576 lumped compartments), checks conservation independently, compares the aortic pressure,
-and writes **`build/adavn_full/arteries_veins_mean.vtk`** with pressure and flow.
+and writes **`$ADAVN_DATA_DIR/arteries_veins_mean.vtk`** with pressure and flow.
 The second uses the application's `steady network` mode and reconstructs its
 seed on the full 1D mesh; it does not advance IDA or solve the compliant HDG
 steady equations. A graph seed can be useful, but is not automatically a
@@ -186,8 +217,10 @@ Inside an eight-core Slurm allocation, with the MPI launcher matching the
 compiler used for the build:
 
 ```sh
-python3 tools/adan/benchmark_full.py \
+"$ADAVN_PYTHON" tools/adan/benchmark_full.py \
   --executable build-gpu/benchmark_assembly --launcher "$MPIEXEC" \
+  --parameters "$ADAVN_DATA_DIR/assembly.prm" \
+  --output-dir "$ADAVN_DATA_DIR/performance" \
   --launcher-arg=--bind-to --launcher-arg=core
 ```
 
@@ -206,10 +239,10 @@ The direct factorization and startup costs require separate interpretation.
 To regenerate the scientific figures after the run and benchmark:
 
 ```sh
-build/analysis-env/bin/python tools/adan/plot_full.py \
-  --run-dir build/adavn_full/transient_10cycles \
-  --performance-dir build/adavn_full/performance \
-  --output-dir build/adavn_full/figures
+"$ADAVN_PYTHON" tools/adan/plot_full.py \
+  --run-dir "$ADAVN_DATA_DIR/transient_10cycles" \
+  --performance-dir "$ADAVN_DATA_DIR/performance" \
+  --output-dir "$ADAVN_DATA_DIR/figures"
 ```
 
 This exports PNG and vector PDF figures of pressure/flow, accepted internal
@@ -221,7 +254,15 @@ and `MPIEXEC` exported from a known working GPU configuration. Adjust the Slurm
 allocation to the local cluster and keep each execution's output directory
 separate.
 
-## Verified reference execution
+## Verified synthetic-metric reference execution
+
+The published snapshots in this section used the explicit **metric geometry**
+mode, before the anatomical workflow was integrated. They contain no atlas
+coordinates and must not be presented as an anatomical simulation receipt.
+To reproduce that geometry, set `ADAVN_GEOMETRY=metric` and a fresh data directory.
+The anatomical workflow above retains the same topology, source lengths,
+material IDs and physical parameters; its execution gets separate local receipts.
+
 
 The [reference snapshots](reference/) were generated on 27 October 2026 on
 `gpu04`, AMD EPYC 7763 CPUs, using the GPU partition's CPU cores. The serial
@@ -300,9 +341,15 @@ output directory so receipts from separate runs cannot be appended together.
 Source data and derived geometry: Müller et al. (2023),
 [doi:10.3389/fphys.2023.1162391](https://doi.org/10.3389/fphys.2023.1162391),
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Changes: full CSV
-extraction, SI conversion, metric embedding, two-cell subdivision, adapted
+extraction, SI conversion, metric or surface-derived anatomical embedding, two-cell subdivision, adapted
 terminal/wall parameters and simulation result fields. No author endorsement
 is implied. The programs are covered by the repository MIT license; that
 license does not replace the data attribution. See [source documentation](../../doc/adan_complete.md)
 for the archived CSV, source digest and article/supplement links. Generated
 large data remain outside Git and are reproducible with the supplied scripts.
+
+Anatomical surface data and geometry have **separate HeMoLab terms**, documented
+at http://hemolab.lncc.br/adan-web/doc/Terms.html. The article's CC BY license
+does not replace those terms. The venous catalogue is
+http://hemolab.lncc.br/adan-web/ADAVN.json; surfaces are in `MESHES/venous/`.
+`tools/adan/sources.json` pins the catalogue and every venous surface digest.

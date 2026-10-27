@@ -69,6 +69,7 @@ def analyze(root):
         mesh.cell_arrays["flow_m3_s"], mesh.cell_arrays["a_d"])]
     result_vtk = root/"arteries_veins_mean.vtk"
     write_vtk(result_vtk, mesh.points, mesh.cells, mesh.cell_arrays, mesh.point_arrays,
+              anatomical=provenance.get("geometry_mode") == "anatomical",
               description="ADAVN full arterial-venous resistive mean-flow result")
     # Article vessel indexes are one based. Do not search by duplicated names.
     aorta = mapping[815]

@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dataset and manufactured-source test dependencies
-        run: python3 -m pip install numpy sympy
+        run: python3 -m pip install numpy scipy sympy
       - name: Test hepatic segmentation imports
         run: |
           python3 -m pip install -r tools/hepatic/requirements.txt

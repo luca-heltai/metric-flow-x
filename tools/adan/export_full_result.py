@@ -88,6 +88,7 @@ def export(root, run, output, expected_final_time=8.):
             arrays[name].append(item[1]["A_hat"]*item[1]["U_hat"]*item[2])
     source.cell_arrays.update(arrays)
     write_vtk(output, source.points, source.cells, source.cell_arrays, source.point_arrays,
+              anatomical=provenance.get("geometry_mode") == "anatomical",
               description="ADAVN full arterial-venous native HDG result; endpoint averages")
     probes = []
     probe_csv = run/"probes.csv"
@@ -111,6 +112,8 @@ def export(root, run, output, expected_final_time=8.):
                   minimum_native_area_m2=minimum_area,
                   aortic_pressure_mmHg=aortic_pressure,
                   pressure_sampling="Mean of probes at the two half-segment midpoints of paper vessel 816 (source row 815).",
+                  geometry=provenance["geometry"],
+                  geometry_license=provenance.get("geometry_source_license", "CC-BY-4.0"),
                   model=provenance["hdg_model"], omitted_physics=provenance["hdg_omissions"],
                   vtk_sha256=hashlib.sha256(output.read_bytes()).hexdigest(),
                   source_csv_sha256=provenance["source_sha256"],

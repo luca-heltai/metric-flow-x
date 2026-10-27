@@ -105,8 +105,9 @@ def write_vtk(path, points, cells, cell_data, point_data, anatomical=False,
               description="ADAVN arterial subset"):
     with path.open("w") as stream:
         attribution = (
-            description + "; Muller/Watanabe/Toro/Feijoo/Blanco 2023; "
-            "doi:10.3389/fphys.2023.1162391; modified SI metric graph; "
+            description + "; Muller/Watanabe/Toro/Feijoo/Blanco 2023; " +
+            ("doi:10.3389/fphys.2023.1162391; modified SI anatomical graph; "
+             if anatomical else "doi:10.3389/fphys.2023.1162391; modified SI metric graph; ")
         )
         license_notice = (
             "geometry: separate HeMoLab terms, see provenance"

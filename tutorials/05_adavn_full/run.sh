@@ -5,6 +5,8 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 DATA_DIR=${ADAVN_DATA_DIR:-"$ROOT_DIR/build/adavn_full"}
 EXECUTABLE=${ADAVN_MEAN_EXECUTABLE:-"$ROOT_DIR/build/adavn_mean_flow"}
 MODE=${1:-transient}
+PYTHON=${ADAVN_PYTHON:-python3}
+GEOMETRY=${ADAVN_GEOMETRY:-anatomical}
 case "$MODE" in prepare|mean|transient|graph) ;; *) echo "Usage: $0 [prepare|mean|transient|graph]" >&2; exit 2;; esac
 if [[ "$MODE" == transient || "$MODE" == graph ]]; then
   RUN_NAME=$MODE
@@ -14,9 +16,21 @@ if [[ "$MODE" == transient || "$MODE" == graph ]]; then
     exit 1
   fi
 fi
-python3 "$ROOT_DIR/tools/adan/download_sources.py" --data-dir "$ROOT_DIR/build/adan"
-python3 "$ROOT_DIR/tools/adan/prepare_full.py" --data-dir "$ROOT_DIR/build/adan" --output-dir "$DATA_DIR"
-python3 - "$ROOT_DIR" "$DATA_DIR" <<'PY'
+DOWNLOAD_ARGS=()
+case "$GEOMETRY" in
+  anatomical)
+    if [[ ${ADAVN_ATLAS_PERMISSION:-0} != 1 ]]; then
+      echo "Anatomical reconstruction requires the atlas permission confirmation: set ADAVN_ATLAS_PERMISSION=1 if you hold it." >&2
+      exit 1
+    fi
+    DOWNLOAD_ARGS=(--include-atlas --include-veins --atlas-permission)
+    ;;
+  metric) ;;
+  *) echo "ADAVN_GEOMETRY must be anatomical or metric" >&2; exit 2 ;;
+esac
+"$PYTHON" "$ROOT_DIR/tools/adan/download_sources.py" --data-dir "$ROOT_DIR/build/adan" "${DOWNLOAD_ARGS[@]}"
+"$PYTHON" "$ROOT_DIR/tools/adan/prepare_full.py" --data-dir "$ROOT_DIR/build/adan" --output-dir "$DATA_DIR" --geometry "$GEOMETRY"
+"$PYTHON" - "$ROOT_DIR" "$DATA_DIR" <<'PY'
 import sys
 from pathlib import Path
 root, data = map(lambda s: Path(s).resolve(), sys.argv[1:])
@@ -44,4 +58,4 @@ if [[ ! -x "$EXECUTABLE" ]]; then
   exit 1
 fi
 "$EXECUTABLE" "$DATA_DIR/mean.prm" | tee "$DATA_DIR/mean.log"
-python3 "$ROOT_DIR/tools/adan/analyze_full.py" --data-dir "$DATA_DIR"
+"$PYTHON" "$ROOT_DIR/tools/adan/analyze_full.py" --data-dir "$DATA_DIR"

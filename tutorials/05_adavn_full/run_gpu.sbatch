@@ -21,5 +21,7 @@ cmake -S . -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release \
 cmake --build "$BUILD_DIR" --target blood_flow adavn_mean_flow benchmark_assembly -j8
 ADAVN_MEAN_EXECUTABLE="$BUILD_DIR/adavn_mean_flow" tutorials/05_adavn_full/run.sh mean
 ADAVN_BLOOD_FLOW_EXECUTABLE="$BUILD_DIR/blood_flow" tutorials/05_adavn_full/run.sh transient
-python3 tools/adan/benchmark_full.py --executable "$BUILD_DIR/benchmark_assembly" \
+DATA_DIR=${ADAVN_DATA_DIR:-"$PWD/build/adavn_full"}
+"${ADAVN_PYTHON:-python3}" tools/adan/benchmark_full.py --executable "$BUILD_DIR/benchmark_assembly" \
+  --parameters "$DATA_DIR/assembly.prm" --output-dir "$DATA_DIR/performance" \
   --launcher "$MPIEXEC" --launcher-arg=--bind-to --launcher-arg=core
