@@ -39,3 +39,7 @@ The source registers these named constants:
 The application enters an `IDA parameters` subsection and delegates registration to deal.II's `SUNDIALS::IDA` parameter object. Repository examples use `Initial time`, `Final time`, `Time interval between each output`, nested `Error control` tolerances, and nested `Running parameters` for step-size, BDF-order, and nonlinear-iteration controls. The installed deal.II version is authoritative for additional IDA entries.
 
 See [Configuration](../configuration.md) for context and [the aortic template](../../parameters/aortic.prm.in) for a source-tree example. The configured file used by a build is `build/parameters/aortic.prm`.
+
+See the [current transient policy](../transient_parameters.md) for native
+initialization, componentwise tolerances, startup ramps, work/step limits and
+the complete parameter-source inventory.

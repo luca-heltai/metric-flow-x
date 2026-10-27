@@ -9,3 +9,8 @@ and manuscript copies are not a second source of configuration.
 See [the reproduction guide](../doc/reproducibility.md) for downloading,
 preparing, running and recording experiments. These inputs target the current
 code and SI dataset releases. They do not certify archived paper results.
+
+The current [transient parameter policy](../doc/transient_parameters.md) applies
+the startup controls from PR #80 to future paper runs, including initialization
+benchmarks. MMS retains uniform scalar tolerances. Earlier numerical results
+must be regenerated with these inputs before the paper is finalized.

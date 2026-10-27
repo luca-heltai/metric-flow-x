@@ -8,6 +8,9 @@ inputs, ordering, effective controls, executable hashes and failures are retaine
 import argparse, datetime, hashlib, json, math, os, re, resource, shlex, signal, socket, subprocess, sys, threading, time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+from reproduce_paper import smoke_ramp_settings
+
 p = argparse.ArgumentParser()
 p.add_argument('--legacy', type=Path, help='Legacy executable/library archive; required only for the legacy variant.')
 p.add_argument('--native', type=Path, required=True)
@@ -26,7 +29,7 @@ p.add_argument('--preserve-reference-tolerances', action='store_true', help='Pro
 p.add_argument('--measurement-kind', choices=['pilot', 'formal'], default='formal')
 p.add_argument('--horizons', nargs='+', type=float, default=[0.01, 0.02, 1.0, 3.0])
 p.add_argument('--runs', type=int, default=3)
-p.add_argument('--variants', nargs='+', choices=['legacy','native_rest','native_0d'], default=['legacy','native_rest','native_0d'])
+p.add_argument('--variants', nargs='+', choices=['legacy','native_rest','native_0d'], default=['native_rest','native_0d'])
 p.add_argument('--expected-host', help='Optional exact hostname guard.')
 p.add_argument('--open-file-limit', type=int, help='Requested soft descriptor limit for this process and child solvers, within the existing hard limit; use e.g. 32768 for 10k-vessel CSV output.')
 p.add_argument('--execute', action='store_true')
@@ -131,6 +134,12 @@ def replace(text, name, value):
     assert count == 1, (name, count)
     return text
 
+def system_setting(text, name, value):
+    if re.search(r'(?m)^\s*set ' + re.escape(name) + r'\s*=', text):
+        return replace(text, name, value)
+    return text.replace('subsection MetricFlowSystem<1, 3>\n',
+                        f'subsection MetricFlowSystem<1, 3>\n  set {name} = {value}\n', 1)
+
 jobs = []
 for case in a.cases:
     text = case_inputs[case].read_text()
@@ -153,14 +162,18 @@ for case in a.cases:
                     folder = out/tag; folder.mkdir()
                     prm = text
                     overrides = {'Output directory': folder/'output', 'Verbosity (console depth)': 0, 'Initial time': 0, 'Final time': horizon, 'Time interval between each output': '0.001', 'Use direct solver': 'true' if ranks == 1 else 'false'}
+                    if re.search(r'(?m)^\s*set Tolerance ramp enabled\s*=', prm):
+                        overrides.update(smoke_ramp_settings(prm, horizon))
                     if not a.preserve_reference_tolerances:
                         overrides.update({'Absolute error tolerance': '1e-12', 'Relative error tolerance': '1e-7'})
                     for key, value in overrides.items():
                         prm = replace(prm, key, value)
-                    extra = f'  set Output terminal CSV file = terminals.csv\n  set Output time interval = {file_interval}\n'
+                    prm = system_setting(prm, 'Output terminal CSV file', 'terminals.csv')
+                    prm = system_setting(prm, 'Output time interval', file_interval)
                     if policy != 'legacy':
-                        extra += ('  set Initial condition policy = native\n  set Initial state source = ' + ('rest' if policy=='native_rest' else 'steady network') + '\n  set Check Jacobian at startup = false\n')
-                    prm = prm.replace('subsection MetricFlowSystem<1, 3>\n', 'subsection MetricFlowSystem<1, 3>\n'+extra, 1)
+                        prm = system_setting(prm, 'Initial condition policy', 'native')
+                        prm = system_setting(prm, 'Initial state source', 'rest' if policy=='native_rest' else 'steady network')
+                        prm = system_setting(prm, 'Check Jacobian at startup', 'false')
                     (folder/'input.prm').write_text(prm)
                     archive = archives[policy]
                     command = launcher(ranks)+[str(archive/'blood_flow'),str(folder/'input.prm')]
