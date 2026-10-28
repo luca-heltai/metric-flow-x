@@ -90,7 +90,7 @@ def prepare(args) -> list[tuple[str, list[str], Path]]:
     elif source_profile.is_file():
         (profile / 'machine.tex').write_text(source_profile.read_text())
     else:
-        raise ValueError('Unknown machine profile; provide --description')
+        (profile / 'machine.tex').write_text('% AUTO_FROM_SCALING_HARDWARE\n')
     # All MPI ranks stay on this node. PRRTE's local launcher does not require
     # Slurm's unavailable pmix plugin, and remains inside the job's CPU cgroup.
     launcher = root / 'jobs/mpirun-local.sh'
@@ -182,7 +182,9 @@ python3 tests/test_output_schedule.py --executable {quote(executable)} \\
 mpirun --version > {quote(root / 'mpi-version.txt')}
 '''
     common = ['--partition=' + args.partition, '--nodes=1', '--hint=nomultithread', '--gres=none',
-              '--nodelist=' + args.node, '--export=ALL', '--chdir=' + str(ROOT)]
+              '--export=ALL', '--chdir=' + str(ROOT)]
+    if args.node:
+        common.append('--nodelist=' + args.node)
     specs = []
 
     def job(name, options, body):
@@ -246,20 +248,21 @@ def main(argv=None) -> int:
     parser.add_argument('--dry-run', action='store_true', help='Write scripts and print sbatch commands without submitting')
     parser.add_argument('--smoke', action='store_true', help='Override final time to 0.001 s for workflow validation, not paper results')
     parser.add_argument('--scaling-only', action='store_true', help='Build and measure 50k/100k sweeps, without field/application runs')
-    parser.add_argument('--node', default='gpu04', help='Reserve this exact node for the entire campaign')
+    parser.add_argument('--node', help='Optionally pin all jobs to this exact node; otherwise Slurm selects nodes')
     parser.add_argument('--partition', default='gpu', help='Slurm partition for the campaign')
-    parser.add_argument('--machine', help='Paper profile label (default: node name)')
+    parser.add_argument('--machine', help='Paper profile label (default: pinned node or partition name)')
     parser.add_argument('--description', help='LaTeX hardware/OS description for a new machine profile')
     parser.add_argument('--ranks', type=int, nargs='+', default=[1, 2, 4, 8, 16, 32, 64],
                         help='Canonical MPI counts to measure on the reserved node')
     args = parser.parse_args(argv)
-    args.machine = args.machine or args.node
+    args.machine = args.machine or args.node or args.partition
     try:
         if args.executable and not re.fullmatch(r'[0-9a-f]{40}', args.executable_revision or ''):
             raise ValueError('--executable requires --executable-revision with the full build commit')
         if args.executable_revision and not args.executable:
             raise ValueError('--executable-revision requires --executable')
-        if not all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', name) for name in (args.node, args.machine)):
+        if not all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', name)
+                   for name in (args.node, args.machine) if name is not None):
             raise ValueError('Invalid node or machine name')
         if args.machine == 'raksha':
             raise ValueError('raksha is the historical reference; choose a new profile')

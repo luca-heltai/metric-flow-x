@@ -15,8 +15,9 @@ the startup controls from PR #80 to future paper runs, including initialization
 benchmarks. MMS retains uniform scalar tolerances. Earlier numerical results
 must be regenerated with these inputs before the paper is finalized.
 
-Use `scripts/submit_paper_gpu.py` for Slurm campaigns, passing the compute node,
-partition, machine profile label and environment script for your system.
+Use `scripts/submit_paper_gpu.py` for Slurm campaigns, passing the partition, machine
+profile label and environment script for your system. Node selection is left
+to the scheduler unless `--node` is specified.
 Use `scripts/finalize_paper_output.py` to export a completed campaign into a
 manuscript machine profile. See the reproduction guide for portable examples,
 provenance checks, resources, timing definitions and the separate field-output stage.

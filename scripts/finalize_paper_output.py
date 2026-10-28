@@ -26,6 +26,25 @@ DIRECTORIES = {'network50k': '50k_vessels', 'network100k': '100k_vessels',
                'liver': '8k_vessels', 'cerebral': 'cerebral'}
 
 
+def hardware_tex(hardware):
+    fields = {row['field'].rstrip(':'): row['data']
+              for row in (hardware.get('lscpu') or {}).get('lscpu', [])}
+    parts = [f"compute node {hardware['hostname']}"]
+    if fields.get('Model name'):
+        parts.append(fields['Model name'])
+    if fields.get('Socket(s)') and fields.get('Core(s) per socket'):
+        parts.append(f"{fields['Socket(s)']} sockets with {fields['Core(s) per socket']} cores per socket")
+    if hardware.get('memory_total_kib'):
+        parts.append(f"{hardware['memory_total_kib'] / 1024**2:.1f} GiB RAM")
+    if hardware.get('platform'):
+        parts.append(hardware['platform'])
+    escapes = {'\\': r'\textbackslash{}', '_': r'\_', '%': r'\%', '&': r'\&',
+               '#': r'\#', '$': r'\$', '{': r'\{', '}': r'\}', '~': r'\textasciitilde{}',
+               '^': r'\textasciicircum{}'}
+    description = ''.join(escapes.get(char, char) for char in ', '.join(parts))
+    return '\\newcommand{\\ScalingMachineDescription}{' + description + '}\n'
+
+
 def read_table(path):
     with path.open(newline='') as stream:
         return list(csv.DictReader(stream))
@@ -59,8 +78,10 @@ def finalize(root, paper_root, machine, ranks, description=None):
         machine_text = '\\newcommand{\\ScalingMachineDescription}{' + description + '}\n'
     elif machine_tex.is_file():
         machine_text = machine_tex.read_text()
+        if 'AUTO_FROM_SCALING_HARDWARE' in machine_text:
+            machine_text = None
     else:
-        raise ValueError('New profile requires --description (LaTeX hardware/OS description)')
+        machine_text = None
     selected = []
     outputs = []
     for path, receipt in receipts(root):
@@ -179,6 +200,8 @@ def finalize(root, paper_root, machine, ranks, description=None):
                 run['section_speedups'][section] = speedup
                 run['section_parallel_efficiencies'][section] = speedup / ratio if speedup is not None else None
     revision, binary, manifest_hash = next(iter(identities))
+    if machine_text is None:
+        machine_text = hardware_tex(selected[0][1]['hardware'])
     # Validate everything before creating any export. Stage on the destination filesystem.
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.finalize-', dir=destination.parent) as temporary:

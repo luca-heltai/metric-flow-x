@@ -118,7 +118,7 @@ Replace the uppercase placeholders and paths with values for your system:
 
 ```bash
 python3 scripts/submit_paper_gpu.py --scaling-only \
-  --node COMPUTE_NODE --machine MACHINE_PROFILE --partition PARTITION \
+  --machine MACHINE_PROFILE --partition PARTITION \
   --env /path/to/spack-environment.sh \
   --description 'Hardware and operating system used for these runs' \
   --output-root "$PWD/paper-runs/campaign-01"
@@ -127,8 +127,8 @@ python3 scripts/submit_paper_gpu.py --scaling-only \
 The environment script must provide CMake, Ninja, OpenMPI 5, Spack and a
 compatible deal.II installation with PETSc and MUMPS. `MACHINE_PROFILE` is a
 label for the results; every run independently records the execution hostname
-and hardware. The hardware description may be omitted when that profile already
-contains `machine.tex` in the manuscript checkout.
+and hardware. The hardware description is optional: existing profile descriptions are kept;
+new profiles derive their description from the recorded scaling host hardware.
 
 To reuse a freshly compiled executable, add `--executable /path/to/blood_flow`
 and `--executable-revision FULL_BUILD_COMMIT`. The first job then snapshots the
@@ -163,7 +163,10 @@ outputs for both large networks. MMS and the three-cell bifurcation use one MPI
 rank; the other output runs use four. The collector also writes portable sample
 tables into `plot-inputs/`. Raw VTU/PVD fields and vessel CSVs remain in `outputs/`.
 
-All jobs are pinned to the node selected by `--node`. No accelerator is requested:
+Slurm selects nodes within the requested partition. Each complete scaling sweep
+holds one exclusive node; independent output jobs can use different nodes.
+Add `--node COMPUTE_NODE` only when every job must use one specific host.
+No accelerator is requested:
 these are CPU/MPI measurements. The generated launcher uses OpenMPI 5 with local
 PRRTE resource discovery and binds each rank to one core within the allocation.
 Check that this launch method and the generated Slurm resource options match
@@ -352,8 +355,8 @@ The input may be a `submit_paper_gpu.py` campaign root, or the output root of
 `reproduce_paper.py --suite scaling`. The destination is
 `<manuscript>/scaling/MACHINE_PROFILE/`. Existing hardware-only profiles are
 accepted; profiles containing results are never overwritten, and the historical
-reference profile is protected. A new
-profile requires `--description 'LaTeX hardware and OS description'`.
+reference profile is protected. New profiles derive their hardware description
+from the scaling receipts, unless `--description` supplies a LaTeX description.
 For an intentionally smaller sweep, pass the same `--ranks 1 2 4 8 16` to
 both the runner and finalizer.
 

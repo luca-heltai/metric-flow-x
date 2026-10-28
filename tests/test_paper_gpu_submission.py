@@ -26,7 +26,7 @@ class PaperGpuSubmissionTest(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.env = self.root / 'environment.sh'
         self.env.write_text('')
-        self.options = ['--output-root', str(self.root / 'runs'), '--env', str(self.env)]
+        self.options = ['--output-root', str(self.root / 'runs'), '--env', str(self.env), '--node', 'gpu04']
         source = patch.object(GPU, 'capture_source', return_value={'revision': 'a' * 40, 'files': {}})
         source.start()
         self.addCleanup(source.stop)
@@ -89,6 +89,13 @@ class PaperGpuSubmissionTest(unittest.TestCase):
                          {str(destination / 'runtime/lib/libmetric_flow_x.so'): GPU.sha256(library)})
         library.write_bytes(b'new compilation')
         self.assertEqual((destination / 'runtime/lib/libmetric_flow_x.so').read_bytes(), b'application library fixture')
+
+    def test_scheduler_can_select_nodes_without_nodelist(self):
+        options = self.options[:-2]
+        self.assertEqual(GPU.main([*options, '--dry-run', '--machine', 'experiment',
+                                  '--description', 'Machine details in run metadata']), 0)
+        record = json.loads((self.root / 'runs/submission.json').read_text())
+        self.assertIsNone(record['node'])
 
     def test_scaling_only_smaller_node(self):
         with patch.object(GPU.subprocess, 'run') as submit:
