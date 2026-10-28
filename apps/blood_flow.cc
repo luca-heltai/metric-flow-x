@@ -416,13 +416,10 @@ namespace MetricFlowX
             std::unique_ptr<SparseDirectMUMPS> native;
 #endif
           } direct_factors;
-          ida.setup_jacobian = [&problem,
-                                &initial_output_seen,
-                                &ic_jacobian_setups,
-                                &direct_factors](const double      t,
-                                                 const VectorType &y,
-                                                 const VectorType &ydot,
-                                                 const double alpha) -> int {
+          ida.setup_jacobian = [&](const double      t,
+                                   const VectorType &y,
+                                   const VectorType &ydot,
+                                   const double      alpha) -> int {
             if (!initial_output_seen)
               ++ic_jacobian_setups;
             ++problem.ida_jacobian_evaluations;
@@ -502,13 +499,9 @@ namespace MetricFlowX
             return 0;
           };
 
-          ida.solve_with_jacobian =
-            [&problem,
-             &initial_output_seen,
-             &ic_linear_solves,
-             &direct_factors](const VectorType &r,
-                              VectorType       &z,
-                              const double /*tol*/) -> int {
+          ida.solve_with_jacobian = [&](const VectorType &r,
+                                        VectorType       &z,
+                                        const double /*tol*/) -> int {
             if (!initial_output_seen)
               ++ic_linear_solves;
             ++problem.ida_linear_solves;
