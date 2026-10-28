@@ -1238,6 +1238,7 @@ namespace MetricFlowX
     unsigned int initial_consistency_max_iterations = 30;
     bool         check_initial_jacobian             = false;
 
+    bool         write_solution_output  = true;
     std::string  output_filename        = "solution";
     bool         use_direct_solver      = true;
     bool         use_junction_mesh      = true;

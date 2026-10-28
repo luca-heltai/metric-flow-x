@@ -692,6 +692,12 @@ namespace MetricFlowX
                                            /*resync_time=*/true,
                                            /*require_consecutive_steps=*/true);
             problem.print_current_statistics(ida, t);
+            if (!problem.write_solution_output)
+              {
+                if (step_number == 0)
+                  integration_start = std::chrono::steady_clock::now();
+                return;
+              }
             const bool at_final_time =
               t >= final_output_time ||
               final_output_time - t <= final_time_tolerance;
@@ -820,6 +826,8 @@ namespace MetricFlowX
     static void
     output_stationary(Problem &problem, const unsigned int cycle)
     {
+      if (!problem.write_solution_output)
+        return;
       problem.compute_pressure(problem.solution,
                                problem.solution_dot,
                                problem.pressure_,

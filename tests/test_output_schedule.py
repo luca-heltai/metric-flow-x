@@ -64,6 +64,32 @@ def validate(executable, source_dir, destination):
                    for item, t in zip(history, actual))
         if number == 0:
             assert len([t for t in expected if 9. <= t <= 10.]) == 21
+    # Reuse the last physical problem and IDA callback grid. Suppressing output
+    # must eliminate solution/per-step files without changing solver work.
+    silent = destination / "no-solution-output"
+    silent.mkdir(exist_ok=True)
+    source = source.replace(str(folder / "output"), str(silent / "output"))
+    settings = ("  set Write solution output = false\n"
+                "  set Print current statistics = false\n")
+    for name in ("network terminals", "mass conservation", "IDA step history",
+                 "IDA internal steps", "flow regime"):
+        settings += f"  set Output {name} CSV file =\n"
+    source = source.replace("  set Output filename", settings + "  set Output filename")
+    (silent / "input.prm").write_text(source)
+    result = subprocess.run([str(executable), "input.prm"], cwd=silent,
+                            env=environment, capture_output=True, text=True, timeout=90)
+    (silent / "run.log").write_text(result.stdout + result.stderr)
+    assert result.returncode == 0, result.stdout + result.stderr
+    files = {path.name for path in (silent / "output").iterdir()}
+    assert files == {"ida_statistics.csv", "scaling_timings.csv",
+                     "initialization_statistics.json"}, files
+    with (silent / "output/ida_statistics.csv").open() as stream:
+        silent_stats = next(csv.DictReader(stream))
+    with (folder / "output/ida_statistics.csv").open() as stream:
+        reference_stats = next(csv.DictReader(stream))
+    for key in ("n_steps", "n_err_test_fails", "n_nonlin_iters", "n_nonlin_conv_fails"):
+        assert silent_stats[key] == reference_stats[key], (key, silent_stats, reference_stats)
+    assert float(silent_stats["wall_time"]) > 0
     print("Long-run cadence, nonmultiple intervals, nonzero start and unique final output: PASSED")
 
 

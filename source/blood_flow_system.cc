@@ -264,6 +264,10 @@ namespace MetricFlowX
     add_parameter("Finite element degree", fe_degree);
     add_parameter("Problem constants", constants);
     add_parameter("Output filename", output_filename);
+    add_parameter(
+      "Write solution output",
+      write_solution_output,
+      "Write solution VTU and vessel CSV files and evaluate output diagnostics.");
     add_parameter("Use direct solver", use_direct_solver);
     add_parameter("Initial state source", initial_state_source);
     add_parameter("Initial condition policy", initial_condition_policy);
@@ -2678,6 +2682,8 @@ namespace MetricFlowX
 
     close_csv_files();
     mach_warning_active.clear();
+    if (!write_solution_output)
+      return;
 
     if (!output_terminal_csv_file.empty())
       {
