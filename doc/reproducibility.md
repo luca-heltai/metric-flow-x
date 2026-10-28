@@ -111,6 +111,80 @@ path as well as `/work`, so prepared absolute parameter paths remain usable.
 Preparing inputs and separately invoking the standalone launcher is still
 possible, but the prepared receipt is not updated by that separate invocation.
 
+## Submit all experiments on the local GPU queue
+
+From the checkout, run:
+
+```bash
+python3 scripts/submit_paper_gpu.py --node gpu04 --scaling-only \
+  --output-root "$PWD/paper-runs/gpu-paper-01"
+```
+
+Drop `--scaling-only` to run all paper experiments as well.
+Choose a fresh directory on shared storage for every submission. Missing or
+modified datasets are downloaded and checked on the submission host before any
+job is submitted; compute nodes do not need Internet access. The script
+submits four jobs immediately, with `afterok` dependencies (three with
+`--scaling-only`, which skips the outputs array):
+
+1. **Build**: 4 CPUs, 32 GiB, up to 4 hours. Activate
+   `/software/spackgpu-v2/env.sh`, verify pinned datasets, and build
+   a fresh Release executable with PETSc vectors/matrices and MUMPS. The driver
+   uses deal.II native MUMPS when PETSc itself lacks MUMPS support. Record source commit, dirty
+   patch/status, binary digest and linked libraries. Keep this checkout unchanged
+   while the submitted jobs are pending/running: every job checks the source
+   revision and tracked-file hashes against the submission snapshot. The build
+   receipt binds the compiled binary hash to its recorded revision and patch;
+   every solver run verifies that receipt.
+2. **Scaling**: one exclusive node, 64 physical cores, one thread per rank,
+   all node memory, up to 48 hours for both sweeps. Run the 50k and 100k networks
+   sequentially with 1,2,4,8,16,32,64 ranks on the same reserved node. No other
+   workflow experiments run during this stage.
+3. **Outputs**: a job array with 35 independent elements, 4 CPUs and
+   16 GiB each. All elements are eligible together after scaling; Slurm starts
+   as many as resources permit. MMS and the three-cell bifurcation keep one MPI rank, avoiding empty
+   partitions on the smallest meshes; other runs use four MPI ranks. Includes MMS, benchmarks, mesh/time sweeps,
+   applications and one run with output for each scaling network.
+4. **Collection**: after every array element succeeds, collect the new output
+   runs into `plot-inputs/`, then validate and export the scaling profile into
+   `paper-output/scaling/<machine>/` inside the campaign. With `--scaling-only`,
+   only the scaling finalizer is run. Raw VTU/PVD fields and vessel CSVs stay
+   in `outputs/`. The smoke workflow skips manuscript export.
+
+Every job uses partition `gpu`, one node and `--hint=nomultithread`.
+`--node gpu04` is the default: all jobs are pinned to that exact host, and
+`--machine` defaults to the node name. Choose another node/profile explicitly
+with `--node` and `--machine`; unknown profiles need `--description`.
+`--ranks 1 2 4 8 16` restricts both sweeps and the reserved CPU count. No GPU
+accelerator is requested (`--gres=none`): these are CPU/MPI experiments on the
+GPU nodes. Thread limits include OpenMP, BLAS and deal.II. Slurm here offers
+`pmi2` but lacks `pmix`; OpenMPI 5 is launched using `mpirun` with local PRRTE
+resource discovery (`--prtemca ras '^slurm' --host localhost:N`), mapping and
+binding each rank to one core inside the allocation. Do not use `srun --mpi=pmix`
+or assume OpenMPI 5 can use Slurm's PMI2 plugin.
+
+Scaling sets `Write solution output = false`, disables progress printing and
+per-step diagnostic CSVs. It skips VTU, vessel probes, pressure reconstruction
+at output callbacks and mass/flow diagnostics, while retaining the original IDA
+callback cadence and solver settings. Final `ida_statistics.csv` records
+`wall_time` for `solve_dae` (including IDA initialization, excluding mesh/setup
+and MPI startup); `initialization_statistics.json` records preparation and initialization times;
+its `ida_setup_and_ic_wall_s` field is the initialization contribution included
+in the solve time, and can be subtracted when reporting integration only. `scaling_timings.csv` records individual timed sections.
+Metadata and these final timing summaries are written once after integration;
+there are no solution files during the measured solve. The runner also records
+`process_wall_seconds` in `run.json`, which includes MPI startup, setup and
+final reporting and should not be substituted for the solve time. Output runs
+have no role in the scaling measurements.
+
+Use `--dry-run` to generate reviewable scripts and dependency commands without
+submitting, `--smoke` to record a short 0.001 s workflow test, `--time D-HH:MM:SS`
+to change the scaling/outputs/collection time limits, and `--env PATH` for another
+compatible Spack environment. `submission.json` records job IDs even if a later
+submission fails. Failed prerequisites prevent dependent jobs from running.
+The script regenerates current-code data; the model/provenance differences
+listed below still apply, and figures are not automatically compared or rendered.
+
 ## Experiment matrix
 
 | Suite | Canonical cases | Configuration |

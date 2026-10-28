@@ -14,3 +14,9 @@ The current [transient parameter policy](../doc/transient_parameters.md) applies
 the startup controls from PR #80 to future paper runs, including initialization
 benchmarks. MMS retains uniform scalar tolerances. Earlier numerical results
 must be regenerated with these inputs before the paper is finalized.
+
+For CPU/MPI scaling on the GPU queue, use
+`python3 scripts/submit_paper_gpu.py --node gpu04 --scaling-only --output-root /shared/new-run`.
+Use `scripts/finalize_paper_output.py` to export a completed campaign into a
+manuscript machine profile. See the reproduction guide for provenance checks,
+resources, timing definitions and the separate field-output stage.
