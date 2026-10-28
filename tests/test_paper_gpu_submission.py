@@ -57,6 +57,39 @@ class PaperGpuSubmissionTest(unittest.TestCase):
         self.assertEqual((root / 'jobs/scaling.sh').read_text().count('--final-time 0.001'), 14)
         self.assertNotIn('finalize_paper_output.py', (root / 'jobs/collect.sh').read_text())
 
+    def test_reused_binary_is_verified_without_rebuilding(self):
+        executable = self.root / 'existing/blood_flow'
+        self.assertEqual(GPU.main([*self.options, '--dry-run', '--executable', str(executable),
+                                  '--executable-revision', 'a' * 40]), 0)
+        root = self.root / 'runs'
+        record = json.loads((root / 'submission.json').read_text())
+        self.assertEqual(list(record['jobs']), ['verify', 'scaling', 'outputs', 'collect'])
+        script = (root / 'jobs/verify.sh').read_text()
+        self.assertIn('snapshot_executable', script)
+        self.assertIn('test_output_schedule.py', script)
+        self.assertNotIn('cmake --build', script)
+        self.assertIn(str(root / 'runtime/blood_flow'), (root / 'jobs/scaling.sh').read_text())
+        for path in (root / 'jobs').glob('*.sh'):
+            subprocess.run(['bash', '-n', str(path)], check=True)
+            for _, block in re.findall(r"<<'(PY\w+)'\n(.*?)\n\1", path.read_text(), re.S):
+                ast.parse(block)
+
+    def test_snapshot_freezes_application_library(self):
+        binary = self.root / 'blood_flow'
+        library = self.root / 'libmetric_flow_x.so'
+        binary.write_bytes(b'executable fixture')
+        library.write_bytes(b'application library fixture')
+        destination = self.root / 'snapshot'
+        listing = f'libmetric_flow_x.so => {library} (0x1234)\n'
+        with patch.object(GPU.subprocess, 'check_output', return_value=listing):
+            GPU.snapshot_executable(binary, destination, 'a' * 40)
+        receipt = json.loads((destination / 'build-provenance.json').read_text())
+        self.assertEqual(receipt['executable_sha256'], GPU.sha256(binary))
+        self.assertEqual(receipt['runtime_library_sha256'],
+                         {str(destination / 'runtime/lib/libmetric_flow_x.so'): GPU.sha256(library)})
+        library.write_bytes(b'new compilation')
+        self.assertEqual((destination / 'runtime/lib/libmetric_flow_x.so').read_bytes(), b'application library fixture')
+
     def test_scaling_only_smaller_node(self):
         with patch.object(GPU.subprocess, 'run') as submit:
             self.assertEqual(GPU.main([*self.options, '--dry-run', '--scaling-only',

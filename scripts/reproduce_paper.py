@@ -142,6 +142,9 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
                     raise ValueError('Executable does not match --build-provenance')
                 if args.executable_revision != build_provenance['executable_revision']:
                     raise ValueError('Executable revision does not match --build-provenance')
+                for library, expected in build_provenance.get('runtime_library_sha256', {}).items():
+                    if sha256(Path(library)) != expected:
+                        raise ValueError(f'Runtime library does not match --build-provenance: {library}')
             if mpi > 1 or args.mpi_arg:
                 launcher = shutil.which(args.mpi_launcher)
                 if launcher is None:

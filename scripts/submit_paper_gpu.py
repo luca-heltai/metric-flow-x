@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 
@@ -23,6 +24,37 @@ def capture_source() -> dict:
     return {'revision': subprocess.check_output(
         ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         'files': {name: sha256(ROOT / name) for name in tracked}}
+
+
+def snapshot_executable(executable: Path, root: Path, revision: str) -> None:
+    """Freeze a reused binary and its application library before any solver runs."""
+    if not executable.is_file():
+        raise ValueError(f'Executable missing: {executable}')
+    runtime = root / 'runtime'
+    (runtime / 'lib').mkdir(parents=True, exist_ok=False)
+    listing = subprocess.check_output(['ldd', str(executable)], text=True)
+    (root / 'linked-libraries.txt').write_text(listing)
+    if 'not found' in listing:
+        raise ValueError('Reused executable has unresolved shared libraries')
+    libraries = re.findall(r'(libmetric_flow_x\S*)\s+=>\s+(.+?)\s+\(0x', listing)
+    copied = {}
+    for source, target in [(executable, runtime / 'blood_flow')] + [
+            (Path(path), runtime / 'lib' / name) for name, path in libraries]:
+        expected = sha256(source)
+        shutil.copy2(source, target)
+        if sha256(target) != expected or sha256(source) != expected:
+            raise ValueError(f'Executable/library changed while copying: {source}')
+        if target.parent.name == 'lib':
+            copied[str(target)] = expected
+    (root / 'executable-revision.txt').write_text(revision + '\n')
+    (root / 'build-provenance.json').write_text(json.dumps({
+        'executable_revision': revision,
+        'executable_sha256': sha256(runtime / 'blood_flow'),
+        'runtime_library_sha256': copied,
+        'source_executable': str(executable),
+        'reused_executable': True,
+        'revision_source': 'user-supplied build revision; runtime smoke checks recorded separately',
+    }, indent=2) + '\n')
 
 
 def prepare(args) -> list[tuple[str, list[str], Path]]:
@@ -89,10 +121,13 @@ for name, expected in state['files'].items():
         sys.exit('Source changed since submission: ' + name)
 PYSOURCE
 '''
+    if args.executable:
+        setup += f'export LD_LIBRARY_PATH={quote(root / "runtime/lib")}:"${{LD_LIBRARY_PATH:-}}"\n'
     build = root / 'build'
+    executable = root / 'runtime/blood_flow' if args.executable else build / 'blood_flow'
     runner = [sys.executable, str(ROOT / 'scripts/reproduce_paper.py'),
               '--dataset-root', str(args.dataset_root.resolve()),
-              '--executable', str(build / 'blood_flow'),
+              '--executable', str(executable),
               '--machine', args.machine,
               '--build-provenance', str(root / 'build-provenance.json'),
               '--mpi-launcher', str(launcher), '--mpi-arg=--report-bindings']
@@ -130,6 +165,22 @@ if (subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != 
     backend='PETSc', build_type='Release'), indent=2) + '\\n')
 PYBUILD
 '''
+    if args.executable:
+        build_body = f'''
+git diff HEAD -- > {quote(root / 'source.patch')}
+git status --porcelain > {quote(root / 'source-status.txt')}
+python3 - {quote(args.executable.resolve())} {quote(root)} {quote(args.executable_revision)} <<'PYREUSE'
+import pathlib, sys
+sys.path.insert(0, 'scripts')
+from submit_paper_gpu import snapshot_executable
+snapshot_executable(pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3])
+PYREUSE
+python3 scripts/reproduce_paper.py {preparation} --prepare-only \\
+  --dataset-root {quote(args.dataset_root.resolve())} --output-root {quote(root / 'prepared-inputs')}
+python3 tests/test_output_schedule.py --executable {quote(executable)} \\
+  --workdir {quote(root / 'validation')} > {quote(root / 'validation.log')} 2>&1
+mpirun --version > {quote(root / 'mpi-version.txt')}
+'''
     common = ['--partition=' + args.partition, '--nodes=1', '--hint=nomultithread', '--gres=none',
               '--nodelist=' + args.node, '--export=ALL', '--chdir=' + str(ROOT)]
     specs = []
@@ -142,7 +193,8 @@ PYBUILD
         specs.append((name, common + options + [f'--job-name=paper-{name}',
                      f'--output={root}/logs/{name}-%A_%a.log'], script))
 
-    job('build', ['--ntasks=1', '--cpus-per-task=4', '--mem=32G', '--time=04:00:00'], build_body)
+    job('verify' if args.executable else 'build',
+        ['--ntasks=1', '--cpus-per-task=4', '--mem=32G', '--time=04:00:00'], build_body)
     # One allocation holds the SAME exclusive node across both complete sweeps.
     body = f'\nscontrol show job "$SLURM_JOB_ID" > {quote(root / "scaling-allocation.txt")}\n'
     body += f'revision=$(cat {quote(root / "executable-revision.txt")})\n'
@@ -187,6 +239,8 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-root', type=Path, required=True, help='Fresh shared directory for jobs, build and results')
     parser.add_argument('--dataset-root', type=Path, default=ROOT)
+    parser.add_argument('--executable', type=Path, help='Reuse an existing binary instead of compiling; snapshot it with its application library')
+    parser.add_argument('--executable-revision', help='Full source commit used for --executable')
     parser.add_argument('--env', type=Path, default=Path('/software/spackgpu-v2/env.sh'), help='Environment script providing Spack, CMake, Ninja and OpenMPI 5')
     parser.add_argument('--time', default='2-00:00:00', help='Time limit per scaling/outputs/collection job')
     parser.add_argument('--dry-run', action='store_true', help='Write scripts and print sbatch commands without submitting')
@@ -201,6 +255,10 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     args.machine = args.machine or args.node
     try:
+        if args.executable and not re.fullmatch(r'[0-9a-f]{40}', args.executable_revision or ''):
+            raise ValueError('--executable requires --executable-revision with the full build commit')
+        if args.executable_revision and not args.executable:
+            raise ValueError('--executable-revision requires --executable')
         if not all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', name) for name in (args.node, args.machine)):
             raise ValueError('Invalid node or machine name')
         if args.machine == 'raksha':
@@ -249,6 +307,7 @@ def main(argv=None) -> int:
             record.write_text(json.dumps({'dry_run': args.dry_run, 'smoke': args.smoke,
                                           'machine': args.machine, 'node': args.node,
                                           'partition': args.partition,
+                                          'source_executable': str(args.executable.resolve()) if args.executable else None,
                                           'ranks': args.ranks,
                                           'scaling_only': args.scaling_only,
                                           'jobs': submitted}, indent=2) + '\n')

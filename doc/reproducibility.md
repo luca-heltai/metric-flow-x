@@ -130,6 +130,14 @@ label for the results; every run independently records the execution hostname
 and hardware. The hardware description may be omitted when that profile already
 contains `machine.tex` in the manuscript checkout.
 
+To reuse a freshly compiled executable, add `--executable /path/to/blood_flow`
+and `--executable-revision FULL_BUILD_COMMIT`. The first job then snapshots the
+binary and its application library, records their hashes and runs a small
+output-scheduling check instead of compiling again. Subsequent jobs use the
+frozen copies and verify their hashes before every run. The reused binary may
+use either supported linear-algebra backend; its source revision is supplied
+by the person who built it.
+
 Choose a fresh directory on storage shared by the submission host and compute
 node. Missing or modified datasets are downloaded and verified before any job
 is submitted; compute nodes do not need Internet access. Keep this checkout
