@@ -302,7 +302,7 @@ below. The local output paths are `build/adavn_anatomical/adavn_full.vtk` for
 the input and `build/adavn_anatomical/arteries_veins_hdg.vtk` for the completed
 result; the tutorial commands regenerate them in `ADAVN_DATA_DIR`.
 
-A separate **32-rank anatomical run** on `gpu04` completed the same ten cycles
+A separate **32-rank anatomical run** on a multicore server completed the same ten cycles
 with native deal.II MUMPS (LP64), one thread per rank and core binding:
 
 | CPU cores | Direct solver | Integration time |
@@ -343,7 +343,7 @@ material IDs and physical parameters; its execution gets separate local receipts
 
 
 The [reference snapshots](reference/) were generated on 27 October 2026 on
-`gpu04`, AMD EPYC 7763 CPUs, using the GPU partition's CPU cores. The serial
+a server with AMD EPYC 7763 CPUs, using a CPU-only Slurm allocation. The serial
 transient and the exclusive-node MPI benchmark are separate measurements.
 The build reused the working `build-gpu` OpenMPI 5.0.10/deal.II 9.8.0 Spack
 installation, PETSc backend, `-Wno-cpp`, and a DebugRelease build's Release

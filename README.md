@@ -334,7 +334,7 @@ values cause an error. A configured CSV requires Parameters mode. Each C>0
 terminal gets one capacitor unknown across MPI ranks; C=0 gets none and uses
 the series resistance R1+R2 (PR #18).
 
-Geometry and arrays now share one VTK reader per rank. On lnx3 with GCC 13.2,
+Geometry and arrays now share one VTK reader per rank. On the reference CPU host with GCC 13.2,
 deal.II 9.8.0 and the 20001-cell, degree-1 SI 10k tree, the measured setup time
 fell from 3.697 s to 1.340 s in a paired run. Whole-process peak RSS, including
 subsequent assembly, was 657904/656936 KiB; this is not a measurement of memory

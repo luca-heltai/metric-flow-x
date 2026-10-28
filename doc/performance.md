@@ -45,7 +45,7 @@ size, compiler, deal.II version, min/median/max samples, residual norm and weigh
 checksum. The existing section timer supplies more detailed totals. No physical
 output files are written, so these measurements do not include output cost.
 
-## Recorded lnx3 experiment
+## Recorded CPU experiment
 
 The baseline uses assembly from `b3046ba` (the build-warning fix, without assembly
 changes); the constant-reference source change is `37708a1`. Both use GCC 13.2.0,

@@ -6,7 +6,7 @@ or capacitance changes; insert cell matrices in bulk; gather/scatter residual
 cell vectors in bulk. A CTest resource lock also prevents concurrent nested
 Ninja writers.
 
-The initial baseline and complete stack were rebuilt on **lnx3**, GCC 13.2,
+The initial baseline and complete stack were rebuilt on the reference CPU host with GCC 13.2,
 deal.II 9.8/PETSc, Release (`-O2`, AVX2). Three alternating process pairs
 measure ADAN56 and the SI 10k network at **MPI1/2/4/8**, with three warmed
 samples per process. Median paired speedups are **1.20–1.34x** for the
@@ -57,7 +57,7 @@ changes against the configured solver tolerances.
 
 Cache interior-face topology; gather face local state once; skip inactive FE
 supports; reuse vessel material stiffness; reuse cell-Jacobian scratch storage.
-Three alternating Release/PETSc pairs on lnx3 compare the consolidated first
+Three alternating Release/PETSc pairs on the reference CPU host compare the consolidated first
 five changes with this complete series at MPI1/2/4/8, with 20 repetitions and
 verified idle cores. ADAN56 residual/Jacobian speedups are **1.43–1.49x /
 1.52–1.62x**; the 10k network reaches **1.13–1.17x / 1.29–1.43x**.
@@ -90,7 +90,7 @@ unsupported componentwise tolerances and fixtures; no tolerance overrides exist.
 
 Remove unused face-Jacobian work; reuse junction scratch; cache physical-boundary
 topology; batch nonzero cell-to-trace rows; reuse reference-face values in junctions.
-Three alternating Release/PETSc pairs on lnx3 directly compare `d22b1bf` with
+Three alternating Release/PETSc pairs on the reference CPU host directly compare `d22b1bf` with
 `4b77600` at MPI1/2/4/8, using three samples and CLI budget 20 (20 residual/
 2 state-Jacobian calls per sample). All 48 process records remain included.
 

@@ -111,79 +111,77 @@ path as well as `/work`, so prepared absolute parameter paths remain usable.
 Preparing inputs and separately invoking the standalone launcher is still
 possible, but the prepared receipt is not updated by that separate invocation.
 
-## Submit all experiments on the local GPU queue
+## Submit experiments with Slurm
 
-From the checkout, run:
+The submission driver runs CPU/MPI experiments on one reserved compute node.
+Replace the uppercase placeholders and paths with values for your system:
 
 ```bash
-python3 scripts/submit_paper_gpu.py --node gpu04 --scaling-only \
-  --output-root "$PWD/paper-runs/gpu-paper-01"
+python3 scripts/submit_paper_gpu.py --scaling-only \
+  --node COMPUTE_NODE --machine MACHINE_PROFILE --partition PARTITION \
+  --env /path/to/spack-environment.sh \
+  --description 'Hardware and operating system used for these runs' \
+  --output-root "$PWD/paper-runs/campaign-01"
 ```
 
-Drop `--scaling-only` to run all paper experiments as well.
-Choose a fresh directory on shared storage for every submission. Missing or
-modified datasets are downloaded and checked on the submission host before any
-job is submitted; compute nodes do not need Internet access. The script
-submits four jobs immediately, with `afterok` dependencies (three with
-`--scaling-only`, which skips the outputs array):
+The environment script must provide CMake, Ninja, OpenMPI 5, Spack and a
+compatible deal.II installation with PETSc and MUMPS. `MACHINE_PROFILE` is a
+label for the results; every run independently records the execution hostname
+and hardware. The hardware description may be omitted when that profile already
+contains `machine.tex` in the manuscript checkout.
 
-1. **Build**: 4 CPUs, 32 GiB, up to 4 hours. Activate
-   `/software/spackgpu-v2/env.sh`, verify pinned datasets, and build
-   a fresh Release executable with PETSc vectors/matrices and MUMPS. The driver
-   uses deal.II native MUMPS when PETSc itself lacks MUMPS support. Record source commit, dirty
-   patch/status, binary digest and linked libraries. Keep this checkout unchanged
-   while the submitted jobs are pending/running: every job checks the source
-   revision and tracked-file hashes against the submission snapshot. The build
-   receipt binds the compiled binary hash to its recorded revision and patch;
-   every solver run verifies that receipt.
-2. **Scaling**: one exclusive node, 64 physical cores, one thread per rank,
-   all node memory, up to 48 hours for both sweeps. Run the 50k and 100k networks
-   sequentially with 1,2,4,8,16,32,64 ranks on the same reserved node. No other
-   workflow experiments run during this stage.
-3. **Outputs**: a job array with 35 independent elements, 4 CPUs and
-   16 GiB each. All elements are eligible together after scaling; Slurm starts
-   as many as resources permit. MMS and the three-cell bifurcation keep one MPI rank, avoiding empty
-   partitions on the smallest meshes; other runs use four MPI ranks. Includes MMS, benchmarks, mesh/time sweeps,
-   applications and one run with output for each scaling network.
-4. **Collection**: after every array element succeeds, collect the new output
-   runs into `plot-inputs/`, then validate and export the scaling profile into
-   `paper-output/scaling/<machine>/` inside the campaign. With `--scaling-only`,
-   only the scaling finalizer is run. Raw VTU/PVD fields and vessel CSVs stay
-   in `outputs/`. The smoke workflow skips manuscript export.
+Choose a fresh directory on storage shared by the submission host and compute
+node. Missing or modified datasets are downloaded and verified before any job
+is submitted; compute nodes do not need Internet access. Keep this checkout
+unchanged while jobs are pending or running: each job checks the source revision
+and tracked-file hashes against the submission snapshot.
 
-Every job uses partition `gpu`, one node and `--hint=nomultithread`.
-`--node gpu04` is the default: all jobs are pinned to that exact host, and
-`--machine` defaults to the node name. Choose another node/profile explicitly
-with `--node` and `--machine`; unknown profiles need `--description`.
-`--ranks 1 2 4 8 16` restricts both sweeps and the reserved CPU count. No GPU
-accelerator is requested (`--gres=none`): these are CPU/MPI experiments on the
-GPU nodes. Thread limits include OpenMP, BLAS and deal.II. Slurm here offers
-`pmi2` but lacks `pmix`; OpenMPI 5 is launched using `mpirun` with local PRRTE
-resource discovery (`--prtemca ras '^slurm' --host localhost:N`), mapping and
-binding each rank to one core inside the allocation. Do not use `srun --mpi=pmix`
-or assume OpenMPI 5 can use Slurm's PMI2 plugin.
+With `--scaling-only`, the driver submits three jobs with `afterok` dependencies:
+
+1. **Build**: compile a fresh Release executable, record source revision and
+   patch, binary digest and linked libraries. Every solver run verifies the
+   executable against that build receipt.
+2. **Scaling**: run the 50k and 100k sweeps sequentially on the same exclusive
+   node, with one thread per rank. The default counts are 1,2,4,8,16,32,64;
+   select a smaller set with `--ranks 1 2 4 8 16`. The reservation requests as
+   many CPU cores as the largest selected count. Choose counts that fit the
+   physical cores available on the selected node.
+3. **Collection**: validate and export the scaling tables and provenance into
+   `paper-output/scaling/MACHINE_PROFILE/` within the campaign directory.
+
+Omitting `--scaling-only` adds a 35-element output array between scaling and
+collection. It covers MMS, benchmarks, mesh/time sweeps, applications and field
+outputs for both large networks. MMS and the three-cell bifurcation use one MPI
+rank; the other output runs use four. The collector also writes portable sample
+tables into `plot-inputs/`. Raw VTU/PVD fields and vessel CSVs remain in `outputs/`.
+
+All jobs are pinned to the node selected by `--node`. No accelerator is requested:
+these are CPU/MPI measurements. The generated launcher uses OpenMPI 5 with local
+PRRTE resource discovery and binds each rank to one core within the allocation.
+Check that this launch method and the generated Slurm resource options match
+your scheduler configuration; inspect the scripts with `--dry-run` before a
+first submission on another system. Thread limits cover OpenMP, BLAS and deal.II.
 
 Scaling sets `Write solution output = false`, disables progress printing and
 per-step diagnostic CSVs. It skips VTU, vessel probes, pressure reconstruction
-at output callbacks and mass/flow diagnostics, while retaining the original IDA
+at output callbacks and mass/flow diagnostics while retaining the original IDA
 callback cadence and solver settings. Final `ida_statistics.csv` records
-`wall_time` for `solve_dae` (including IDA initialization, excluding mesh/setup
-and MPI startup); `initialization_statistics.json` records preparation and initialization times;
-its `ida_setup_and_ic_wall_s` field is the initialization contribution included
-in the solve time, and can be subtracted when reporting integration only. `scaling_timings.csv` records individual timed sections.
-Metadata and these final timing summaries are written once after integration;
-there are no solution files during the measured solve. The runner also records
-`process_wall_seconds` in `run.json`, which includes MPI startup, setup and
-final reporting and should not be substituted for the solve time. Output runs
-have no role in the scaling measurements.
+`wall_time` for `solve_dae`, including IDA initialization and excluding mesh/setup
+and MPI startup. `initialization_statistics.json` records preparation and
+initialization times; its `ida_setup_and_ic_wall_s` contribution can be subtracted
+when reporting integration only. `scaling_timings.csv` records individual timed
+sections. These final summaries are written after integration.
 
-Use `--dry-run` to generate reviewable scripts and dependency commands without
-submitting, `--smoke` to record a short 0.001 s workflow test, `--time D-HH:MM:SS`
-to change the scaling/outputs/collection time limits, and `--env PATH` for another
-compatible Spack environment. `submission.json` records job IDs even if a later
-submission fails. Failed prerequisites prevent dependent jobs from running.
-The script regenerates current-code data; the model/provenance differences
-listed below still apply, and figures are not automatically compared or rendered.
+The runner also records `process_wall_seconds` in `run.json`. This includes MPI
+startup, setup and final reporting and should not replace solve time. Separate
+field-output runs have no role in scaling measurements.
+
+Use `--smoke` for a recorded 0.001 s workflow check, which skips manuscript
+export. `--time D-HH:MM:SS` changes the scaling/output/collection limits.
+`submission.json` retains submitted job IDs even if a later submission fails;
+failed prerequisites prevent dependent jobs from running. The scripts regenerate
+current-code data; the provenance differences below still apply, and figures
+are not automatically compared or rendered.
 
 ## Experiment matrix
 
@@ -197,7 +195,7 @@ listed below still apply, and figures are not automatically compared or rendered
 | `fields` | `network50k-output`, `network100k-output` | Same large networks with solution output, 4 MPI ranks |
 | `scaling` | `network50k-np1` through `network100k-np64` | 50001/100001 segments; p3; 1,2,4,8,16,32,64 MPI ranks; no solution output |
 
-The runner accepts `--machine gpu04` (or `lnx`) and records the actual hostname,
+The runner accepts `--machine MACHINE_PROFILE` and records the actual hostname,
 hardware, thread limits, executable hash and source revision in every `run.json`.
 Set `--executable-revision "$(git rev-parse HEAD)"` only for a binary built from
 that revision; `--build-provenance FILE` additionally verifies its SHA256 and
@@ -328,8 +326,8 @@ without importing or checking those archived comparisons.
 
 ## Finalize machine-specific scaling tables
 
-The manuscript checkout in this workspace is `paper/` (singular). Use
-`--paper-root ./papers` if your checkout has a different name. The current
+Pass the manuscript checkout with `--paper-root /path/to/manuscript`; the
+default is `paper/` relative to the software checkout. The current
 manuscript actually plots the 50k and 100k strong-scaling tables; the old
 8k/30k tables are unused and are not regenerated. The companion paper branch
 removes those two unused LaTeX table loads.
@@ -337,14 +335,16 @@ removes those two unused LaTeX table loads.
 After a completed canonical campaign, export its results with:
 
 ```bash
-python3 scripts/finalize_paper_output.py /shared/gpu04-paper-01 \
-  --machine gpu04 --paper-root ./paper
+python3 scripts/finalize_paper_output.py /path/to/campaign-01 \
+  --machine MACHINE_PROFILE --paper-root /path/to/manuscript \
+  --description 'Hardware and operating system used for these runs'
 ```
 
 The input may be a `submit_paper_gpu.py` campaign root, or the output root of
 `reproduce_paper.py --suite scaling`. The destination is
-`paper/scaling/gpu04/`. Existing hardware-only profiles are accepted; profiles
-containing results are never overwritten, and `raksha` is protected. A new
+`<manuscript>/scaling/MACHINE_PROFILE/`. Existing hardware-only profiles are
+accepted; profiles containing results are never overwritten, and the historical
+reference profile is protected. A new
 profile requires `--description 'LaTeX hardware and OS description'`.
 For an intentionally smaller sweep, pass the same `--ranks 1 2 4 8 16` to
 both the runner and finalizer.
@@ -370,23 +370,25 @@ for both networks. Source revision for a directly reused binary remains a user
 attestation unless a build receipt was supplied; the binary hash is always
 recorded by the runner.
 
-For example, on `lnx2`, with a freshly compiled executable from this revision:
+For a direct run on a machine with fewer available cores, first compile the
+executable from the revision being recorded, then run:
 
 ```bash
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 export BLIS_NUM_THREADS=1 DEAL_II_NUM_THREADS=1
-python3 scripts/reproduce_paper.py --suite scaling --machine lnx \
+python3 scripts/reproduce_paper.py --suite scaling --machine MACHINE_PROFILE \
   --ranks 1 2 4 8 16 --executable /path/to/fresh-build/blood_flow \
-  --executable-revision "$(git rev-parse HEAD)" --output-root /shared/lnx-paper-01
-python3 scripts/finalize_paper_output.py /shared/lnx-paper-01 \
-  --machine lnx --ranks 1 2 4 8 16 --paper-root ./paper
+  --executable-revision "$(git rev-parse HEAD)" --output-root /path/to/campaign-01
+python3 scripts/finalize_paper_output.py /path/to/campaign-01 \
+  --machine MACHINE_PROFILE --ranks 1 2 4 8 16 --paper-root /path/to/manuscript \
+  --description 'Hardware and operating system used for these runs'
 ```
 
 Exporting scaling tables does not complete the other manuscript figures.
 The pressure/network snapshots and mass-conservation images require rendering
 new field outputs; the cerebral IDA discussion and its historical BDF5 filename
 must be reconciled with the current cerebral input (BDF2). The finalizer neither
-copies raksha measurements/images nor relabels BDF2 results as BDF5. It reports
+copies historical measurements/images nor relabels BDF2 results as BDF5. It reports
 `scaling_tables_ready: true` and `manuscript_profile_complete: false` explicitly.
 Before selecting a new full profile, generate the application figures and
 review the measured numerical claims and software versions in the text. Older
