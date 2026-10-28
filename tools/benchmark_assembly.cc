@@ -39,12 +39,15 @@ main(int argc, char **argv)
   for (const auto &cell : flow.dof_handler().active_cell_iterators())
     if (cell->is_locally_owned())
       {
-        flow.get_system_dof_indices(cell, indices);
+        indices.resize(cell->get_fe().n_dofs_per_cell());
+        cell->get_dof_indices(indices);
         for (unsigned int i = 0; i < indices.size(); ++i)
           {
             const auto component =
-              flow.finite_element().system_to_component_index(i).first;
+              cell->get_fe().system_to_component_index(i).first;
             y(indices[i]) =
+              component == 4 ?
+                0. :
               component % 2 == 0 ?
                 1.01 * flow.vessel_properties(cell->material_id()).a_d :
                 0.1;
@@ -103,11 +106,11 @@ main(int argc, char **argv)
     Utilities::MPI::gather(flow.mpi_communicator(),
                            flow.locally_owned_dofs().n_elements(),
                            0);
-  const auto capacitor_dofs =
-    Utilities::MPI::gather(flow.mpi_communicator(),
-                           flow.locally_owned_dofs().n_elements() -
-                             flow.dof_handler().n_locally_owned_dofs(),
-                           0);
+  const auto capacitor_dofs = Utilities::MPI::gather(
+    flow.mpi_communicator(),
+    flow.component_dofs(BloodFlowSystem<1, 3>::Component::capacitor_pressure)
+      .n_elements(),
+    0);
   const auto json_array = [](const auto &values) {
     std::ostringstream out;
     out << std::setprecision(17) << '[';
@@ -160,14 +163,17 @@ main(int argc, char **argv)
           for (const auto &cell : flow.dof_handler().active_cell_iterators())
             if (cell->is_locally_owned())
               {
-                flow.get_system_dof_indices(cell, indices);
+                indices.resize(cell->get_fe().n_dofs_per_cell());
+                cell->get_dof_indices(indices);
                 for (unsigned int i = 0; i < indices.size(); ++i)
                   {
                     const auto component =
-                      flow.finite_element().system_to_component_index(i).first;
+                      cell->get_fe().system_to_component_index(i).first;
                     const double variation =
                       1.0 + 0.001 * ((indices[i] + state) % 13);
                     y(indices[i]) =
+                      component == 4 ?
+                        0. :
                       component % 2 == 0 ?
                         (1.01 + 0.02 * state) * variation *
                           flow.vessel_properties(cell->material_id()).a_d :

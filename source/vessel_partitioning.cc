@@ -76,9 +76,7 @@ namespace MetricFlowX
                           AssertThrow(terminals.emplace(bid, index).second,
                                       ExcMessage(
                                         "Repeated terminal boundary ID."));
-                          if (rcr_map.at(bid).C > 0. &&
-                              outlet_type != "Reflection" &&
-                              outlet_type != "Dirichlet")
+                          if (rcr_map.at(bid).C > 0. && outlet_type == "RCR")
                             ++cost;
                         }
                     }

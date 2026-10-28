@@ -71,6 +71,11 @@ test()
       ParameterAcceptor::clear();
       BloodFlowSystem<1, 3> flow(comm);
       flow.initialize_params("terminal_connections.prm");
+      if (venous_capacitor)
+        {
+          flow.fe_degree            = 2;
+          flow.n_global_refinements = 2;
+        }
       flow.setup();
       AssertThrow(flow.vessel_map.at(0).dynamic_viscosity == .001 &&
                     flow.vessel_map.at(1).dynamic_viscosity == .004,
@@ -94,10 +99,11 @@ test()
         if (cell->is_locally_owned() && cell->material_id() == 0)
           {
             std::vector<types::global_dof_index> indices(
-              flow.fe_->n_dofs_per_cell());
-            flow.get_system_dof_indices(cell, indices);
+              flow.fe_collection_.max_dofs_per_cell());
+            indices.resize(cell->get_fe().n_dofs_per_cell());
+            cell->get_dof_indices(indices);
             for (unsigned int k = 0; k < indices.size(); ++k)
-              if (flow.fe_->system_to_component_index(k).first == 0)
+              if (cell->get_fe().system_to_component_index(k).first == 0)
                 invalid_trial(indices[k]) = 100 * flow.vessel_map.at(0).a_d;
           }
       invalid_trial.compress(VectorOperation::insert);
@@ -110,12 +116,13 @@ test()
         if (cell->is_locally_owned())
           {
             std::vector<types::global_dof_index> indices(
-              flow.fe_->n_dofs_per_cell());
-            flow.get_system_dof_indices(cell, indices);
+              flow.fe_collection_.max_dofs_per_cell());
+            indices.resize(cell->get_fe().n_dofs_per_cell());
+            cell->get_dof_indices(indices);
             for (unsigned int k = 0; k < indices.size(); ++k)
               {
                 const auto component =
-                  flow.fe_->system_to_component_index(k).first;
+                  cell->get_fe().system_to_component_index(k).first;
                 y(indices[k])    = component % 2 == 0 ?
                                      flow.vessel_map.at(cell->material_id()).a_d *
                                     (1.01 + .001 * k) :

@@ -208,13 +208,14 @@ test()
             const double resistance =
               8. * .004 * length / (numbers::PI * std::pow(r, 4));
             std::vector<types::global_dof_index> dofs(
-              flow.fe_->n_dofs_per_cell());
+              flow.fe_collection_.max_dofs_per_cell());
             for (const auto &cell : flow.dof_handler_.active_cell_iterators())
               if (cell->is_locally_owned())
                 {
-                  flow.get_system_dof_indices(cell, dofs);
+                  dofs.resize(cell->get_fe().n_dofs_per_cell());
+                  cell->get_dof_indices(dofs);
                   for (unsigned int i = 0; i < dofs.size(); ++i)
-                    if (flow.fe_->system_to_component_index(i).first == 0)
+                    if (cell->get_fe().system_to_component_index(i).first == 0)
                       {
                         const auto   point = flow.support_point(cell, i);
                         const double expected =
@@ -225,8 +226,9 @@ test()
                           std::abs(p - expected) < 1.e-8,
                           ExcMessage(
                             "Rigid graph pressure or compliant/external-pressure reconstruction is wrong."));
-                        const auto j = flow.fe_->component_to_system_index(
-                          1, flow.fe_->system_to_component_index(i).second);
+                        const auto j = cell->get_fe().component_to_system_index(
+                          1,
+                          cell->get_fe().system_to_component_index(i).second);
                         AssertThrow(
                           std::abs(state(dofs[i]) * state(dofs[j]) - 1.e-6) <
                             1.e-18,

@@ -59,18 +59,20 @@ test()
   VectorType v(problem.locally_owned_dofs_, problem.mpi_communicator_);
   v = 0.0;
 
-  const unsigned int n_dofs = problem.fe_->n_dofs_per_cell();
+  const unsigned int max_dofs = problem.fe_collection_.max_dofs_per_cell();
   for (const auto &cell : problem.dof_handler_.active_cell_iterators())
     {
       if (!cell->is_locally_owned())
         continue;
 
-      std::vector<types::global_dof_index> ldofs(n_dofs);
-      problem.get_system_dof_indices(cell, ldofs);
+      std::vector<types::global_dof_index> ldofs(max_dofs);
+      const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
+      ldofs.resize(n_dofs);
+      cell->get_dof_indices(ldofs);
       for (unsigned int i = 0; i < n_dofs; ++i)
         {
           // Only set the area component (component 0) DOFs to 1
-          if (problem.fe_->system_to_component_index(i).first == 0)
+          if (cell->get_fe().system_to_component_index(i).first == 0)
             v(ldofs[i]) = 1.0;
         }
     }
@@ -80,15 +82,19 @@ test()
   //     cells only -- per_cell_mass has no entries for ghost cells), then
   //     reduce across ranks.
   double         L_local = 0.0;
-  Vector<double> local_v(n_dofs), local_Mv(n_dofs);
+  Vector<double> local_v(max_dofs), local_Mv(max_dofs);
   for (const auto &cell : problem.dof_handler_.active_cell_iterators())
     {
       if (!cell->is_locally_owned())
         continue;
 
-      std::vector<types::global_dof_index> ldofs(n_dofs);
-      problem.get_system_dof_indices(cell, ldofs);
+      std::vector<types::global_dof_index> ldofs(max_dofs);
+      const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
+      ldofs.resize(n_dofs);
+      cell->get_dof_indices(ldofs);
 
+      local_v.reinit(n_dofs);
+      local_Mv.reinit(n_dofs);
       for (unsigned int i = 0; i < n_dofs; ++i)
         local_v(i) = v(ldofs[i]);
 

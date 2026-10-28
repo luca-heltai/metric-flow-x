@@ -105,11 +105,12 @@ test()
           flow.assemble_cell_residuals(.1, flow.y_relevant, hyperbolic);
           hyperbolic.compress(VectorOperation::add);
           std::vector<types::global_dof_index> indices(
-            flow.fe_->n_dofs_per_cell());
+            flow.fe_collection_.max_dofs_per_cell());
           for (const auto &cell : flow.dof_handler_.active_cell_iterators())
             if (cell->is_locally_owned())
               {
-                flow.get_system_dof_indices(cell, indices);
+                indices.resize(cell->get_fe().n_dofs_per_cell());
+                cell->get_dof_indices(indices);
                 Vector<double> local(indices.size()), mass_rate(indices.size());
                 rate.extract_subvector_to(indices.begin(),
                                           indices.end(),
@@ -117,7 +118,7 @@ test()
                 flow.per_cell_mass[cell->active_cell_index()].vmult(mass_rate,
                                                                     local);
                 for (unsigned int i = 0; i < indices.size(); ++i)
-                  if (flow.fe_->system_to_component_index(i).first == 0)
+                  if (cell->get_fe().system_to_component_index(i).first == 0)
                     defect =
                       std::max(defect,
                                std::abs(mass_rate[i] - hyperbolic(indices[i])));

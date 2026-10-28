@@ -47,11 +47,12 @@ test()
         if (cell->is_locally_owned())
           {
             std::vector<types::global_dof_index> dofs(
-              flow.fe_->n_dofs_per_cell());
-            flow.get_system_dof_indices(cell, dofs);
+              flow.fe_collection_.max_dofs_per_cell());
+            dofs.resize(cell->get_fe().n_dofs_per_cell());
+            cell->get_dof_indices(dofs);
             const auto &vessel = flow.vessel_map.at(cell->material_id());
             for (unsigned int i = 0; i < dofs.size(); ++i)
-              if (flow.fe_->system_to_component_index(i).first == 0)
+              if (cell->get_fe().system_to_component_index(i).first == 0)
                 AssertThrow(std::abs(pressure(dofs[i]) - vessel.p0 -
                                      vessel.p_d) < 1e-8,
                             ExcInternalError());

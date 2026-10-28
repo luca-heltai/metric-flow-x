@@ -305,7 +305,7 @@ namespace MetricFlowX
       Utilities::MPI::broadcast(mpi_communicator_, graph.edge_flows, 0);
     state = 0.;
     std::vector<std::pair<Index, double>> values;
-    std::vector<Index>                    ldofs(fe_->n_dofs_per_cell());
+    std::vector<Index> ldofs(fe_collection_.max_dofs_per_cell());
     try
       {
         for (const auto &cell : dof_handler_.active_cell_iterators())
@@ -322,9 +322,12 @@ namespace MetricFlowX
               const double sign =
                 compute_directional_vector(cell) * tangent >= 0. ? 1. : -1.;
               const auto &v = vessel_map.at(edge.vessel_id);
-              get_system_dof_indices(cell, ldofs);
+              ldofs.resize(cell->get_fe().n_dofs_per_cell());
+              cell->get_dof_indices(ldofs);
               for (unsigned int i = 0; i < ldofs.size(); ++i)
                 {
+                  if (cell->get_fe().system_to_component_index(i).first == 4)
+                    continue;
                   const auto   point = support_point(cell, i);
                   const double x =
                     std::clamp(((point - p0) * tangent) / p0.distance(p1),
@@ -361,7 +364,7 @@ namespace MetricFlowX
                   else
                     a = reference_branch_area(v.wall, transmural, ad, v.h_wall);
                   const auto component =
-                    fe_->system_to_component_index(i).first;
+                    cell->get_fe().system_to_component_index(i).first;
                   values.emplace_back(ldofs[i],
                                       component == 0 || component == 2 ?
                                         a :
@@ -414,14 +417,18 @@ namespace MetricFlowX
       use_componentwise_tolerances ? make_absolute_tolerances() : make_state();
     reinit_state(initial_trace_weights_);
     initial_trace_weights_ = 0.;
-    std::vector<Index> ldofs(fe_->n_dofs_per_cell());
+    std::vector<Index> ldofs(fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
-          get_system_dof_indices(cell, ldofs);
+          ldofs.resize(cell->get_fe().n_dofs_per_cell());
+          cell->get_dof_indices(ldofs);
           for (unsigned int i = 0; i < ldofs.size(); ++i)
             {
-              const auto   component = fe_->system_to_component_index(i).first;
+              const auto component =
+                cell->get_fe().system_to_component_index(i).first;
+              if (component == 4)
+                continue;
               const double ad =
                 compute_a_d_at_point(cell, support_point(cell, i));
               scales(ldofs[i]) =
@@ -584,18 +591,22 @@ namespace MetricFlowX
     state_dot           = 0.;
     VectorType residual = make_state();
     assemble_residual(t, state, state_dot, residual);
-    std::vector<Index> ldofs(fe_->n_dofs_per_cell());
-    Vector<double> local(fe_->n_dofs_per_cell()), rate(fe_->n_dofs_per_cell());
+    std::vector<Index> ldofs(fe_collection_.max_dofs_per_cell());
+    Vector<double>     local(fe_collection_.max_dofs_per_cell()),
+      rate(fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
-          get_system_dof_indices(cell, ldofs);
+          ldofs.resize(cell->get_fe().n_dofs_per_cell());
+          cell->get_dof_indices(ldofs);
+          local.reinit(ldofs.size());
+          rate.reinit(ldofs.size());
           residual.extract_subvector_to(ldofs.begin(),
                                         ldofs.end(),
                                         local.begin());
           per_cell_mass_inv[cell->active_cell_index()].vmult(rate, local);
           for (unsigned int i = 0; i < ldofs.size(); ++i)
-            if (fe_->system_to_component_index(i).first < 2)
+            if (cell->get_fe().system_to_component_index(i).first < 2)
               state_dot(ldofs[i]) = -rate[i];
         }
     for (const auto &[bid, index] : rcr_pc_dof)
@@ -656,18 +667,22 @@ namespace MetricFlowX
     for (const auto i : trace_dofs_owned)
       algebraic =
         std::max(algebraic, std::abs(residual(i)) / initial_trace_weights_(i));
-    std::vector<Index> ldofs(fe_->n_dofs_per_cell());
-    Vector<double> local(fe_->n_dofs_per_cell()), rate(fe_->n_dofs_per_cell());
+    std::vector<Index> ldofs(fe_collection_.max_dofs_per_cell());
+    Vector<double>     local(fe_collection_.max_dofs_per_cell()),
+      rate(fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
-          get_system_dof_indices(cell, ldofs);
+          ldofs.resize(cell->get_fe().n_dofs_per_cell());
+          cell->get_dof_indices(ldofs);
+          local.reinit(ldofs.size());
+          rate.reinit(ldofs.size());
           residual.extract_subvector_to(ldofs.begin(),
                                         ldofs.end(),
                                         local.begin());
           per_cell_mass_inv[cell->active_cell_index()].vmult(rate, local);
           for (unsigned int i = 0; i < ldofs.size(); ++i)
-            if (fe_->system_to_component_index(i).first < 2)
+            if (cell->get_fe().system_to_component_index(i).first < 2)
               {
                 const double scaled =
                   horizon * std::abs(rate[i]) / weight(ldofs[i]);
@@ -744,14 +759,18 @@ namespace MetricFlowX
           (algebraic ? 1. : horizon);
         scales(i) = std::max(1., std::abs(double(state(i)))) / horizon;
       }
-    std::vector<Index> indices(fe_->n_dofs_per_cell());
+    std::vector<Index> indices(fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
-          get_system_dof_indices(cell, indices);
+          indices.resize(cell->get_fe().n_dofs_per_cell());
+          cell->get_dof_indices(indices);
           for (unsigned int j = 0; j < indices.size(); ++j)
             {
-              const auto   component = fe_->system_to_component_index(j).first;
+              const auto component =
+                cell->get_fe().system_to_component_index(j).first;
+              if (component == 4)
+                continue;
               const double ad =
                 compute_a_d_at_point(cell, support_point(cell, j));
               scales(indices[j]) =
@@ -941,10 +960,14 @@ namespace MetricFlowX
             for (const auto &cell : dof_handler_.active_cell_iterators())
               if (cell->is_locally_owned())
                 {
-                  get_system_dof_indices(cell, indices);
+                  indices.resize(cell->get_fe().n_dofs_per_cell());
+                  cell->get_dof_indices(indices);
                   const auto &vp = vessel_map.at(cell->material_id());
                   for (unsigned int j = 0; j < indices.size(); ++j)
-                    if (fe_->system_to_component_index(j).first % 2 == 0)
+                    if ((cell->get_fe().system_to_component_index(j).first ==
+                           0 ||
+                         cell->get_fe().system_to_component_index(j).first ==
+                           2))
                       {
                         const double area = trial(indices[j]);
                         if (!std::isfinite(area) || area <= 0.)

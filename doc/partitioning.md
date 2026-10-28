@@ -39,13 +39,30 @@ alone does not imply vascular or algebraic adjacency.
 
 ## Coupled system numbering
 
-Each capacitor pressure belongs to the rank owning its terminal cell. The full
-system is ordered as `[FE_0, Pc_0, FE_1, Pc_1, ...]`, so each rank still owns a
-contiguous interval as PETSc requires. FE evaluation and visualization vectors
-retain the native DoFHandler numbering. `system_dof_index()` maps one native FE
-index to its system index; `get_system_dof_indices(cell, indices)` supplies cell
-indices for vectors from `make_state()` and for the system matrices. Callers
-must use this API rather than raw `cell->get_dof_indices()` for system vectors.
+All unknowns belong to one hp-enabled `DoFHandler`. Both elements in the
+`hp::FECollection` have five components:
+
+- components 0 and 1 retain `FE_DGQ(degree)` for cell area and velocity;
+- components 2 and 3 retain `FE_DGQ(1)` for the face traces;
+- component 4 is `FE_Nothing` on interior cells, at inlets, and at outlets
+  without a capacitor; it is `FE_DGQ(0)` on RCR terminal cells with `C > 0`.
+
+`distribute_dofs()` supplies the system numbering, ownership and geometric
+ghost indices. State vectors, FE evaluation, matrices and visualization use
+the same indices. Callers use `cell->get_dof_indices(indices)` and
+`cell->get_fe()` for local dimensions and shape functions. The previous
+`system_dof_index()` and `get_system_dof_indices()` conversion API is removed.
+`component_dofs(Component::capacitor_pressure)` selects the locally owned
+terminal pressures through a standard component mask.
+
+A capacitor belongs to its terminal cell's owner. `Reflection`, `Dirichlet`
+and `C = 0` outlets allocate no component-4 DoFs. A serial input cell with two
+capacitive endpoints is refined once before partitioning, since two independent
+terminal pressures require two DG0 cells. Custom mesh initializers must provide
+at most one capacitor terminal per cell; this condition is checked collectively.
+Visualization exports `Pc`, extended by zero on `FE_Nothing` cells, as a standard
+FE field. Assembly selects `hp::FEValues` and `hp::FEFaceValues` for each active
+element and sizes local vectors and matrices from the current cell.
 
 Ghost sets include distant terminal-link endpoints. Capacitor derivatives are
 read locally during assembly; the former all-reduction of all capacitor time
@@ -60,7 +77,38 @@ partition metrics alone do not establish a simulation speedup. Global system
 indices change with the partition and capacitor ownership; compare numerical
 states by vessel/cell and component, not by raw global row number.
 
-## Local ADAVN comparison
+## Validation of the hp terminal field
+
+With deal.II 9.8.0, GCC 12.3.0 and OpenMPI 5.0.10:
+
+- PETSc Debug/Release passes 112/112 CTest entries (104 tests and eight build
+  dependencies). Trilinos Release passes the 12/12 focused entries (nine tests
+  and three build dependencies), including serial, MPI2 and MPI4.
+- The hp regression checks the native fifth-component indices, ownership,
+  evaluation on ghost cells, zero extension through `FE_Nothing`, empty ranks,
+  repeated setup, degrees one/two, and splitting two capacitive endpoints.
+  The terminal-link test also exercises refined degree-two cells and both
+  implicit Jacobian blocks against finite differences.
+- All 14 stationary graph/HDG application cases and two input rejection checks
+  pass. Direct inspection of ten serial VTU outputs confirms that `Pc` is zero
+  without capacitance and on interior cells, and constant on terminal cells.
+- A rest-state RCR transient completes five IDA steps with the existing
+  four-component exact solution: area L2 error is zero and the other physical
+  field errors are below `8e-18`.
+- The MPI2 assembly benchmark reports 129 native DoFs on 16 cells, owned as
+  `[64, 65]`, with capacitor counts `[0, 1]`. This checks the migrated tool;
+  it is not a performance comparison.
+
+clang-format 16.0.6, whitespace and path-naming checks pass. Sphinx builds the
+updated documentation with warnings treated as errors. Hosted CI on other
+library versions is separate from these local results.
+
+## Reference ADAVN comparison
+
+These archived measurements were made at commit `7ebd35b`, before the hp
+terminal-field representation. They describe the vessel partitioner and the
+earlier capacitor layout; they are not fresh validation or timing results for
+the hp implementation.
 
 The [32-rank receipt](performance_data/partitioning/adavn32.json) records a run
 on the same 8,804-cell anatomical input used by the full-network tutorial:

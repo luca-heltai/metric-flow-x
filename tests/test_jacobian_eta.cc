@@ -97,21 +97,12 @@ test()
   problem.assemble_residual(t, problem.solution, ydot, residual);
   problem.assemble_jacobian(t, problem.solution, ydot, alpha);
 
-  // Sum of squares over LOCALLY OWNED rows only, then reduced across ranks.
-  // A parallel PETSc vector only allows direct indexing for entries this
-  // rank owns (or holds as a ghost); looping the full global range with
-  // operator[] on every rank, as the serial version did, isn't valid here,
-  // and summing beyond locally_owned_dofs_ would double-count anything also
-  // visible as a ghost. There's no member named n_trace_end on
-  // BloodFlowSystem (it doesn't exist -- checked against the header); the
-  // actual FE/capacitor boundary the header documents is
-  // dof_handler_.n_dofs(): rows before it are the cell (differential) and
-  // trace (algebraic) unknowns, rows at or after it are the RCR capacitor
-  // pressures.
-  const types::global_dof_index first_pc    = problem.dof_handler_.n_dofs();
-  double                        pc_sq_local = 0.0, rest_sq_local = 0.0;
+  // Split the residual by FE component, independently of global numbering.
+  // Only owned rows enter the collective sums.
+  double pc_sq_local = 0.0, rest_sq_local = 0.0;
   for (const auto i : problem.locally_owned_dofs_)
-    (i >= first_pc ? pc_sq_local : rest_sq_local) += residual(i) * residual(i);
+    (problem.rcr_dofs_owned.is_element(i) ? pc_sq_local : rest_sq_local) +=
+      residual(i) * residual(i);
 
   const double rest_sq =
     Utilities::MPI::sum(rest_sq_local, problem.mpi_communicator_);

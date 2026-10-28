@@ -20,12 +20,16 @@
 
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_interface_values.h>
+#include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/fe_values_extractors.h>
 
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria.h>
+
+#include <deal.II/hp/fe_collection.h>
+#include <deal.II/hp/fe_values.h>
 
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
@@ -177,8 +181,7 @@ namespace MetricFlowX
   //
   // Every unknown of the system is a DoF of `dof_handler_` (components 0,1
   // carry the cell values A, U; components 2,3 carry the face traces A_hat,
-  // U_hat), with the sole exception of the RCR capacitor pressures, which
-  // follow each rank's FE entries in the coupled system vector. Ownership of
+  // U_hat; component 4 carries RCR capacitor pressures). Ownership of
   // an unknown is consequently the ownership of the cell that carries it, as
   // determined by the Triangulation partitioning, and this class defines no
   // second ownership rule.
@@ -308,7 +311,8 @@ namespace MetricFlowX
       area,
       velocity,
       area_trace,
-      velocity_trace
+      velocity_trace,
+      capacitor_pressure
     };
 
     /** Context passed to the externally supplied pressure provider.
@@ -449,32 +453,10 @@ namespace MetricFlowX
     const DoFHandler<dim, spacedim> &
     dof_handler() const;
 
+    /** The interior element. For cell-local sizes and shape functions use
+     * cell->get_fe(), which includes the capacitor on terminal cells. */
     const FiniteElement<dim, spacedim> &
     finite_element() const;
-
-    /** Convert a native DoFHandler index to the coupled system numbering. */
-    types::global_dof_index
-    system_dof_index(const types::global_dof_index fe_index) const
-    {
-      AssertIndexRange(fe_index, dof_handler_.n_dofs());
-      const auto owner = std::upper_bound(fe_rank_offsets_.begin(),
-                                          fe_rank_offsets_.end(),
-                                          fe_index) -
-                         fe_rank_offsets_.begin() - 1;
-      return fe_index + capacitor_rank_offsets_[owner];
-    }
-
-    /** Get cell indices for use with make_state() and system matrices. */
-    template <typename CellIterator>
-    void
-    get_system_dof_indices(const CellIterator                   &cell,
-                           std::vector<types::global_dof_index> &indices) const
-    {
-      cell->get_dof_indices(indices);
-      for (auto &index : indices)
-        index = system_dof_index(index);
-    }
-
 
     const AffineConstraints<double> &
     constraints() const;
@@ -919,38 +901,18 @@ namespace MetricFlowX
     // -----------------------------------------------------------------------
     // Mesh and FE space
     //
-    //   FESystem( FE_DGQ(fe_degree), 2,   -> components 0,1 : cell  A, U
-    //             FE_DGQ(1),        2 )   -> components 2,3 : trace A_hat,
-    //             U_hat
-    //
-    // Each rank owns a contiguous system block [local FE DoFs | local Pc].
-    // DoFHandler and FE evaluation vectors retain their native numbering;
-    // system_dof_index() inserts preceding ranks' capacitor blocks.
+    // Components 0,1: cell A,U; components 2,3: face traces A_hat,U_hat.
+    // Component 4: DG0 capacitor pressure on RCR terminal cells, FE_Nothing
+    // elsewhere. All state and matrix indices are native DoFHandler indices.
     // -----------------------------------------------------------------------
     parallel::fullydistributed::Triangulation<dim, spacedim> triangulation_;
     DoFHandler<dim, spacedim>                                dof_handler_;
-    std::unique_ptr<FiniteElement<dim, spacedim>>            fe_;
+    dealii::hp::FECollection<dim, spacedim>                  fe_collection_;
 
-    types::global_dof_index              n_total_dofs = 0;
-    std::vector<types::global_dof_index> fe_rank_offsets_;
-    std::vector<types::global_dof_index> capacitor_rank_offsets_;
-
-    IndexSet
-    system_index_set(const IndexSet &fe_indices) const
-    {
-      IndexSet result(n_total_dofs);
-      for (const auto index : fe_indices)
-        result.add_index(system_dof_index(index));
-      result.compress();
-      return result;
-    }
+    types::global_dof_index n_total_dofs = 0;
 
     // -----------------------------------------------------------------------
     // Index sets
-    //
-    // The *_fe_dofs sets span the FE range only, sized dof_handler_.n_dofs(),
-    // as required by FEValues::get_function_values().  The unqualified sets
-    // span the full system, sized n_total_dofs.
     //
     // cell_dofs_owned and trace_dofs_owned come from DoFTools::extract_dofs()
     // with a ComponentMask, and hence identify the differential and the
@@ -958,14 +920,12 @@ namespace MetricFlowX
     // -----------------------------------------------------------------------
     IndexSet locally_owned_dofs_;
     IndexSet locally_relevant_dofs_;
-    IndexSet locally_owned_fe_dofs;
-    IndexSet locally_relevant_fe_dofs;
     IndexSet cell_dofs_owned;  // components 0,1 : differential rows
     IndexSet trace_dofs_owned; // components 2,3 : algebraic rows
     IndexSet rcr_dofs_owned;   // capacitor rows owned by this rank
     IndexSet differential_dofs_;
     IndexSet algebraic_dofs_;
-    std::array<IndexSet, 4> component_dofs_;
+    std::array<IndexSet, 5> component_dofs_;
 
     // -----------------------------------------------------------------------
     // Trace continuity
@@ -998,10 +958,11 @@ namespace MetricFlowX
     {
       types::global_dof_index a = numbers::invalid_dof_index;
       types::global_dof_index u = numbers::invalid_dof_index;
-      for (unsigned int i = 0; i < fe_->n_dofs_per_cell(); ++i)
+      for (unsigned int i = 0; i < fe_collection_[0].n_dofs_per_cell(); ++i)
         {
-          const unsigned int c = fe_->system_to_component_index(i).first;
-          if ((c == 2 || c == 3) && fe_->has_support_on_face(i, f))
+          const unsigned int c =
+            fe_collection_[0].system_to_component_index(i).first;
+          if ((c == 2 || c == 3) && fe_collection_[0].has_support_on_face(i, f))
             (c == 2 ? a : u) = ldofs[i];
         }
       return {a, u};
@@ -1011,10 +972,8 @@ namespace MetricFlowX
     // Capacitor pressures as differential DAE unknowns, one per RCR terminal
     // with C > 0.
     //
-    // The terminal boundary ids are global data, so every rank enumerates the
-    // capacitor block identically.  A given Pc index is owned by the rank
-    // owning the unique cell holding that terminal face, so its row is always
-    // assembled locally.
+    // The boundary-id map identifies component-4 DoFs for terminal closures
+    // and distant resistor links. Ownership is inherited from DoFHandler.
     // -----------------------------------------------------------------------
     std::map<types::boundary_id, types::global_dof_index> rcr_pc_dof;
     types::global_dof_index                               n_rcr_dofs = 0;
@@ -1132,8 +1091,9 @@ namespace MetricFlowX
     {
       if (!viscoelastic_wall)
         return 0.;
-      std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
-      get_system_dof_indices(cell, indices);
+      std::vector<types::global_dof_index> indices(
+        cell->get_fe().n_dofs_per_cell());
+      cell->get_dof_indices(indices);
       const auto delta = cell->vertex(1) - cell->vertex(0);
       Point<dim> xi;
       xi[0] =
@@ -1142,9 +1102,9 @@ namespace MetricFlowX
                    1.);
       double area = 0., rate = 0.;
       for (unsigned int i = 0; i < indices.size(); ++i)
-        if (fe_->system_to_component_index(i).first == 0)
+        if (cell->get_fe().system_to_component_index(i).first == 0)
           {
-            const double phi = fe_->shape_value(i, xi);
+            const double phi = cell->get_fe().shape_value(i, xi);
             area += phi * y(indices[i]);
             rate += phi * ydot(indices[i]);
           }
@@ -1258,22 +1218,10 @@ namespace MetricFlowX
     VectorType theoretical_peak;
 
     // -----------------------------------------------------------------------
-    // Ghosted read vectors.
-    //
-    // All assembly reads go through these and all assembly writes go to a
-    // non-ghosted vector followed by compress(), which is the only
-    // communication in the whole assembly.
-    //
-    //   y_relevant    : full system, for direct y[dof] reads of trace and
-    //                   capacitor unknowns.
-    //   y_fe_relevant : FE range only, as required by
-    //                   FEValues::get_function_values(), which asserts that the
-    //                   vector has size dof_handler_.n_dofs().
-    //   y_fe_owned    : scratch used to build y_fe_relevant.
+    // The state uses the DoFHandler numbering, including terminal pressures.
+    // Import both the geometric ghost layer and distant terminal-link values.
     // -----------------------------------------------------------------------
     mutable VectorType y_relevant;
-    mutable VectorType y_fe_relevant;
-    mutable VectorType y_fe_owned;
     mutable VectorType residual_F;
 
     void
@@ -1491,7 +1439,7 @@ namespace MetricFlowX
       const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
       const unsigned int                                              i) const
     {
-      const double xi = fe_->unit_support_point(i)[0];
+      const double xi = cell->get_fe().unit_support_point(i)[0];
       return cell->vertex(0) + xi * (cell->vertex(1) - cell->vertex(0));
     }
 

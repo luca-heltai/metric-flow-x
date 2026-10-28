@@ -10,7 +10,7 @@ At each IDA output callback, deal.II `DataOut` writes parallel visualization rec
 - a `.pvtu` record describing the pieces;
 - a `.pvd` time-series file using the configured output base name.
 
-The visualization vectors include the FE-range solution and computed pressure fields, plus `vessel_id` cell data for joining with terminal metadata. The exact piece suffixes are produced by deal.II and include the output cycle and MPI rank.
+The visualization vectors include the solution (including the fifth FE field `Pc`, zero away from capacitive terminal cells) and computed pressure fields, plus `vessel_id` cell data for joining with terminal metadata. The exact piece suffixes are produced by deal.II and include the output cycle and MPI rank.
 
 ## CSV filenames
 

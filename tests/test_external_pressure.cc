@@ -227,13 +227,14 @@ test()
     if (cell->is_locally_owned())
       {
         std::vector<types::global_dof_index> ldofs(
-          problem.fe_->n_dofs_per_cell());
-        problem.get_system_dof_indices(cell, ldofs);
+          problem.fe_collection_.max_dofs_per_cell());
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
+        cell->get_dof_indices(ldofs);
         const double expected_external =
           17.0 + 100.0 * cell->center()[0] +
           3.0 * static_cast<double>(cell->material_id());
-        for (unsigned int i = 0; i < problem.fe_->n_dofs_per_cell(); ++i)
-          if (problem.fe_->system_to_component_index(i).first == 0)
+        for (unsigned int i = 0; i < cell->get_fe().n_dofs_per_cell(); ++i)
+          if (cell->get_fe().system_to_component_index(i).first == 0)
             {
               const double base =
                 problem.pressure(y(ldofs[i]), cell->material_id());
