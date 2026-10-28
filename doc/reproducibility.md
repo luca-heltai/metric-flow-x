@@ -251,3 +251,70 @@ The manuscript's `tikz_plots.tex` reads reduced tables in its `plot_data/`
 directory. Its existing Python plotting scripts contain manuscript-specific
 paths and comparisons; the collector provides portable new-run samples
 without importing or checking those archived comparisons.
+
+## Finalize machine-specific scaling tables
+
+The manuscript checkout in this workspace is `paper/` (singular). Use
+`--paper-root ./papers` if your checkout has a different name. The current
+manuscript actually plots the 50k and 100k strong-scaling tables; the old
+8k/30k tables are unused and are not regenerated. The companion paper branch
+removes those two unused LaTeX table loads.
+
+After a completed canonical campaign, export its results with:
+
+```bash
+python3 scripts/finalize_paper_output.py /shared/gpu04-paper-01 \
+  --machine gpu04 --paper-root ./paper
+```
+
+The input may be a `submit_paper_gpu.py` campaign root, or the output root of
+`reproduce_paper.py --suite scaling`. The destination is
+`paper/scaling/gpu04/`. Existing hardware-only profiles are accepted; profiles
+containing results are never overwritten, and `raksha` is protected. A new
+profile requires `--description 'LaTeX hardware and OS description'`.
+For an intentionally smaller sweep, pass the same `--ranks 1 2 4 8 16` to
+both the runner and finalizer.
+
+The export contains:
+
+- `plot_data/scaling_50k.csv` and `scaling_100k.csv`, with the exact column names
+  used by the manuscript, sorted by MPI count. Each value comes from the named
+  accumulated section in `scaling_timings.csv`; no averaging, last-row selection
+  or substitution of process wall time is performed.
+- `50k_vessels/runs/`, `100k_vessels/runs/` and, when supplied, `8k_vessels/runs/`
+  and `cerebral/runs/`, preserving receipts, parameters, logs and raw outputs.
+- `provenance/` with available build/submission metadata, and `finalization.json`
+  with source hashes, the measured execution host, executable revision/hash,
+  solve/initialization/integration times, speedups and parallel efficiencies
+  relative to the smallest measured MPI count, and remaining manuscript work.
+
+The finalizer rejects failed, prepared, smoke, incomplete, duplicate or mixed
+scaling runs. A sweep must use one executable, one host and the same numerical
+inputs for each network, with solution/progress/per-step diagnostic output
+disabled and explicit single-thread limits. All requested counts must be present
+for both networks. Source revision for a directly reused binary remains a user
+attestation unless a build receipt was supplied; the binary hash is always
+recorded by the runner.
+
+For example, on `lnx2`, with a freshly compiled executable from this revision:
+
+```bash
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+export BLIS_NUM_THREADS=1 DEAL_II_NUM_THREADS=1
+python3 scripts/reproduce_paper.py --suite scaling --machine lnx \
+  --ranks 1 2 4 8 16 --executable /path/to/fresh-build/blood_flow \
+  --executable-revision "$(git rev-parse HEAD)" --output-root /shared/lnx-paper-01
+python3 scripts/finalize_paper_output.py /shared/lnx-paper-01 \
+  --machine lnx --ranks 1 2 4 8 16 --paper-root ./paper
+```
+
+Exporting scaling tables does not complete the other manuscript figures.
+The pressure/network snapshots and mass-conservation images require rendering
+new field outputs; the cerebral IDA discussion and its historical BDF5 filename
+must be reconciled with the current cerebral input (BDF2). The finalizer neither
+copies raksha measurements/images nor relabels BDF2 results as BDF5. It reports
+`scaling_tables_ready: true` and `manuscript_profile_complete: false` explicitly.
+Before selecting a new full profile, generate the application figures and
+review the measured numerical claims and software versions in the text. Older
+manuscript checkouts also need the unused `scaling_8k.csv` and `scaling_30k.csv`
+loads removed from `tikz_plots.tex`.
