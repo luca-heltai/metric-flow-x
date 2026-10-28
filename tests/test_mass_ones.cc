@@ -66,18 +66,22 @@ test()
   // Locally owned cells only -- per_cell_mass has no entries for ghost
   // cells -- then reduced across ranks.
 
-  double             L_local = 0.0;
-  const unsigned int n_dofs  = problem.fe_->n_dofs_per_cell();
-  Vector<double>     local_v(n_dofs), local_Mv(n_dofs);
+  double             L_local  = 0.0;
+  const unsigned int max_dofs = problem.fe_collection_.max_dofs_per_cell();
+  Vector<double>     local_v(max_dofs), local_Mv(max_dofs);
 
   for (const auto &cell : problem.dof_handler_.active_cell_iterators())
     {
       if (!cell->is_locally_owned())
         continue;
 
-      std::vector<types::global_dof_index> ldofs(n_dofs);
+      std::vector<types::global_dof_index> ldofs(max_dofs);
+      const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
+      ldofs.resize(n_dofs);
       cell->get_dof_indices(ldofs);
 
+      local_v.reinit(n_dofs);
+      local_Mv.reinit(n_dofs);
       for (unsigned int i = 0; i < n_dofs; ++i)
         local_v(i) = problem.solution(ldofs[i]); // = 1.0 for all cell DOFs
 

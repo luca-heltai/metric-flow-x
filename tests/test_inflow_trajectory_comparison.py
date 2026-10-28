@@ -72,6 +72,36 @@ end
         r=m.compare_case(self.before,self.after)
         self.assertTrue(r['accepted'])
         self.assertTrue(all(v['max_normalized_error']==0 for v in r['metrics'].values()))
+    def consolidate_vessels(self, folder):
+        legacy = folder/'output/HDG_IDA_Vessel_0.csv'
+        _, rows = m.read_csv(legacy)
+        self.write_csv(folder, 'vessel_probes.csv',
+            ['time_s','vessel_id','pressure_Pa','flow_m3_s','area_m2','velocity_m_s'],
+            [[row['time_s'],0,float(row['P_dynpcm2'])/10,float(row['Q_cm3ps'])*1e-6,
+              float(row['A_cm2'])*1e-4,float(row['U_cmps'])*.01] for row in rows])
+        legacy.unlink()
+
+    def test_consolidated_vessel_probes_match_historical_units(self):
+        expected = m.csv_output_files(self.before/'output')
+        self.consolidate_vessels(self.after)
+        self.assertEqual(expected, m.csv_output_files(self.after/'output'))
+        self.assertTrue(m.compare_case(self.before,self.after)['accepted'])
+        self.consolidate(self.after)
+        self.assertTrue(m.compare_case(self.before,self.after)['accepted'])
+
+    def test_duplicate_consolidated_vessel_rows_rejected(self):
+        self.consolidate_vessels(self.after)
+        path = self.after/'output/vessel_probes.csv'
+        lines = path.read_text().splitlines()
+        path.write_text('\n'.join(lines+[lines[-1]])+'\n')
+        with self.assertRaisesRegex(ValueError, 'vessel rows'):
+            m.compare_case(self.before,self.after)
+
+    def test_mixed_vessel_layout_rejected(self):
+        self.consolidate_vessels(self.after)
+        shutil.copyfile(self.before/'output/HDG_IDA_Vessel_0.csv', self.after/'output/HDG_IDA_Vessel_0.csv')
+        with self.assertRaisesRegex(ValueError, 'Mixed'):
+            m.compare_case(self.before,self.after)
     def consolidate(self, folder):
         fields, rows = m.read_csv(folder/'output/terminal_0.csv')
         _, outlet = m.read_csv(folder/'output/terminal_1.csv')

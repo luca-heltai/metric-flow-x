@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def validate(executable, destination, mpi, initial_time=0.0):
     destination.mkdir(parents=True, exist_ok=True)
-    source = (ROOT / "parameters/constant.prm.in").read_text().replace("@SOURCE_DIR@", str(ROOT))
+    source = (ROOT / "tests/parameters/constant.prm.in").read_text().replace("@SOURCE_DIR@", str(ROOT))
     source = source.replace("= 4\n", "= 3\n").replace("= 1.1\n", "= 0.01\n")
     source = source.replace("= 0.005\n", "= 0.001\n").replace("= 1e-06", "= 1e-12")
     source = source.replace("= 1e-05", "= 1e-07").replace("= HLL\n", "= HLL_HDG\n")

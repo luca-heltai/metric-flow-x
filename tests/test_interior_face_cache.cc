@@ -57,7 +57,8 @@ test()
           AssertThrow(face.cell->face(face.face_no)->at_boundary(),
                       ExcInternalError());
           std::vector<types::global_dof_index> dofs(
-            flow.fe_->n_dofs_per_cell());
+            flow.fe_collection_.max_dofs_per_cell());
+          dofs.resize(face.cell->get_fe().n_dofs_per_cell());
           face.cell->get_dof_indices(dofs);
           const auto [area, velocity] =
             flow.face_trace_dofs(dofs, face.face_no);

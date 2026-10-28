@@ -63,7 +63,7 @@ test()
       for (const auto &[index, value] : original)
         {
           const double expected =
-            index.first < flow.dof_handler().n_dofs() ? 2 * value : value;
+            flow.rcr_dofs_owned.is_element(index.first) ? value : 2 * value;
           AssertThrow(std::abs(scaled.at(index) - expected) <=
                         1e-14 * std::abs(expected),
                       ExcMessage("Mass rebuild must refresh geometry values."));

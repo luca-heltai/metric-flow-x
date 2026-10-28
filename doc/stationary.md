@@ -67,7 +67,9 @@ equilibrium under time integration.
 ## Output and tests
 
 Both modes reuse the VTK/PVTU/PVD output and the vessel/optional terminal CSV
-formats. CSV filenames retain the existing `HDG_IDA_Vessel_*.csv` convention.
+formats. Midpoint probes share `Output vessel CSV file` (default
+`vessel_probes.csv`) and use SI units with a vessel-ID column; select them with
+`Vessel probe IDs`. See [outputs](outputs.md#vessel-csv-probes).
 They do not create transient step histories, mass-conservation histories or
 IDA integration statistics. `steady HDG` additionally writes
 `stationary_statistics.json` with the snapshot time, zero integration-step

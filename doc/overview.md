@@ -8,7 +8,7 @@ The implementation uses a hybridized, HDG-type finite-element layout:
 
 - discontinuous cell fields represent area `A` and axial velocity `U`;
 - a pair of face trace fields represents `A_hat` and `U_hat` on every unique face;
-- RCR terminal capacitor pressures, when present, occupy an appended block.
+- RCR terminal capacitor pressures form a fifth FE component, using DG0 on capacitive terminal cells and `FE_Nothing` elsewhere; ownership follows their terminal cell.
 
 These blocks are assembled into one distributed vector. IDA treats cell and capacitor rows as differential and trace rows as algebraic.
 

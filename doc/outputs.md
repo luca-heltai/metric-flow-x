@@ -10,7 +10,7 @@ At each IDA output callback, deal.II `DataOut` writes parallel visualization rec
 - a `.pvtu` record describing the pieces;
 - a `.pvd` time-series file using the configured output base name.
 
-The visualization vectors include the FE-range solution and computed pressure fields, plus `vessel_id` cell data for joining with terminal metadata. The exact piece suffixes are produced by deal.II and include the output cycle and MPI rank.
+The visualization vectors include the solution (including the fifth FE field `Pc`, zero away from capacitive terminal cells) and computed pressure fields, plus `vessel_id` cell data for joining with terminal metadata. The exact piece suffixes are produced by deal.II and include the output cycle and MPI rank.
 
 ## CSV filenames
 
@@ -21,6 +21,7 @@ created automatically. Existing files are not removed when output is disabled.
 
 | Parameter | Default |
 | --- | --- |
+| `Output vessel CSV file` | `vessel_probes.csv` |
 | `Output terminal CSV file` | empty (disabled) |
 | `Output network terminals CSV file` | `network_terminals.csv` |
 | `Output mass conservation CSV file` | `mass_conservation.csv` |
@@ -38,13 +39,26 @@ retain their append behavior; other files are overwritten for each solve.
 
 ## Vessel CSV probes
 
-At setup, the implementation opens one CSV file per vessel at its arc-length midpoint. The current filename pattern is:
+Midpoint probes use one CSV, written by rank zero. Configure the filename and
+the optional list of vessel IDs independently:
 
 ```text
-HDG_IDA_Vessel_<vessel-id>.csv
+subsection MetricFlowSystem<1, 3>
+  set Output vessel CSV file = probes.csv
+  set Vessel probe IDs = 0, 2, 7
+end
 ```
 
-Rows are appended at IDA output times. The header and columns are emitted by `BloodFlowSystem::open_csv_files()`/`BloodFlowSystem::write_csv_row()` in `source/blood_flow_system.cc`; consumers should treat them as implementation output rather than a stable file-format contract.
+An empty filename disables vessel probes, regardless of the ID list. A nonempty
+filename with an empty ID list selects all vessels. Unknown selected IDs are
+errors. Paths follow the rules above; no `none` or `all` keywords are needed.
+
+The columns are `time_s,vessel_id,pressure_Pa,flow_m3_s,area_m2,velocity_m_s`,
+all in SI units. Each output appends one row per selected midpoint, ordered by
+vessel ID. The unique rank owning each midpoint evaluates it; all ranks,
+including empty ranks, participate in gathering a bounded snapshot. Only rank
+zero opens the file. No `HDG_IDA_Vessel_<id>.csv` files are created. Use a fresh
+directory to avoid confusing historical per-vessel files with new output.
 
 ## Terminal names and effective parameters
 
@@ -54,12 +68,9 @@ The optional input CSV column `label` supplies the name; a missing or blank
 label defaults to `boundary_<boundary_id>`. In VTK mode the same default is
 used. Boundary and vessel IDs remain the keys, so labels need not be unique.
 
-Each vessel probe also includes a `boundary_<id>_label` column for every
-terminal connected to that vessel. A vessel with no terminal retains its five
-numeric columns. Probe filenames keep the existing numeric vessel ID, so
-arbitrary label text cannot alter output paths. Visualization `vessel_id` cell
-data links to the terminal table. Global mass, solver statistics, and timing
-summaries retain their aggregate schemas.
+Use `vessel_id` to join midpoint probes or visualization cells to this metadata
+table for terminal labels. Labels do not become filenames. Global mass, solver
+statistics, and timing summaries retain their aggregate schemas.
 
 All C++ solver CSV writers use Rapidcsv, including probes, terminal metadata,
 `mass_conservation.csv`, `ida_statistics.csv`, and `scaling_timings.csv`.
@@ -87,8 +98,8 @@ paths are resolved under `Output directory`; absolute paths are used directly.
 Parent directories are created as needed. The former `Write terminal CSV files`
 boolean is removed; replace it with the desired filename in existing inputs.
 Disabled output creates no terminal time-series file.
-`network_terminals.csv` remains the static outlet metadata table. Existing
-per-vessel probes are unchanged. Use a fresh output directory to avoid mixing
+`network_terminals.csv` remains the static outlet metadata table. Use a fresh
+output directory to avoid mixing
 new output with older `terminal_<boundary_id>.csv` files.
 
 The inflow and ramp comparison tools read both layouts, including comparisons
@@ -161,6 +172,19 @@ startup to fail rather than silently stepping below it:
 ```sh
 python3 tests/test_ida_progress.py --executable build/blood_flow
 ```
+
+## Wall-domain checks and nonlinear convergence
+
+For ADAVN walls, residual and Jacobian callbacks reject trial states outside the
+positive-area, hyperbolic wall domain with a recoverable IDA return code. The
+`check_wall_domain` timer measures this check. At console depth greater than
+one, rejected non-hyperbolic trials identify their vessel and area ratio.
+
+`IDA parameters / Running parameters / Nonlinear convergence coefficient`
+controls the native IDA Newton convergence test independently of time-error
+acceptance; its default 0.33 preserves the SUNDIALS default. A smaller value can
+be useful when deliberately loose startup weights would otherwise also loosen
+the nonlinear solve. See the [SUNDIALS IDAS documentation](https://sundials.readthedocs.io/en/latest/idas/Usage/SIM.html).
 
 ## Logs and parameter receipt
 

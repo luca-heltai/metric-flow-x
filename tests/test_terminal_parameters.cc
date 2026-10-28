@@ -164,6 +164,7 @@ test()
     "set Vtk file path for mesh input = " +
       absolute_mesh +
       "\n"
+      "set Outlet boundary condition type = RCR\n"
       "set Terminal parameter source = Parameters\n"
       "set Terminal parameters CSV file = " +
       std::filesystem::absolute("terminal.csv").string() +
@@ -234,14 +235,16 @@ test()
       auto residual = flow.make_state();
       y             = 0.0;
       ydot          = 0.01;
-      std::vector<types::global_dof_index> indices(flow.fe_->n_dofs_per_cell());
+      std::vector<types::global_dof_index> indices(
+        flow.fe_collection_.max_dofs_per_cell());
       for (const auto &cell : flow.dof_handler_.active_cell_iterators())
         if (cell->is_locally_owned())
           {
+            indices.resize(cell->get_fe().n_dofs_per_cell());
             cell->get_dof_indices(indices);
             for (unsigned int i = 0; i < indices.size(); ++i)
               y(indices[i]) =
-                flow.fe_->system_to_component_index(i).first % 2 == 0 ?
+                cell->get_fe().system_to_component_index(i).first % 2 == 0 ?
                   1.1 * flow.vessel_map.at(cell->material_id()).a_d :
                   0.05;
           }

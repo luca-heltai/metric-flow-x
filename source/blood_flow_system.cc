@@ -5,7 +5,8 @@
  * Unknown layout:
  *   FESystem( FE_DGQ(fe_degree), 2,   -> comps 0,1 : cell  A, U
  *             FE_DGQ(1),        2 )   -> comps 2,3 : trace A_hat, U_hat
- *   followed by n_rcr_dofs capacitor pressures appended after the FE range.
+ *   Component 4 is FE_DGQ(0) on capacitive terminal cells and FE_Nothing
+ *   elsewhere. The DoFHandler numbers the entire coupled system.
  *
  * Ownership follows the mesh partition: the rank owning a cell owns that
  * cell's cell-DoFs and its trace-DoFs, because every one of them is a DoF of
@@ -22,8 +23,6 @@
 #include <deal.II/base/types.h>
 
 #include <deal.II/distributed/tria_base.h>
-
-#include <deal.II/dofs/dof_renumbering.h>
 
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -248,7 +247,6 @@ namespace MetricFlowX
            "Reflection coefficient at outflow boundary"})
     , triangulation_(mpi_communicator_)
     , dof_handler_(triangulation_)
-    , fe_(nullptr)
     , rhs_function("Functions",
                    "0.0; 0.0",
                    "RHS expression",
@@ -298,6 +296,14 @@ namespace MetricFlowX
     add_parameter("Verbosity (console depth)", verbosity);
     add_parameter("Output directory", output_directory);
     add_parameter(
+      "Output vessel CSV file",
+      output_vessel_csv_file,
+      "One midpoint probe CSV relative to Output directory, or absolute. Empty disables vessel probes.");
+    add_parameter(
+      "Vessel probe IDs",
+      vessel_probe_ids,
+      "Comma-separated vessel IDs for midpoint probes. Empty selects all vessels.");
+    add_parameter(
       "Output time interval",
       time_interval,
       "Positive value sets the interval between written outputs; zero writes "
@@ -305,6 +311,26 @@ namespace MetricFlowX
     add_parameter("Numerical flux type", numerical_flux_type_str);
     add_parameter("Use Riemann Invariants", use_riemann_invariants);
     add_parameter("Use junction mesh", use_junction_mesh);
+    add_parameter("Mesh partitioning",
+                  mesh_partitioning,
+                  "Weighted vessel graph (requires METIS), or legacy zorder.",
+                  this->prm,
+                  Patterns::Selection("graph|zorder"));
+    add_parameter("Partition junction weight",
+                  partition_junction_weight,
+                  "Positive graph edge weight at shared mesh vertices.",
+                  this->prm,
+                  Patterns::Integer(1));
+    add_parameter("Partition terminal connection weight",
+                  partition_terminal_weight,
+                  "Positive graph edge weight for peripheral resistive links.",
+                  this->prm,
+                  Patterns::Integer(1));
+    add_parameter("Partition imbalance tolerance",
+                  partition_imbalance,
+                  "Allowed maximum load excess relative to the mean.",
+                  this->prm,
+                  Patterns::Double(0., 1.));
     add_parameter("Outlet boundary condition type", outlet_type);
     add_parameter("Vtk file path for mesh input", vtk_file_path);
     add_parameter(
@@ -322,6 +348,12 @@ namespace MetricFlowX
       this->prm,
       Patterns::Selection("VTK|Parameters"));
     add_parameter("Terminal parameters CSV file", terminal_parameters_csv_file);
+    add_parameter(
+      "Terminal connections CSV file",
+      terminal_connections_csv_file,
+      "Optional undirected resistor graph: boundary0,boundary1,resistance. "
+      "Connects capacitor pressures (C>0) or trace pressures (C=0); "
+      "replaces the connected terminals' fixed downstream closure.");
     add_parameter("Default terminal R1", default_terminal_r1);
     add_parameter("Default terminal R2", default_terminal_r2);
     add_parameter("Default terminal C", default_terminal_c);
@@ -403,10 +435,6 @@ namespace MetricFlowX
       !viscoelastic_wall || wall_model != "Square root",
       ExcMessage(
         "Viscoelastic wall requires an ADAVN wall model and its adavn_K_m input field."));
-    AssertThrow(
-      wall_model == "Square root" || initial_state_source != "steady network",
-      ExcMessage(
-        "ADAVN walls do not support the square-root steady-network initializer; select Initial state source = rest."));
     AssertThrow(std::isfinite(time_interval) && time_interval >= 0.0,
                 ExcMessage("Output time interval must be finite and "
                            "non-negative."));
@@ -483,6 +511,15 @@ namespace MetricFlowX
   }
 
   template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::prescribed_inflow(const double t)
+  {
+    inflow_function.set_time(t);
+    return inflow_series.empty() ? inflow_function.value(Point<1>(0.)) :
+                                   inflow_series.value(t);
+  }
+
+  template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::setup()
   {
@@ -512,16 +549,19 @@ namespace MetricFlowX
   {
     auto result = make_state();
     result      = velocity_absolute_tolerance;
-    std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
+    std::vector<types::global_dof_index> indices(
+      fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
+          indices.resize(cell->get_fe().n_dofs_per_cell());
           cell->get_dof_indices(indices);
           const double reference_area = std::min(compute_a_d_at_face(cell, 0),
                                                  compute_a_d_at_face(cell, 1));
           for (unsigned int i = 0; i < indices.size(); ++i)
             {
-              const auto component = fe_->system_to_component_index(i).first;
+              const auto component =
+                cell->get_fe().system_to_component_index(i).first;
               if (component == 0 || component == 2)
                 result(indices[i]) =
                   area_absolute_tolerance_fraction * reference_area;
@@ -545,9 +585,11 @@ namespace MetricFlowX
         const unsigned int next = offsets.size();
         offsets.emplace(id, next);
       }
-    std::vector<double>     local(offsets.size(), 0.0), global(offsets.size());
-    const QGauss<dim>       quadrature(fe_degree + 2);
-    FEValues<dim, spacedim> values(*fe_, quadrature, update_values);
+    std::vector<double> local(offsets.size(), 0.0), global(offsets.size());
+    const QGauss<dim>   quadrature(fe_degree + 2);
+    hp::FEValues<dim, spacedim>      hp_values(fe_collection_,
+                                          hp::QCollection<dim>(quadrature),
+                                          update_values);
     const FEValuesExtractors::Scalar area(0), velocity(1);
     std::vector<double> areas(quadrature.size()), velocities(quadrature.size());
     for (const auto &cell : dof_handler_.active_cell_iterators())
@@ -555,9 +597,10 @@ namespace MetricFlowX
         {
           const unsigned int id   = cell->material_id();
           double            &peak = local[offsets.at(id)];
-          values.reinit(cell);
-          values[area].get_function_values(y_fe_relevant, areas);
-          values[velocity].get_function_values(y_fe_relevant, velocities);
+          hp_values.reinit(cell);
+          const auto &values = hp_values.get_present_fe_values();
+          values[area].get_function_values(y_relevant, areas);
+          values[velocity].get_function_values(y_relevant, velocities);
           for (unsigned int q = 0; q < quadrature.size(); ++q)
             peak = std::max(peak,
                             std::abs(velocities[q]) /
@@ -579,6 +622,76 @@ namespace MetricFlowX
     for (const auto &[id, offset] : offsets)
       result.emplace(id, global[offset]);
     return result;
+  }
+
+  template <int dim, int spacedim>
+  bool
+  BloodFlowSystem<dim, spacedim>::has_admissible_wall_states(
+    const VectorType &state) const
+  {
+    TimerOutput::Scope timer(computing_timer, "check_wall_domain");
+    update_ghosted_vectors(state);
+    unsigned int invalid = 0;
+    for (const auto i : locally_owned_dofs_)
+      if (!std::isfinite(state(i)))
+        invalid = 1;
+    const auto admissible = [this, &invalid](double       a,
+                                             unsigned int vid,
+                                             double       reference) {
+      if (!std::isfinite(a) || a <= 0.)
+        return false;
+      a                    = std::max(a, 1e-10);
+      const double modulus = a * compute_pressure_derivative(a, vid, reference);
+      const bool   valid   = std::isfinite(modulus) && modulus > 0.;
+      if (!valid && invalid == 0 && verbosity > 1)
+        deallog << "Recoverable wall-domain rejection: vessel " << vid
+                << ", A/Aref=" << a / reference << ", A*dP/dA=" << modulus
+                << std::endl;
+      return valid;
+    };
+    const QGauss<dim>                quadrature(std::max(fe_degree, 1u) + 1);
+    hp::FEValues<dim, spacedim>      hp_values(fe_collection_,
+                                          hp::QCollection<dim>(quadrature),
+                                          update_values |
+                                            update_quadrature_points);
+    const FEValuesExtractors::Scalar area(0);
+    std::vector<double>              areas(quadrature.size()),
+      local(fe_collection_.max_dofs_per_cell());
+    std::vector<types::global_dof_index> indices(
+      fe_collection_.max_dofs_per_cell());
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          const auto vid = cell->material_id();
+          hp_values.reinit(cell);
+          const auto &values = hp_values.get_present_fe_values();
+          indices.resize(cell->get_fe().n_dofs_per_cell());
+          cell->get_dof_indices(indices);
+          local.resize(indices.size());
+          state.extract_subvector_to(indices, local);
+          values[area].get_function_values_from_local_dof_values(local, areas);
+          for (unsigned int q = 0; q < quadrature.size(); ++q)
+            if (!admissible(areas[q],
+                            vid,
+                            compute_a_d_at_point(cell,
+                                                 values.quadrature_point(q))))
+              invalid = 1;
+          for (const auto f : cell->face_indices())
+            {
+              Point<dim> xi;
+              xi[0]            = f;
+              double cell_area = 0.;
+              for (unsigned int i = 0; i < local.size(); ++i)
+                if (cell->get_fe().system_to_component_index(i).first == 0)
+                  cell_area += local[i] * cell->get_fe().shape_value(i, xi);
+              const auto   trace     = face_trace_dofs(indices, f);
+              const double reference = compute_a_d_at_face(cell, f);
+              if (!admissible(cell_area, vid, reference) ||
+                  !admissible(state(trace.first), vid, reference))
+                invalid = 1;
+            }
+        }
+    return Utilities::MPI::max(invalid, mpi_communicator_) == 0;
   }
 
   template <int dim, int spacedim>
@@ -690,6 +803,9 @@ namespace MetricFlowX
                 continue;
               }
             check(PCFactorSetShiftType(subpc, MAT_SHIFT_NONZERO));
+            // A near-zero shift can leave singular local DAE blocks with
+            // enormous inverse entries and cause GMRES breakdown.
+            check(PCFactorSetShiftAmount(subpc, 1e-5));
             // The coupled vessel equations need fill beyond their original
             // sparsity pattern for a useful local approximation.
             if (n_mpi_processes > 1 && std::string(type) == PCILU)
@@ -760,8 +876,9 @@ namespace MetricFlowX
   const FiniteElement<dim, spacedim> &
   BloodFlowSystem<dim, spacedim>::finite_element() const
   {
-    AssertThrow(fe_ != nullptr, ExcMessage("BloodFlowSystem is not set up."));
-    return *fe_;
+    AssertThrow(fe_collection_.size() != 0,
+                ExcMessage("BloodFlowSystem is not set up."));
+    return fe_collection_[0];
   }
 
   template <int dim, int spacedim>
@@ -972,6 +1089,27 @@ namespace MetricFlowX
     vtk.read_cell_data("p0", cell_p0);
     vtk.read_cell_data("L", cell_L);
     vtk.read_cell_data("r_d", cell_r_d);
+
+    cell_viscosity.reinit(0);
+    if (vtk.has_cell_data("viscosity"))
+      {
+        vtk.read_cell_data("viscosity", cell_viscosity);
+        AssertThrow(cell_viscosity.size() == cell_vessel_ids.size(),
+                    ExcMessage(
+                      "viscosity must contain one value per VTK cell."));
+        std::map<unsigned int, double> seen;
+        for (unsigned int i = 0; i < cell_viscosity.size(); ++i)
+          {
+            const double value = cell_viscosity[i];
+            AssertThrow(std::isfinite(value) && value >= 0.,
+                        ExcMessage(
+                          "VTK viscosity must be finite and nonnegative."));
+            const auto [it, inserted] = seen.emplace(cell_vessel_ids[i], value);
+            AssertThrow(
+              inserted || it->second == value,
+              ExcMessage("viscosity differs between cells sharing vessel_id."));
+          }
+      }
 
     wall_input.clear();
     if (wall_model != "Square root")
@@ -1248,12 +1386,32 @@ namespace MetricFlowX
     else
       {
         serial_triangulation.refine_global(n_global_refinements);
+        if (outlet_type == "RCR")
+          {
+            for (const auto &cell :
+                 serial_triangulation.active_cell_iterators())
+              {
+                unsigned int capacitors = 0;
+                for (const auto f : cell->face_indices())
+                  if (cell->face(f)->at_boundary())
+                    {
+                      const auto bid = cell->face(f)->boundary_id();
+                      if (bid != 0 && rcr_map.count(bid) &&
+                          rcr_map.at(bid).C > 0.)
+                        ++capacitors;
+                    }
+                if (capacitors > 1)
+                  cell->set_refine_flag();
+              }
+            serial_triangulation.execute_coarsening_and_refinement();
+          }
 
-        // Partition and hand the description to the fully distributed mesh. The
-        // z-order partitioner keeps a vessel's cells together, which keeps the
-        // number of junctions straddling a subdomain boundary small.
-        GridTools::partition_triangulation_zorder(n_mpi_processes,
-                                                  serial_triangulation);
+
+        if (mesh_partitioning == "graph")
+          partition_vessels(serial_triangulation);
+        else
+          GridTools::partition_triangulation_zorder(n_mpi_processes,
+                                                    serial_triangulation);
 
         const auto description = TriangulationDescription::Utilities::
           create_description_from_triangulation(serial_triangulation,
@@ -1315,7 +1473,9 @@ namespace MetricFlowX
         vp.p0     = cell_p0[data_index];
         vp.a_d    = cell_a_d[data_index];
         vp.L      = cell_L[data_index];
-        vp.r_d    = cell_r_d[data_index];
+        vp.dynamic_viscosity =
+          cell_viscosity.size() ? cell_viscosity[data_index] : viscosity;
+        vp.r_d  = cell_r_d[data_index];
         vp.r_in = (cell_r_in.size() > data_index) ? cell_r_in[data_index] : 0.0;
         vp.r_out =
           (cell_r_out.size() > data_index) ? cell_r_out[data_index] : 0.0;
@@ -1593,14 +1753,17 @@ namespace MetricFlowX
     interior_faces.clear();
     boundary_faces.clear();
 
-    std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
-    std::vector<types::global_dof_index> nb_dofs(fe_->n_dofs_per_cell());
+    std::vector<types::global_dof_index> ldofs(
+      fe_collection_.max_dofs_per_cell());
+    std::vector<types::global_dof_index> nb_dofs(
+      fe_collection_.max_dofs_per_cell());
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!(cell->is_locally_owned()))
           continue;
 
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
 
         for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
@@ -1629,6 +1792,7 @@ namespace MetricFlowX
                 // ghost.  Either way its DoF indices are readable.
                 const auto        &nb   = cell->neighbor(f);
                 const unsigned int nb_f = cell->neighbor_of_neighbor(f);
+                nb_dofs.resize(nb->get_fe().n_dofs_per_cell());
                 nb->get_dof_indices(nb_dofs);
                 const auto [a_canon, u_canon] = face_trace_dofs(nb_dofs, nb_f);
 
@@ -1683,15 +1847,8 @@ namespace MetricFlowX
   // ==========================================================================
   // build_rcr_dof_map
   //
-  // One capacitor pressure per RCR terminal with C > 0 or we write R_2 > 0,
-  // appended after the FE range.  The terminal boundary ids come from rcr_map,
-  // which is replicated, so the enumeration is identical on every rank without
-  // communication -- a necessary property, since a global index must mean the
-  // same thing everywhere.
-  //
-  // A Pc index is *owned* by the rank owning the cell that carries the terminal
-  // face.  Each terminal face has exactly one incident cell, so this assigns
-  // every Pc to exactly one rank and locally_owned_dofs_ stays a partition.
+  // One pressure per terminal with C > 0, owned by the terminal cell's rank.
+  // Component 4 supplies a native DoF on each capacitor terminal cell.
   // ==========================================================================
   template <int dim, int spacedim>
   void
@@ -1700,71 +1857,180 @@ namespace MetricFlowX
     TimerOutput::Scope timer(computing_timer, "build_rcr_dof_map");
 
     rcr_pc_dof.clear();
-    n_rcr_dofs = 0;
-
-    const types::global_dof_index first_pc = dof_handler_.n_dofs();
-
-    // Numbering: identical on every rank, no communication needed -- rcr_map
-    // is replicated, so every rank enumerates it the same way.
-    if (outlet_type != "Reflection" && outlet_type != "Dirichlet")
-      for (const auto &[bid, rcr] : rcr_map)
+    std::map<types::boundary_id, types::global_dof_index> local;
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned() && cell->active_fe_index() == 1)
         {
-          if (bid == 0)
-            continue; // inflow
-          if (rcr.C <= 0.0)
-            continue; // single-R terminal carries no capacitor unknown
-
-          rcr_pc_dof[bid] = first_pc + n_rcr_dofs;
-          ++n_rcr_dofs;
+          std::vector<types::global_dof_index> indices(
+            cell->get_fe().n_dofs_per_cell());
+          cell->get_dof_indices(indices);
+          const auto pc =
+            indices[cell->get_fe().component_to_system_index(4, 0)];
+          for (const auto f : cell->face_indices())
+            if (cell->face(f)->at_boundary())
+              {
+                const auto bid = cell->face(f)->boundary_id();
+                if (rcr_map.count(bid) && bid != 0 && rcr_map.at(bid).C > 0.)
+                  local.emplace(bid, pc);
+              }
         }
-
-    n_total_dofs = first_pc + n_rcr_dofs;
-
-    // Ownership: dof_handler_'s own FE numbering is already split into
-    // contiguous, rank-ordered blocks with no gaps between them (that's
-    // intrinsic to how a parallel DoFHandler numbers its own dofs -- rank r's
-    // block ends exactly where rank r+1's begins).  The Pc range sits right
-    // after all of that, starting at first_pc.  For a rank's combined FE+Pc
-    // range to be one contiguous interval (which is what PETSc requires),
-    // every Pc must go to the *one* rank whose FE block ends at first_pc -- no
-    // other rank's FE block is adjacent to the Pc range, so splitting the Pc's
-    // up by terminal ownership (or by any other rule) always leaves a gap for
-    // every rank except that one.  Assembly is unaffected: it still happens on
-    // whichever rank owns each terminal's cell, and off-owner contributions
-    // are already routed correctly by the compress(VectorOperation::add)
-    // calls used throughout this file.
-    unsigned int local_candidate = n_mpi_processes; // sentinel: "not me"
-    if (first_pc > 0 &&
-        dof_handler_.locally_owned_dofs().is_element(first_pc - 1))
-      local_candidate = this_mpi_process;
-
-    const unsigned int pc_owner =
-      Utilities::MPI::min(local_candidate, mpi_communicator_);
-
-    Assert(pc_owner < n_mpi_processes,
-           ExcMessage("Could not find the rank owning the last FE DoF."));
-
-    rcr_dofs_owned.clear();
-    rcr_dofs_owned.set_size(n_total_dofs);
-    if (this_mpi_process == pc_owner)
-      for (types::global_dof_index i = first_pc; i < n_total_dofs; ++i)
-        rcr_dofs_owned.add_index(i);
-    rcr_dofs_owned.compress();
-
-    Assert(Utilities::MPI::sum<types::global_dof_index>(
-             rcr_dofs_owned.n_elements(), mpi_communicator_) == n_rcr_dofs,
-           ExcMessage(
-             "Every capacitor DOF must be owned by exactly one rank."));
+    for (const auto &entries :
+         Utilities::MPI::all_gather(mpi_communicator_, local))
+      for (const auto &entry : entries)
+        AssertThrow(
+          rcr_pc_dof.insert(entry).second,
+          ExcMessage(
+            "Capacitor terminal must have exactly one incident cell."));
+    n_total_dofs = dof_handler_.n_dofs();
+    n_rcr_dofs   = rcr_pc_dof.size();
+    rcr_dofs_owned =
+      DoFTools::extract_dofs(dof_handler_,
+                             ComponentMask({false, false, false, false, true}));
+    AssertThrow(
+      Utilities::MPI::sum<types::global_dof_index>(rcr_dofs_owned.n_elements(),
+                                                   mpi_communicator_) ==
+        n_rcr_dofs,
+      ExcMessage(
+        "Each capacitor needs a distinct terminal cell and boundary ID."));
     if (verbosity > 0)
       pcout << "RCR capacitor DOFs: n_rcr = " << n_rcr_dofs
             << "  n_total = " << n_total_dofs << std::endl;
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::setup_terminal_connections()
+  {
+    terminal_links.clear();
+    terminal_ports.clear();
+    if (terminal_connections_csv_file.empty())
+      return;
+    AssertThrow(
+      outlet_type == "RCR" && !viscoelastic_wall,
+      ExcMessage(
+        "Terminal connections require RCR boundaries and elastic walls."));
+    rapidcsv::Document csv(terminal_connections_csv_file);
+    for (const auto &column : {"boundary0", "boundary1", "resistance"})
+      AssertThrow(csv.GetColumnIdx(column) >= 0,
+                  ExcMessage("Terminal connections CSV requires column " +
+                             std::string(column)));
+    std::set<std::pair<types::boundary_id, types::boundary_id>> pairs;
+    for (size_t row = 0; row < csv.GetRowCount(); ++row)
+      {
+        const auto   a = csv.GetCell<types::boundary_id>("boundary0", row);
+        const auto   b = csv.GetCell<types::boundary_id>("boundary1", row);
+        const double resistance = csv.GetCell<double>("resistance", row);
+        AssertThrow(a != b && a != 0 && b != 0 && a != 255 && b != 255 &&
+                      rcr_map.count(a) && rcr_map.count(b) &&
+                      std::isfinite(resistance) && resistance > 0.,
+                    ExcMessage("Invalid terminal connection at CSV row " +
+                               std::to_string(row + 2)));
+        AssertThrow(pairs.emplace(std::min(a, b), std::max(a, b)).second,
+                    ExcMessage("Duplicate undirected terminal connection."));
+        for (const auto bid : {a, b})
+          AssertThrow(
+            rcr_map.at(bid).C > 0. || rcr_map.at(bid).R1 == 0.,
+            ExcMessage(
+              "A connected terminal without a capacitor requires R1=0."));
+        terminal_links[a].emplace_back(b, resistance);
+        terminal_links[b].emplace_back(a, resistance);
+      }
+    std::map<types::boundary_id, TerminalPort> local;
+    unsigned int                               repeated = 0;
+    for (const auto &face : boundary_faces)
+      {
+        const auto bid = face.cell->face(face.face_no)->boundary_id();
+        if (terminal_links.count(bid))
+          if (!local
+                 .emplace(bid,
+                          TerminalPort{face.a_hat_dof,
+                                       face.u_hat_dof,
+                                       face.cell->material_id(),
+                                       compute_a_d_at_face(face.cell,
+                                                           face.face_no),
+                                       face.face_no == 1 ? 1 : -1,
+                                       face.cell->face(face.face_no)->vertex(0),
+                                       face.cell->id()})
+                 .second)
+            repeated = 1;
+      }
+    AssertThrow(Utilities::MPI::max(repeated, mpi_communicator_) == 0,
+                ExcMessage("Repeated connected terminal boundary ID."));
+    for (const auto &ports :
+         Utilities::MPI::all_gather(mpi_communicator_, local))
+      for (const auto &[bid, port] : ports)
+        AssertThrow(
+          terminal_ports.emplace(bid, port).second,
+          ExcMessage(
+            "Connected terminal must have exactly one incident cell."));
+    AssertThrow(
+      terminal_ports.size() == terminal_links.size(),
+      ExcMessage(
+        "Every connected terminal must be a degree-one mesh endpoint."));
+  }
+
+  template <int dim, int spacedim>
+  types::global_dof_index
+  BloodFlowSystem<dim, spacedim>::terminal_pressure_dof(
+    types::boundary_id bid) const
+  {
+    const auto it = rcr_pc_dof.find(bid);
+    return it == rcr_pc_dof.end() ? terminal_ports.at(bid).area : it->second;
+  }
+
+  template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::terminal_pressure_derivative(
+    types::boundary_id bid,
+    const VectorType  &y) const
+  {
+    if (rcr_pc_dof.count(bid))
+      return 1.;
+    const auto &port = terminal_ports.at(bid);
+    return compute_pressure_derivative(std::max(y(port.area), 1e-10),
+                                       port.vessel,
+                                       port.reference_area);
+  }
+
+  template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::terminal_pressure(types::boundary_id bid,
+                                                    const VectorType  &y,
+                                                    double             t) const
+  {
+    const auto it = rcr_pc_dof.find(bid);
+    if (it != rcr_pc_dof.end())
+      return y(it->second);
+    const auto &port = terminal_ports.at(bid);
+    return compute_physical_pressure(std::max(y(port.area), 1e-10),
+                                     port.vessel,
+                                     port.reference_area,
+                                     t,
+                                     port.point,
+                                     port.cell_id);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::build_terminal_connection_sparsity(
+    DynamicSparsityPattern &dsp)
+  {
+    for (const auto &face : boundary_faces)
+      {
+        const auto bid = face.cell->face(face.face_no)->boundary_id();
+        if (!terminal_links.count(bid))
+          continue;
+        const auto row = terminal_pressure_dof(bid);
+        for (const auto &[other, resistance] : terminal_links.at(bid))
+          dsp.add(row, terminal_pressure_dof(other));
+      }
   }
 
   // ============================================================================
   // update_ghosted_vectors
   //
   // The single point where the solver communicates during assembly: copy the
-  // locally owned `y` into the two ghosted read vectors.  Everything that
+  // locally owned `y` into the ghosted read vector. Everything that
   // follows reads from these and writes only owned rows, so no assembly routine
   // needs a reduction of its own.
   // ============================================================================
@@ -1777,32 +2043,6 @@ namespace MetricFlowX
 
 
     y_relevant = y;
-    // std::cout << "Rank " << this_mpi_process << '\n'
-    //           << "  y size        = " << y.size() << '\n'
-    //           << "  owned dofs    = " << locally_owned_dofs_.n_elements() <<
-    //           '\n'
-    //           << "  owned FE dofs = " << locally_owned_fe_dofs.n_elements()
-    //           << '\n'
-    //           << "  range = [" << y.local_range().first << ", "
-    //           << y.local_range().second << ")\n";
-    const auto range = y.local_range();
-
-    for (const auto i : locally_owned_fe_dofs)
-      {
-        if (i < range.first || i >= range.second)
-          {
-            std::cout << "Rank " << this_mpi_process << " invalid FE index "
-                      << i << " local range [" << range.first << ","
-                      << range.second << ")\n";
-            std::abort();
-          }
-      }
-    const auto          indices = locally_owned_fe_dofs.get_index_vector();
-    std::vector<double> values(indices.size());
-    y.extract_subvector_to(indices, values);
-    y_fe_owned.set(indices, values);
-    y_fe_owned.compress(VectorOperation::insert);
-    y_fe_relevant = y_fe_owned;
   }
 
   // ============================================================================
@@ -1844,14 +2084,17 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::build_cell_sparsity(
     DynamicSparsityPattern &dsp)
   {
-    std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
-    std::vector<types::global_dof_index> nb_dofs(fe_->n_dofs_per_cell());
+    std::vector<types::global_dof_index> ldofs(
+      fe_collection_.max_dofs_per_cell());
+    std::vector<types::global_dof_index> nb_dofs(
+      fe_collection_.max_dofs_per_cell());
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
 
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
 
         for (const auto i : ldofs)
@@ -1863,6 +2106,7 @@ namespace MetricFlowX
             if (cell->face(f)->at_boundary())
               continue;
 
+            nb_dofs.resize(cell->neighbor(f)->get_fe().n_dofs_per_cell());
             cell->neighbor(f)->get_dof_indices(nb_dofs);
             for (const auto i : ldofs)
               for (const auto j : nb_dofs)
@@ -1878,14 +2122,17 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::build_trace_sparsity(
     DynamicSparsityPattern &dsp)
   {
-    std::vector<types::global_dof_index> cell_dofs(fe_->n_dofs_per_cell());
-    std::vector<types::global_dof_index> nb_dofs(fe_->n_dofs_per_cell());
+    std::vector<types::global_dof_index> cell_dofs(
+      fe_collection_.max_dofs_per_cell());
+    std::vector<types::global_dof_index> nb_dofs(
+      fe_collection_.max_dofs_per_cell());
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
 
+        cell_dofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(cell_dofs);
 
         for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
@@ -1915,6 +2162,7 @@ namespace MetricFlowX
 
             if (!cell->face(f)->at_boundary())
               {
+                nb_dofs.resize(cell->neighbor(f)->get_fe().n_dofs_per_cell());
                 cell->neighbor(f)->get_dof_indices(nb_dofs);
                 for (const auto ni : nb_dofs)
                   {
@@ -1933,17 +2181,20 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::build_junction_sparsity(
     DynamicSparsityPattern &dsp)
   {
-    std::vector<types::global_dof_index> cell_dofs(fe_->n_dofs_per_cell());
+    std::vector<types::global_dof_index> cell_dofs(
+      fe_collection_.max_dofs_per_cell());
 
     for (const auto &J : junctions)
       {
         const unsigned int K = J.n_vessels();
 
         std::vector<types::global_dof_index> a_row(K), u_row(K);
-        std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
+        std::vector<types::global_dof_index> ldofs(
+          fe_collection_.max_dofs_per_cell());
 
         for (unsigned int i = 0; i < K; ++i)
           {
+            ldofs.resize(J.half_faces[i].cell->get_fe().n_dofs_per_cell());
             J.half_faces[i].cell->get_dof_indices(ldofs);
 
             const auto [a_hat_dof, u_hat_dof] =
@@ -1963,6 +2214,8 @@ namespace MetricFlowX
                   dsp.add(row, a_row[j]);
                   dsp.add(row, u_row[j]);
 
+                  cell_dofs.resize(
+                    J.half_faces[j].cell->get_fe().n_dofs_per_cell());
                   J.half_faces[j].cell->get_dof_indices(cell_dofs);
                   for (const auto cj : cell_dofs)
                     dsp.add(row, cj);
@@ -2049,6 +2302,7 @@ namespace MetricFlowX
     build_junction_sparsity(dsp);
     build_rcr_sparsity(dsp);
     build_trace_continuity_sparsity(dsp);
+    build_terminal_connection_sparsity(dsp);
 
     SparsityTools::distribute_sparsity_pattern(dsp,
                                                locally_owned_dofs_,
@@ -2082,25 +2336,44 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer, "setup_system");
 
-    if (!fe_)
-      fe_ = std::make_unique<FESystem<dim, spacedim>>(
-        FE_DGQ<dim, spacedim>(fe_degree),
-        2, // comps 0,1 : cell A, U (DG)
-        FE_DGQ<dim, spacedim>(1),
-        2); // comps 2,3 : trace A_hat, U_hat
-
-    dof_handler_.distribute_dofs(*fe_);
-
-    // DoFRenumbering::component_wise() is deliberately not applied.  It would
-    // not produce a global [cell | trace] block layout in parallel -- it
-    // renumbers within each rank's owned range -- and nothing needs one: the
-    // component index sets below take over every role the old integer ranges
-    // played.
-
-    // Global network data first: everything downstream (junction detection via
-    // the pressure laws, compute_a_d_local() via the arc-length bounds) reads
-    // it.
     build_global_vessel_data();
+    dof_handler_.reinit(triangulation_);
+    fe_collection_ = hp::FECollection<dim, spacedim>();
+    fe_collection_.push_back(
+      FESystem<dim, spacedim>(FE_DGQ<dim, spacedim>(fe_degree),
+                              2,
+                              FE_DGQ<dim, spacedim>(1),
+                              2,
+                              FE_Nothing<dim, spacedim>(),
+                              1));
+    fe_collection_.push_back(
+      FESystem<dim, spacedim>(FE_DGQ<dim, spacedim>(fe_degree),
+                              2,
+                              FE_DGQ<dim, spacedim>(1),
+                              2,
+                              FE_DGQ<dim, spacedim>(0),
+                              1));
+    unsigned int invalid_terminal_cell = 0;
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          unsigned int capacitors = 0;
+          if (outlet_type == "RCR")
+            for (const auto f : cell->face_indices())
+              if (cell->face(f)->at_boundary())
+                {
+                  const auto bid = cell->face(f)->boundary_id();
+                  if (bid != 0 && rcr_map.count(bid) && rcr_map.at(bid).C > 0.)
+                    ++capacitors;
+                }
+          invalid_terminal_cell |= capacitors > 1;
+          cell->set_active_fe_index(capacitors > 0 ? 1 : 0);
+        }
+    AssertThrow(
+      Utilities::MPI::max(invalid_terminal_cell, mpi_communicator_) == 0,
+      ExcMessage(
+        "A custom mesh with two capacitor terminals on one cell must be refined."));
+    dof_handler_.distribute_dofs(fe_collection_);
 
     if (outlet_type == "RCR")
       AssertThrow(!terminal_boundary_ids.empty(),
@@ -2108,41 +2381,22 @@ namespace MetricFlowX
                              "network."));
 
     detect_junctions();
+    build_rcr_dof_map();
     build_face_dof_map();
-    build_rcr_dof_map(); // sets n_total_dofs and rcr_dofs_owned
+    setup_terminal_connections();
 
     // ---- index sets ---------------------------------------------------------
-    locally_owned_fe_dofs = dof_handler_.locally_owned_dofs();
-
-    locally_relevant_fe_dofs =
+    locally_owned_dofs_ = dof_handler_.locally_owned_dofs();
+    locally_relevant_dofs_ =
       DoFTools::extract_locally_relevant_dofs(dof_handler_);
-
-    locally_owned_dofs_.clear();
-    locally_owned_dofs_.set_size(n_total_dofs);
-    locally_owned_dofs_.add_indices(locally_owned_fe_dofs);
-    locally_owned_dofs_.add_indices(rcr_dofs_owned);
-    locally_owned_dofs_.compress();
-    locally_relevant_dofs_.clear();
-    locally_relevant_dofs_.set_size(n_total_dofs);
-    locally_relevant_dofs_.add_indices(locally_relevant_fe_dofs);
-    locally_relevant_dofs_.add_indices(rcr_dofs_owned);
-
-    // A rank reads Pc only for terminals whose cell it owns, but make every Pc
-    // it can reach through a ghost relevant as well so that diagnostics and
-    // output can read them without a special case.
-    for (const auto &cell : dof_handler_.active_cell_iterators())
+    // Resistive links can join terminals on distant mesh partitions. Import
+    // their endpoint pressures along with the ordinary geometric ghost layer.
+    for (const auto &face : boundary_faces)
       {
-        if (cell->is_artificial())
-          continue;
-
-        for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
-          {
-            if (!cell->face(f)->at_boundary())
-              continue;
-            const auto it = rcr_pc_dof.find(cell->face(f)->boundary_id());
-            if (it != rcr_pc_dof.end())
-              locally_relevant_dofs_.add_index(it->second);
-          }
+        const auto bid = face.cell->face(face.face_no)->boundary_id();
+        if (terminal_links.count(bid))
+          for (const auto &[other, resistance] : terminal_links.at(bid))
+            locally_relevant_dofs_.add_index(terminal_pressure_dof(other));
       }
     locally_relevant_dofs_.compress();
 
@@ -2150,36 +2404,15 @@ namespace MetricFlowX
     // capacitor pressures) versus the algebraic ones (the traces).  Taken from
     // a ComponentMask, so they are right with or without renumbering.
     {
-      const ComponentMask cell_mask({true, true, false, false});
-      const ComponentMask trace_mask({false, false, true, true});
-
-      const IndexSet cell_fe = DoFTools::extract_dofs(dof_handler_, cell_mask);
-      const IndexSet trace_fe =
-        DoFTools::extract_dofs(dof_handler_, trace_mask);
-
-      cell_dofs_owned.clear();
-      cell_dofs_owned.set_size(n_total_dofs);
-      cell_dofs_owned.add_indices(cell_fe);
-      cell_dofs_owned.compress();
-
-      trace_dofs_owned.clear();
-      trace_dofs_owned.set_size(n_total_dofs);
-      trace_dofs_owned.add_indices(trace_fe);
-      trace_dofs_owned.compress();
-
-      const std::array<ComponentMask, 4> component_masks = {
-        {ComponentMask({true, false, false, false}),
-         ComponentMask({false, true, false, false}),
-         ComponentMask({false, false, true, false}),
-         ComponentMask({false, false, false, true})}};
-      for (unsigned int c = 0; c < component_masks.size(); ++c)
-        {
-          component_dofs_[c].clear();
-          component_dofs_[c].set_size(n_total_dofs);
-          component_dofs_[c].add_indices(
-            DoFTools::extract_dofs(dof_handler_, component_masks[c]));
-          component_dofs_[c].compress();
-        }
+      cell_dofs_owned = DoFTools::extract_dofs(
+        dof_handler_, ComponentMask({true, true, false, false, false}));
+      trace_dofs_owned = DoFTools::extract_dofs(
+        dof_handler_, ComponentMask({false, false, true, true, false}));
+      for (unsigned int c = 0; c < component_dofs_.size(); ++c)
+        component_dofs_[c] =
+          DoFTools::extract_dofs(dof_handler_,
+                                 fe_collection_.component_mask(
+                                   FEValuesExtractors::Scalar(c)));
 
       differential_dofs_.clear();
       differential_dofs_.set_size(n_total_dofs);
@@ -2190,15 +2423,6 @@ namespace MetricFlowX
       algebraic_dofs_ = trace_dofs_owned;
     }
 
-    for (const auto i : locally_owned_fe_dofs)
-      {
-        if (!locally_owned_dofs_.is_element(i))
-          {
-            std::cout << "Rank " << this_mpi_process
-                      << " FE DoF missing from system IndexSet: " << i
-                      << std::endl;
-          }
-      }
     // ---- sparsity + matrices ------------------------------------------------
     build_extended_sparsity_pattern();
 
@@ -2211,12 +2435,6 @@ namespace MetricFlowX
     y_relevant.reinit(locally_owned_dofs_,
                       locally_relevant_dofs_,
                       mpi_communicator_);
-    y_fe_owned.reinit(locally_owned_fe_dofs, mpi_communicator_);
-    y_fe_relevant.reinit(locally_owned_fe_dofs,
-                         locally_relevant_fe_dofs,
-                         mpi_communicator_);
-    AssertThrow(y_fe_relevant.size() == dof_handler_.n_dofs(),
-                ExcInternalError());
     if (verbosity > 0)
       pcout << "  cell DoFs (differential): "
             << Utilities::MPI::sum<types::global_dof_index>(
@@ -2284,21 +2502,24 @@ namespace MetricFlowX
     // ---- cell block and this cell's own trace pair --------------------------
     // Both are DoFs of a locally owned cell, hence owned here, so the whole
     // loop writes with insert semantics and no row is touched twice.
-    std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
+    std::vector<types::global_dof_index> ldofs(
+      fe_collection_.max_dofs_per_cell());
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
 
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
 
         // Nodal interpolation of a_d(x).  For a linearly tapered radius a_d is
         // quadratic in x, so for fe_degree >= 2 the vessel starts exactly at
         // rest (A = a_d, U = 0 gives p = p0 + p_d everywhere).
-        for (unsigned int i = 0; i < fe_->n_dofs_per_cell(); ++i)
+        for (unsigned int i = 0; i < cell->get_fe().n_dofs_per_cell(); ++i)
           {
-            const unsigned int comp = fe_->system_to_component_index(i).first;
+            const unsigned int comp =
+              cell->get_fe().system_to_component_index(i).first;
             dst(ldofs[i]) =
               (comp == 0) ? compute_a_d_at_point(cell, support_point(cell, i)) :
                             0.0;
@@ -2317,7 +2538,7 @@ namespace MetricFlowX
           }
       }
 
-    // ---- capacitor block ----------------------------------------------------
+    // ---- capacitor component ------------------------------------------------
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
@@ -2384,17 +2605,19 @@ namespace MetricFlowX
     per_cell_mass.assign(n_local_cells, FullMatrix<double>());
     per_cell_mass_inv.assign(n_local_cells, FullMatrix<double>());
 
-    const QGauss<dim>       quad(fe_degree + 1);
-    FEValues<dim, spacedim> fev(*fe_, quad, update_values | update_JxW_values);
-
-    const unsigned int n_dofs = fe_->n_dofs_per_cell();
+    const QGauss<dim>           quad(fe_degree + 1);
+    hp::FEValues<dim, spacedim> hp_fev(fe_collection_,
+                                       hp::QCollection<dim>(quad),
+                                       update_values | update_JxW_values);
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
+        const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
 
-        fev.reinit(cell);
+        hp_fev.reinit(cell);
+        const auto        &fev = hp_fev.get_present_fe_values();
         FullMatrix<double> M(n_dofs, n_dofs);
 
         // FESystem(FE_DGQ, 2) shape functions are component specific: phi_i is
@@ -2404,16 +2627,17 @@ namespace MetricFlowX
         // Only the cell components (0,1) carry a mass term, so the trace rows
         // and columns of M stay exactly zero -- which is what makes alpha*M
         // leave the trace rows algebraic.
-        for (unsigned int q = 0; q < fev.n_quadrature_points; ++q)
+        for (unsigned int q = 0; q < quad.size(); ++q)
           for (unsigned int i = 0; i < n_dofs; ++i)
             {
-              const unsigned int ci = fe_->system_to_component_index(i).first;
+              const unsigned int ci =
+                cell->get_fe().system_to_component_index(i).first;
               if (ci >= 2)
                 continue;
               for (unsigned int j = 0; j < n_dofs; ++j)
                 {
                   const unsigned int cj =
-                    fe_->system_to_component_index(j).first;
+                    cell->get_fe().system_to_component_index(j).first;
                   if (ci != cj)
                     continue;
                   M(i, j) +=
@@ -2423,11 +2647,11 @@ namespace MetricFlowX
 
         per_cell_mass[cell->active_cell_index()] = M;
 
-        // For the initial-state inverse, put 1 on the trace diagonal so the
-        // dense inverse exists; that block is never applied.
+        // For the initial-state inverse, put 1 on non-cell diagonals so the
+        // dense inverse exists; those entries are never applied.
         FullMatrix<double> M_inv(M);
         for (unsigned int i = 0; i < n_dofs; ++i)
-          if (fe_->system_to_component_index(i).first >= 2)
+          if (cell->get_fe().system_to_component_index(i).first >= 2)
             M_inv(i, i) = 1.0;
         M_inv.gauss_jordan();
         per_cell_mass_inv[cell->active_cell_index()] = std::move(M_inv);
@@ -2437,27 +2661,22 @@ namespace MetricFlowX
   // ============================================================================
   // open_csv_files
   //
-  // One CSV per vessel, written at the vessel's arc-length midpoint.  The probe
+  // One CSV for the selected vessels' arc-length midpoints. The probe
   // cell is chosen by a global argmin over the distance to the midpoint: each
   // rank offers its best locally owned candidate and the rank holding the
-  // overall winner opens the file.  Every vessel is therefore probed exactly
-  // once, by whichever rank owns the middle of it, and no file is written by
-  // two ranks.
+  // overall winner evaluates the probe. Rank zero writes gathered snapshots
+  // ordered by vessel ID, so neither records nor files are duplicated in MPI.
   // ============================================================================
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::open_csv_files()
   {
-    const std::string dir =
-      output_directory + (output_directory.empty() ? "" : "/");
-
     // Every rank may open a vessel file, so every rank makes sure the
     // directory exists (create_directories is a no-op when it already does).
     if (!output_directory.empty())
       std::filesystem::create_directories(output_directory);
 
     close_csv_files();
-    csv_vessel.clear();
     mach_warning_active.clear();
 
     if (!output_terminal_csv_file.empty())
@@ -2539,9 +2758,39 @@ namespace MetricFlowX
         }
     });
 
+    if (output_vessel_csv_file.empty())
+      return;
+    std::set<unsigned int> selected;
+    for (const auto value : vessel_probe_ids)
+      {
+        AssertThrow(vessel_map.count(value),
+                    ExcMessage("Unknown vessel probe ID " +
+                               std::to_string(value)));
+        selected.insert(value);
+      }
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process == 0)
+        {
+          csv_vessel.open(
+            prepare_csv_path(output_directory, output_vessel_csv_file));
+          AssertThrow(csv_vessel,
+                      ExcMessage("Cannot open vessel probe CSV: " +
+                                 output_vessel_csv_file));
+          csv_write_row(csv_vessel,
+                        "time_s",
+                        "vessel_id",
+                        "pressure_Pa",
+                        "flow_m3_s",
+                        "area_m2",
+                        "velocity_m_s");
+        }
+    });
+
     for (const auto &[vid, vpp] : vessel_map)
       {
         (void)vpp;
+        if (!selected.empty() && !selected.count(vid))
+          continue;
 
         double     s_mid = 0.0;
         const auto it    = vessel_s_bounds.find(vid);
@@ -2592,15 +2841,6 @@ namespace MetricFlowX
           continue;
 
         probe_targets.emplace_back(vid, best_cell, best_xi);
-
-        std::ofstream &os = csv_vessel[vid];
-        os.open(dir + "HDG_IDA_Vessel_" + std::to_string(vid) + ".csv");
-        AssertThrow(os, ExcMessage("Cannot open vessel probe CSV."));
-        std::vector<std::string> header{
-          "time_s", "P_dynpcm2", "Q_cm3ps", "A_cm2", "U_cmps"};
-        for (const auto id : vessel_terminals[vid])
-          header.push_back("boundary_" + std::to_string(id) + "_label");
-        csv_write_record(os, header);
       }
   }
 
@@ -2697,56 +2937,71 @@ namespace MetricFlowX
         error = Utilities::MPI::broadcast(mpi_communicator_, error, 0);
         AssertThrow(error.empty(), ExcMessage(error));
       }
-    const unsigned int dofs_per_cell = fe_->n_dofs_per_cell();
+    if (output_vessel_csv_file.empty())
+      return;
+    using ProbeRow = std::pair<unsigned int, std::vector<std::string>>;
+    std::vector<ProbeRow> local_probe_rows;
+    collective_csv_action(mpi_communicator_, [&]() {
+      for (const auto &[vid, cell, xi] : probe_targets)
+        {
+          const Point<dim> xi_probe =
+            (dim == 1) ? Point<dim>(xi) : Point<dim>();
 
-    for (const auto &[vid, cell, xi] : probe_targets)
-      {
-        const Point<dim> xi_probe = (dim == 1) ? Point<dim>(xi) : Point<dim>();
+          // The probe cell is locally owned, so every one of its DoFs is owned
+          // here and can be read straight out of the non-ghosted vector.
+          std::vector<types::global_dof_index> ldofs;
+          ldofs.resize(cell->get_fe().n_dofs_per_cell());
+          cell->get_dof_indices(ldofs);
 
-        std::ofstream &os = csv_vessel.at(vid);
+          double A_val = 0.0, U_val = 0.0;
+          for (unsigned int i = 0; i < ldofs.size(); ++i)
+            {
+              const double       phi = cell->get_fe().shape_value(i, xi_probe);
+              const unsigned int comp =
+                cell->get_fe().system_to_component_index(i).first;
+              if (comp == 0)
+                A_val += sol(ldofs[i]) * phi;
+              else if (comp == 1)
+                U_val += sol(ldofs[i]) * phi;
+            }
 
-        // The probe cell is locally owned, so every one of its DoFs is owned
-        // here and can be read straight out of the non-ghosted vector.
-        std::vector<types::global_dof_index> ldofs(dofs_per_cell);
-        cell->get_dof_indices(ldofs);
-
-        double A_val = 0.0, U_val = 0.0;
-        for (unsigned int i = 0; i < dofs_per_cell; ++i)
-          {
-            const double       phi  = fe_->shape_value(i, xi_probe);
-            const unsigned int comp = fe_->system_to_component_index(i).first;
-            if (comp == 0)
-              A_val += sol(ldofs[i]) * phi;
-            else if (comp == 1)
-              U_val += sol(ldofs[i]) * phi;
-          }
-
-        const double A_cm2  = A_val * 1.0e4;
-        const double U_cmps = U_val * 1.0e2;
-
-        const Point<spacedim> x_probe =
-          cell->vertex(0) + xi * (cell->vertex(1) - cell->vertex(0));
-        const double P_Pa =
-          compute_physical_pressure(A_val,
-                                    vid,
-                                    compute_a_d_at_point(cell, x_probe),
-                                    t,
-                                    x_probe,
-                                    cell->id()) +
-          (ydot ? viscous_pressure(sol, *ydot, cell, x_probe) : 0.);
-        const double P_dynpcm2 = P_Pa * 10.0;
-
-        const double Q_cm3ps = A_val * U_val * 1.0e6;
-
-        std::vector<std::string> values{csv_cell(t),
-                                        csv_cell(P_dynpcm2),
-                                        csv_cell(Q_cm3ps),
-                                        csv_cell(A_cm2),
-                                        csv_cell(U_cmps)};
-        for (const auto id : vessel_terminals.at(vid))
-          values.push_back(rcr_map.at(id).label);
-        csv_write_record(os, values);
-      }
+          const Point<spacedim> x_probe =
+            cell->vertex(0) + xi * (cell->vertex(1) - cell->vertex(0));
+          const double P_Pa =
+            compute_physical_pressure(A_val,
+                                      vid,
+                                      compute_a_d_at_point(cell, x_probe),
+                                      t,
+                                      x_probe,
+                                      cell->id()) +
+            (ydot ? viscous_pressure(sol, *ydot, cell, x_probe) : 0.);
+          local_probe_rows.emplace_back(
+            vid,
+            std::vector<std::string>{csv_cell(t),
+                                     csv_cell(vid),
+                                     csv_cell(P_Pa),
+                                     csv_cell(A_val * U_val),
+                                     csv_cell(A_val),
+                                     csv_cell(U_val)});
+        }
+    });
+    const auto parts =
+      Utilities::MPI::gather(mpi_communicator_, local_probe_rows, 0);
+    collective_csv_action(mpi_communicator_, [&]() {
+      if (this_mpi_process == 0 && csv_vessel.is_open())
+        {
+          std::vector<ProbeRow> rows;
+          for (const auto &part : parts)
+            rows.insert(rows.end(), part.begin(), part.end());
+          std::sort(rows.begin(), rows.end(), [](const auto &a, const auto &b) {
+            return a.first < b.first;
+          });
+          for (const auto &row : rows)
+            csv_write_record(csv_vessel, row.second);
+          csv_vessel.flush();
+          AssertThrow(csv_vessel, ExcMessage("Cannot write vessel probe CSV."));
+        }
+    });
   }
 
   // ============================================================================
@@ -2757,9 +3012,8 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::close_csv_files()
   {
     flow_regime_log.close();
-    for (auto &kv : csv_vessel)
-      if (kv.second.is_open())
-        kv.second.close();
+    if (csv_vessel.is_open())
+      csv_vessel.close();
     if (csv_terminal.is_open())
       csv_terminal.close();
   }
@@ -3143,59 +3397,61 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer, "assemble_cell_residuals");
 
-    // FEValues and FEFaceValues read through the ghosted FE-range vector.  It
-    // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
-    // it holds every entry a locally owned cell can ask for, including the ones
-    // on its ghost neighbours.
-    const VectorType &y_cell = y_fe_relevant;
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
     const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
     const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
-    const QGauss<dim>     quad_cell(fe_->tensor_degree() + 1);
-    const QGauss<dim - 1> quad_face(fe_->tensor_degree() + 1);
+    const QGauss<dim>     quad_cell(std::max(fe_degree, 1u) + 1);
+    const QGauss<dim - 1> quad_face(std::max(fe_degree, 1u) + 1);
 
-    FEValues<dim, spacedim>     fev(*fe_,
-                                quad_cell,
-                                update_values | update_gradients |
-                                  update_quadrature_points | update_JxW_values);
-    FEFaceValues<dim, spacedim> fef(*fe_,
-                                    quad_face,
-                                    update_values | update_JxW_values |
-                                      update_normal_vectors |
-                                      update_quadrature_points);
+    hp::FEValues<dim, spacedim>     hp_fev(fe_collection_,
+                                       hp::QCollection<dim>(quad_cell),
+                                       update_values | update_gradients |
+                                         update_quadrature_points |
+                                         update_JxW_values);
+    hp::FEFaceValues<dim, spacedim> hp_fef(fe_collection_,
+                                           hp::QCollection<dim - 1>(quad_face),
+                                           update_values | update_JxW_values |
+                                             update_normal_vectors |
+                                             update_quadrature_points);
 
     rhs_function.set_time(t);
 
-    std::vector<double> A_h(fev.n_quadrature_points);
-    std::vector<double> U_h(fev.n_quadrature_points);
-    std::vector<double> Ah_q(fef.n_quadrature_points);
-    std::vector<double> Uh_q(fef.n_quadrature_points);
-    std::vector<double> Ahat_q(fef.n_quadrature_points);
-    std::vector<double> Uhat_q(fef.n_quadrature_points);
+    std::vector<double> A_h(quad_cell.size());
+    std::vector<double> U_h(quad_cell.size());
+    std::vector<double> Ah_q(quad_face.size());
+    std::vector<double> Uh_q(quad_face.size());
+    std::vector<double> Ahat_q(quad_face.size());
+    std::vector<double> Uhat_q(quad_face.size());
 
-    const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
-    std::vector<double>                  local_values(n_dofs);
-    Vector<double>                       cell_rhs(n_dofs);
-    std::vector<types::global_dof_index> ldofs(n_dofs);
+    const unsigned int  max_dofs = fe_collection_.max_dofs_per_cell();
+    std::vector<double> local_values(max_dofs);
+    Vector<double>      cell_rhs(max_dofs);
+    std::vector<types::global_dof_index> ldofs(max_dofs);
 
     const double rho = density;
-    const double eta =
-      2.0 * (friction_profile + 2.0) * numbers::PI * viscosity / rho;
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
+        const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
+        local_values.resize(n_dofs);
+        cell_rhs.reinit(n_dofs);
 
         const auto         cell_id = cell->id();
         const unsigned int vid     = cell->material_id();
-        fev.reinit(cell);
+        const double       eta = 2.0 * (friction_profile + 2.0) * numbers::PI *
+                           vessel_map.at(vid).dynamic_viscosity / rho;
+        hp_fev.reinit(cell);
+        const auto &fev = hp_fev.get_present_fe_values();
 
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
-        y_cell.extract_subvector_to(ldofs, local_values);
+        local_values.resize(ldofs.size());
+        y_relevant.extract_subvector_to(ldofs, local_values);
 
         const auto &JxW = fev.get_JxW_values();
 
@@ -3208,7 +3464,7 @@ namespace MetricFlowX
 
         // ---- Volume integral
         // --------------------------------------------------
-        for (unsigned int q = 0; q < fev.n_quadrature_points; ++q)
+        for (unsigned int q = 0; q < quad_cell.size(); ++q)
           {
             const double A = std::max(A_h[q], 1e-10);
             const double U = U_h[q];
@@ -3234,7 +3490,7 @@ namespace MetricFlowX
             for (unsigned int i = 0; i < n_dofs; ++i)
               {
                 const unsigned int comp =
-                  fe_->system_to_component_index(i).first;
+                  cell->get_fe().system_to_component_index(i).first;
 
                 if (comp == 0 && !pressure_only)
                   {
@@ -3268,7 +3524,8 @@ namespace MetricFlowX
 
         for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
           {
-            fef.reinit(cell, f);
+            hp_fef.reinit(cell, f);
+            const auto  &fef     = hp_fef.get_present_fe_values();
             const double ad_face = compute_a_d_at_face(cell, f);
             const auto  &normals = fef.get_normal_vectors();
             const auto  &JxW     = fef.get_JxW_values();
@@ -3291,7 +3548,7 @@ namespace MetricFlowX
             fef[u_hat_extractor].get_function_values_from_local_dof_values(
               local_values, Uhat_q);
 
-            for (unsigned int q = 0; q < fef.n_quadrature_points; ++q)
+            for (unsigned int q = 0; q < quad_face.size(); ++q)
               {
                 const double A_in  = std::max(Ah_q[q], 1e-10);
                 const double U_in  = Uh_q[q];
@@ -3336,7 +3593,7 @@ namespace MetricFlowX
                 for (unsigned int i = 0; i < n_dofs; ++i)
                   {
                     const unsigned int comp =
-                      fe_->system_to_component_index(i).first;
+                      cell->get_fe().system_to_component_index(i).first;
                     if (comp >= 2)
                       continue; // trace components carry no cell
                                 // flux
@@ -3367,11 +3624,11 @@ namespace MetricFlowX
     TimerOutput::Scope timer(computing_timer,
                              "assemble_trace_interior_equations");
 
-    // FEValues and FEFaceValues read through the ghosted FE-range vector.  It
+    // FEValues and FEFaceValues read through the ghosted state vector. It
     // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
     // it holds every entry a locally owned cell can ask for, including the ones
     // on its ghost neighbours.
-    const VectorType &y_cell = y_fe_relevant;
+    const VectorType &y_cell = y_relevant;
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
@@ -3379,10 +3636,11 @@ namespace MetricFlowX
     // const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
     const QGauss<dim - 1> quad_face(1); // each 1-D face is a single 0-D point
-    FEFaceValues<dim, spacedim> fef(*fe_,
-                                    quad_face,
-                                    update_values | update_normal_vectors |
-                                      update_quadrature_points);
+    hp::FEFaceValues<dim, spacedim> hp_fef(fe_collection_,
+                                           hp::QCollection<dim - 1>(quad_face),
+                                           update_values |
+                                             update_normal_vectors |
+                                             update_quadrature_points);
 
     for (const auto &face : interior_faces)
       {
@@ -3398,30 +3656,33 @@ namespace MetricFlowX
         const double ad_L    = ad_face;
         const double ad_R    = ad_face;
         // Interior cell values at face — use y_cell, not y
-        fef.reinit(cell, f);
-        const double bn_L =
-          compute_interior_tangent_normal_product(cell,
-                                                  fef.get_normal_vectors()[0]);
+        hp_fef.reinit(cell, f);
+        const double bn_L = compute_interior_tangent_normal_product(
+          cell, hp_fef.get_present_fe_values().get_normal_vectors()[0]);
 
         std::vector<double> A_L_v(1), U_L_v(1);
-        fef[area_extractor].get_function_values(y_cell, A_L_v);
-        fef[velocity_extractor].get_function_values(y_cell, U_L_v);
+        hp_fef.get_present_fe_values()[area_extractor].get_function_values(
+          y_cell, A_L_v);
+        hp_fef.get_present_fe_values()[velocity_extractor].get_function_values(
+          y_cell, U_L_v);
 
-        fef.reinit(nb, nb_f);
-        const double bn_R =
-          compute_interior_tangent_normal_product(nb,
-                                                  fef.get_normal_vectors()[0]);
+        hp_fef.reinit(nb, nb_f);
+        const double bn_R = compute_interior_tangent_normal_product(
+          nb, hp_fef.get_present_fe_values().get_normal_vectors()[0]);
 
         std::vector<double> A_R_v(1), U_R_v(1);
-        fef[area_extractor].get_function_values(y_cell, A_R_v);
-        fef[velocity_extractor].get_function_values(y_cell, U_R_v);
+        hp_fef.get_present_fe_values()[area_extractor].get_function_values(
+          y_cell, A_R_v);
+        hp_fef.get_present_fe_values()[velocity_extractor].get_function_values(
+          y_cell, U_R_v);
 
-        const double           A_L   = std::max(A_L_v[0], 1e-10);
-        const double           U_L   = U_L_v[0];
-        const double           A_R   = std::max(A_R_v[0], 1e-10);
-        const double           U_R   = U_R_v[0];
-        const Point<spacedim> &point = fef.get_quadrature_points()[0];
-        const double           external_pressure_L =
+        const double           A_L = std::max(A_L_v[0], 1e-10);
+        const double           U_L = U_L_v[0];
+        const double           A_R = std::max(A_R_v[0], 1e-10);
+        const double           U_R = U_R_v[0];
+        const Point<spacedim> &point =
+          hp_fef.get_present_fe_values().get_quadrature_points()[0];
+        const double external_pressure_L =
           external_pressure({t, point, vid_L, cell->id()}, provider);
         const double external_pressure_R =
           external_pressure({t, point, vid_R, nb->id()}, provider);
@@ -3515,23 +3776,20 @@ namespace MetricFlowX
     TimerOutput::Scope timer(computing_timer,
                              "assemble_trace_boundary_equations");
 
-    // FEValues and FEFaceValues read through the ghosted FE-range vector.  It
-    // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
-    // it holds every entry a locally owned cell can ask for, including the ones
-    // on its ghost neighbours.
-    const VectorType &y_cell = y_fe_relevant;
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
 
-    std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
-    std::vector<double>                  local_values(fe_->n_dofs_per_cell());
-    std::vector<double>                  A_int_v(1), U_int_v(1);
+    std::vector<types::global_dof_index> ldofs(
+      fe_collection_.max_dofs_per_cell());
+    std::vector<double> local_values(fe_collection_.max_dofs_per_cell());
+    std::vector<double> A_int_v(1), U_int_v(1);
 
-    const QGauss<dim - 1>       quad_face(1);
-    FEFaceValues<dim, spacedim> fef(*fe_,
-                                    quad_face,
-                                    update_values | update_quadrature_points);
+    const QGauss<dim - 1>           quad_face(1);
+    hp::FEFaceValues<dim, spacedim> hp_fef(fe_collection_,
+                                           hp::QCollection<dim - 1>(quad_face),
+                                           update_values |
+                                             update_quadrature_points);
 
     inflow_function.set_time(t);
     if (outlet_type == "Dirichlet")
@@ -3545,8 +3803,9 @@ namespace MetricFlowX
         const types::boundary_id bid = cell->face(f)->boundary_id();
         const unsigned int       vid = cell->material_id();
 
-        // Interior cell value at face — use y_cell, not y
-        fef.reinit(cell, f);
+        // Gather the interior state in coupled system numbering.
+        hp_fef.reinit(cell, f);
+        const auto            &fef   = hp_fef.get_present_fe_values();
         const Point<spacedim> &point = fef.get_quadrature_points()[0];
 
         if (pressure_only)
@@ -3562,8 +3821,10 @@ namespace MetricFlowX
             continue;
           }
 
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
-        y_cell.extract_subvector_to(ldofs, local_values);
+        local_values.resize(ldofs.size());
+        y_relevant.extract_subvector_to(ldofs, local_values);
         fef[area_extractor].get_function_values_from_local_dof_values(
           local_values, A_int_v);
         fef[velocity_extractor].get_function_values_from_local_dof_values(
@@ -3587,16 +3848,37 @@ namespace MetricFlowX
           }
         else if (bid == 0) // inflow
           {
-            inflow_function.set_time(t);
-            const double Q_in =
-              (inflow_series.empty() ? inflow_function.value(Point<1>(0.0)) :
-                                       inflow_series.value(t));
+            const double Q_in = prescribed_inflow(t);
             const double W2_int =
               U_int - compute_invariant(A_int, vid, a_d_local);
 
             res_A = A_hat_cur * U_hat_cur - Q_in;
             res_U =
               (U_hat_cur - compute_invariant(A_hat, vid, a_d_local)) - W2_int;
+          }
+        else if (terminal_links.count(bid))
+          {
+            const auto  &port     = terminal_ports.at(bid);
+            const double sign     = port.outward_sign;
+            const double Q        = sign * A_hat_cur * U_hat_cur;
+            const double pressure = compute_physical_pressure(
+              A_hat, vid, a_d_local, t, point, cell->id());
+            if (rcr_pc_dof.count(bid))
+              res_A = pressure - rcr_map.at(bid).R1 * Q - y(rcr_pc_dof.at(bid));
+            else
+              {
+                double conductance = 0., weighted_pressure = 0.;
+                for (const auto &[other, resistance] : terminal_links.at(bid))
+                  {
+                    conductance += 1. / resistance;
+                    weighted_pressure +=
+                      terminal_pressure(other, y, t) / resistance;
+                  }
+                res_A = pressure - (Q + weighted_pressure) / conductance;
+              }
+            res_U = U_hat_cur +
+                    sign * compute_invariant(A_hat, vid, a_d_local) - U_int -
+                    sign * compute_invariant(A_int, vid, a_d_local);
           }
         else if (outlet_type == "RCR" && rcr_map.count(bid) &&
                  (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
@@ -3655,37 +3937,11 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::assemble_rcr_capacitor_equations(
     const VectorType &y,
     const VectorType &ydot,
-    VectorType       &F)
+    VectorType       &F,
+    const double      t)
   {
     if (rcr_pc_dof.empty())
       return;
-
-    // ydot is IDA's raw vector: unlike y (ghosted into y_relevant by the
-    // caller), it only holds entries this rank owns.  Pc row ownership is now
-    // assigned to a single designated rank for PETSc's sake (see
-    // build_rcr_dof_map), which in general differs from the rank that owns
-    // the terminal's cell -- the rank that needs Pc_dot here to write the
-    // residual is often not the one that owns it.  n_rcr_dofs is tiny, so a
-    // manual all-reduce of that short array is far cheaper than standing up a
-    // full ghosted copy of ydot just for this.
-    const types::global_dof_index first_pc = n_total_dofs - n_rcr_dofs;
-    std::vector<double>           pc_dot_local(n_rcr_dofs, 0.0);
-    for (const auto &[bid, pc_dof] : rcr_pc_dof)
-      if (locally_owned_dofs_.is_element(pc_dof))
-        pc_dot_local[pc_dof - first_pc] = ydot(pc_dof);
-
-    // Utilities::MPI::sum's std::vector<double> overload isn't explicitly
-    // instantiated in every deal.II build (it's only compiled for a fixed set
-    // of types), so call MPI_Allreduce directly instead -- it's always
-    // available once <deal.II/base/mpi.h> is included.
-    std::vector<double> pc_dot_global(n_rcr_dofs, 0.0);
-    if (n_rcr_dofs > 0)
-      MPI_Allreduce(pc_dot_local.data(),
-                    pc_dot_global.data(),
-                    static_cast<int>(n_rcr_dofs),
-                    MPI_DOUBLE,
-                    MPI_SUM,
-                    mpi_communicator_);
 
     for (const auto &face : boundary_faces)
       {
@@ -3698,18 +3954,25 @@ namespace MetricFlowX
         const types::global_dof_index pc_dof = pit->second;
         const auto &rcr = rcr_map.at(cell->face(f)->boundary_id());
 
-        const double A_hat  = y(face.a_hat_dof);
-        const double U_hat  = y(face.u_hat_dof);
-        const double Q      = A_hat * U_hat;
+        const double A_hat = y(face.a_hat_dof);
+        const double U_hat = y(face.u_hat_dof);
+        const auto   bid   = cell->face(f)->boundary_id();
+        const double sign =
+          terminal_links.count(bid) ? terminal_ports.at(bid).outward_sign : 1.;
+        const double Q      = sign * A_hat * U_hat;
         const double Pc     = y(pc_dof);
-        const double Pc_dot = pc_dot_global[pc_dof - first_pc];
+        const double Pc_dot = ydot(pc_dof);
 
         // C*Ṗc - Q + (Pc - P_out)/R2 = 0
-        // Written from whichever rank owns the terminal's cell; the row
-        // itself may be owned by a *different* rank for PETSc's
-        // partitioning, and the off-owner add is routed there by the
-        // caller's compress(VectorOperation::add).
-        F(pc_dof) += rcr.C * Pc_dot - Q + (Pc - rcr.P_out) / rcr.R2;
+        // Both the terminal cell and its capacitor row belong to this rank.
+        double discharge = (Pc - rcr.P_out) / rcr.R2;
+        if (terminal_links.count(bid))
+          {
+            discharge = 0.;
+            for (const auto &[other, resistance] : terminal_links.at(bid))
+              discharge += (Pc - terminal_pressure(other, y, t)) / resistance;
+          }
+        F(pc_dof) += rcr.C * Pc_dot - Q + discharge;
       }
   }
 
@@ -3728,39 +3991,25 @@ namespace MetricFlowX
     if (junctions.empty())
       return;
 
-    // FEValues and FEFaceValues read through the ghosted FE-range vector.  It
-    // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
-    // it holds every entry a locally owned cell can ask for, including the ones
-    // on its ghost neighbours.
-    const VectorType &y_cell = y_fe_relevant;
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
 
-    const QGauss<dim - 1> quad_face(1);
-    // Scalar DGQ values are reference-face data. Only these values are reused;
-    // all material, geometry and pressure evaluations below remain current.
-    std::array<std::unique_ptr<FEFaceValues<dim, spacedim>>,
-               GeometryInfo<dim>::faces_per_cell>
-      face_fe_values;
-    for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
-      {
-        face_fe_values[f] =
-          std::make_unique<FEFaceValues<dim, spacedim>>(*fe_,
-                                                        quad_face,
-                                                        update_values);
-        face_fe_values[f]->reinit(junctions.front().half_faces.front().cell, f);
-      }
+    const QGauss<dim - 1>           quad_face(1);
+    hp::FEFaceValues<dim, spacedim> hp_fef(fe_collection_,
+                                           hp::QCollection<dim - 1>(quad_face),
+                                           update_values);
 
     const double rho   = density;
     const double A_min = 1e-10;
 
-    std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
-    std::vector<double>                  local_values(fe_->n_dofs_per_cell());
-    std::vector<double>                  Av(1), Uv(1);
-    std::vector<double>                  A_int, U_int, c0, W;
-    std::vector<double>                  A_hat, U_hat, c_hat;
-    std::vector<int>                     s;
+    std::vector<types::global_dof_index> ldofs(
+      fe_collection_.max_dofs_per_cell());
+    std::vector<double> local_values(fe_collection_.max_dofs_per_cell());
+    std::vector<double> Av(1), Uv(1);
+    std::vector<double> A_int, U_int, c0, W;
+    std::vector<double> A_hat, U_hat, c_hat;
+    std::vector<int>    s;
     std::vector<types::global_dof_index> a_idx, u_idx;
 
     for (const auto &J : junctions)
@@ -3784,10 +4033,13 @@ namespace MetricFlowX
             const auto        &hf  = J.half_faces[i];
             const unsigned int vid = hf.cell->material_id();
 
-            // Interior cell value at the junction face — use y_cell
-            auto &fef = *face_fe_values[hf.face_no];
+            // Gather the junction state in coupled system numbering.
+            hp_fef.reinit(hf.cell, hf.face_no);
+            const auto &fef = hp_fef.get_present_fe_values();
+            ldofs.resize(hf.cell->get_fe().n_dofs_per_cell());
             hf.cell->get_dof_indices(ldofs);
-            y_cell.extract_subvector_to(ldofs, local_values);
+            local_values.resize(ldofs.size());
+            y_relevant.extract_subvector_to(ldofs, local_values);
             fef[area_extractor].get_function_values_from_local_dof_values(
               local_values, Av);
             fef[velocity_extractor].get_function_values_from_local_dof_values(
@@ -4018,15 +4270,21 @@ namespace MetricFlowX
     // cell is locally owned, so each row is written by exactly one rank once.
     residual = 0.0;
 
-    const unsigned int n_dofs = fe_->n_dofs_per_cell();
-    Vector<double>     local_F(n_dofs), local_Mydot(n_dofs), local_res(n_dofs);
-    std::vector<types::global_dof_index> ldofs(n_dofs);
+    const unsigned int max_dofs = fe_collection_.max_dofs_per_cell();
+    Vector<double>     local_F(max_dofs), local_Mydot(max_dofs),
+      local_res(max_dofs);
+    std::vector<types::global_dof_index> ldofs(max_dofs);
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
+        const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
+        local_F.reinit(n_dofs);
+        local_Mydot.reinit(n_dofs);
+        local_res.reinit(n_dofs);
 
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
 
         residual_F.extract_subvector_to(ldofs.begin(),
@@ -4044,7 +4302,7 @@ namespace MetricFlowX
       }
 
     // RCR capacitor rows: differential, written directly in M*ydot - R form.
-    assemble_rcr_capacitor_equations(y_relevant, ydot, residual);
+    assemble_rcr_capacitor_equations(y_relevant, ydot, residual, t);
 
     residual.compress(VectorOperation::add);
     if (viscoelastic_wall)
@@ -4082,12 +4340,13 @@ namespace MetricFlowX
     // assemble their contribution to the raw R vector, so this is the exact
     // additive pressure contribution to F.  Capacitor and trace-continuity
     // rows have no prescribed-pressure term.
-    const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
+    const unsigned int n_dofs = fe_collection_.max_dofs_per_cell();
     std::vector<types::global_dof_index> ldofs(n_dofs);
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
         for (const auto dof : ldofs)
           destination(dof) -= residual_F(dof);
@@ -4210,12 +4469,14 @@ namespace MetricFlowX
       return;
     derivative_jacobian_matrix_ = 0.0;
 
-    const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
-    std::vector<types::global_dof_index> ldofs(n_dofs);
+    const unsigned int max_dofs = fe_collection_.max_dofs_per_cell();
+    std::vector<types::global_dof_index> ldofs(max_dofs);
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
+        const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
         const FullMatrix<double> &M_K =
           per_cell_mass[cell->active_cell_index()];
@@ -4257,61 +4518,62 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer, "assemble_jacobian_cell_block");
 
-    // FEValues and FEFaceValues read through the ghosted FE-range vector.  It
-    // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
-    // it holds every entry a locally owned cell can ask for, including the ones
-    // on its ghost neighbours.
-    const VectorType &y_cell = y_fe_relevant;
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
     const FEValuesExtractors::Scalar a_hat_extractor(2); // trace area
     const FEValuesExtractors::Scalar u_hat_extractor(3); // trace velocity
 
-    const QGauss<dim>     quad_cell(fe_->tensor_degree() + 1);
-    const QGauss<dim - 1> quad_face(fe_->tensor_degree() + 1);
+    const QGauss<dim>     quad_cell(std::max(fe_degree, 1u) + 1);
+    const QGauss<dim - 1> quad_face(std::max(fe_degree, 1u) + 1);
 
-    FEValues<dim, spacedim>     fev(*fe_,
-                                quad_cell,
-                                update_values | update_gradients |
-                                  update_quadrature_points | update_JxW_values);
-    FEFaceValues<dim, spacedim> fef(*fe_,
-                                    quad_face,
-                                    update_values | update_JxW_values |
-                                      update_normal_vectors);
+    hp::FEValues<dim, spacedim>     hp_fev(fe_collection_,
+                                       hp::QCollection<dim>(quad_cell),
+                                       update_values | update_gradients |
+                                         update_quadrature_points |
+                                         update_JxW_values);
+    hp::FEFaceValues<dim, spacedim> hp_fef(fe_collection_,
+                                           hp::QCollection<dim - 1>(quad_face),
+                                           update_values | update_JxW_values |
+                                             update_normal_vectors);
 
     const double rho = density;
-    const double eta =
-      2.0 * (friction_profile + 2.0) * numbers::PI * viscosity / rho;
     (void)t;
-    const unsigned int                   n_dofs = fe_->n_dofs_per_cell();
-    std::vector<double>                  local_values(n_dofs);
-    std::vector<types::global_dof_index> ldofs(n_dofs);
-    std::vector<double>                  A_h(fev.n_quadrature_points),
-      U_h(fev.n_quadrature_points);
-    std::vector<double> Ah_q(fef.n_quadrature_points),
-      Uh_q(fef.n_quadrature_points);
-    std::vector<double> Ahat_q(fef.n_quadrature_points),
-      Uhat_q(fef.n_quadrature_points);
-    FullMatrix<double>     cell_matrix(n_dofs, n_dofs);
+    const unsigned int  max_dofs = fe_collection_.max_dofs_per_cell();
+    std::vector<double> local_values(max_dofs);
+    std::vector<types::global_dof_index> ldofs(max_dofs);
+    std::vector<double>    A_h(quad_cell.size()), U_h(quad_cell.size());
+    std::vector<double>    Ah_q(quad_face.size()), Uh_q(quad_face.size());
+    std::vector<double>    Ahat_q(quad_face.size()), Uhat_q(quad_face.size());
+    FullMatrix<double>     cell_matrix(max_dofs, max_dofs);
     constexpr unsigned int n_trace_columns =
       2 * GeometryInfo<dim>::faces_per_cell;
     std::array<types::global_dof_index, n_trace_columns> trace_columns;
     boost::container::small_vector<double, 64>           trace_values;
-    trace_values.resize(n_dofs * n_trace_columns);
+    trace_values.resize(max_dofs * n_trace_columns);
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
+        const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
+        local_values.resize(n_dofs);
+        cell_matrix.reinit(n_dofs, n_dofs);
+        trace_values.resize(n_dofs * n_trace_columns);
 
         const unsigned int vid = cell->material_id();
 
-        fev.reinit(cell);
+        const double eta = 2.0 * (friction_profile + 2.0) * numbers::PI *
+                           vessel_map.at(vid).dynamic_viscosity / rho;
+
+        hp_fev.reinit(cell);
+        const auto &fev = hp_fev.get_present_fe_values();
 
         const auto &JxW = fev.get_JxW_values();
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
-        y_cell.extract_subvector_to(ldofs, local_values);
+        local_values.resize(ldofs.size());
+        y_relevant.extract_subvector_to(ldofs, local_values);
 
         fev[area_extractor].get_function_values_from_local_dof_values(
           local_values, A_h);
@@ -4323,7 +4585,7 @@ namespace MetricFlowX
 
         // ---- Block (1,1) volume - cell_matrix
         // -------------------------------
-        for (unsigned int q = 0; q < fev.n_quadrature_points; ++q)
+        for (unsigned int q = 0; q < quad_cell.size(); ++q)
           {
             const double A    = std::max(A_h[q], 1e-10);
             const double U    = U_h[q];
@@ -4333,7 +4595,8 @@ namespace MetricFlowX
 
             for (unsigned int i = 0; i < n_dofs; ++i)
               {
-                const unsigned int ci = fe_->system_to_component_index(i).first;
+                const unsigned int ci =
+                  cell->get_fe().system_to_component_index(i).first;
                 if (ci >= 2)
                   continue;
                 const Tensor<1, spacedim> grad_phiA =
@@ -4345,7 +4608,7 @@ namespace MetricFlowX
 
                 for (unsigned int j = 0; j < n_dofs; ++j)
                   {
-                    if (fe_->system_to_component_index(j).first >= 2)
+                    if (cell->get_fe().system_to_component_index(j).first >= 2)
                       continue;
                     const double trial_A = fev[area_extractor].value(j, q);
                     const double trial_U = fev[velocity_extractor].value(j, q);
@@ -4369,7 +4632,8 @@ namespace MetricFlowX
 
         for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
           {
-            fef.reinit(cell, f);
+            hp_fef.reinit(cell, f);
+            const auto  &fef     = hp_fef.get_present_fe_values();
             const auto  &normals = fef.get_normal_vectors();
             const auto  &JxW_f   = fef.get_JxW_values();
             const double ad_face = compute_a_d_at_face(cell, f);
@@ -4395,7 +4659,7 @@ namespace MetricFlowX
             trace_columns[2 * f]     = td.a_hat_dof;
             trace_columns[2 * f + 1] = td.u_hat_dof;
 
-            for (unsigned int q = 0; q < fef.n_quadrature_points; ++q)
+            for (unsigned int q = 0; q < quad_face.size(); ++q)
               {
                 const double A_in = std::max(Ah_q[q], 1e-10);
                 const double U_in = Uh_q[q];
@@ -4428,7 +4692,7 @@ namespace MetricFlowX
                     for (unsigned int i = 0; i < n_dofs; ++i)
                       {
                         const unsigned int comp =
-                          fe_->system_to_component_index(i).first;
+                          cell->get_fe().system_to_component_index(i).first;
                         if (comp >= 2)
                           continue; // trace rows carry no cell flux
                         const double phi = fef.shape_value(i, q);
@@ -4464,7 +4728,7 @@ namespace MetricFlowX
                     for (unsigned int i = 0; i < n_dofs; ++i)
                       {
                         const unsigned int comp =
-                          fe_->system_to_component_index(i).first;
+                          cell->get_fe().system_to_component_index(i).first;
                         if (comp >= 2)
                           continue; // trace rows carry no cell flux
                         const double phi = fef.shape_value(i, q);
@@ -4501,19 +4765,20 @@ namespace MetricFlowX
     TimerOutput::Scope timer(computing_timer,
                              "assemble_jacobian_trace_interior_block");
 
-    // FEValues and FEFaceValues read through the ghosted FE-range vector.  It
+    // FEValues and FEFaceValues read through the ghosted state vector. It
     // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
     // it holds every entry a locally owned cell can ask for, including the ones
     // on its ghost neighbours.
-    const VectorType &y_cell = y_fe_relevant;
+    const VectorType &y_cell = y_relevant;
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
 
-    const QGauss<dim - 1>       quad_face(1);
-    FEFaceValues<dim, spacedim> fef(*fe_,
-                                    quad_face,
-                                    update_values | update_normal_vectors);
+    const QGauss<dim - 1>           quad_face(1);
+    hp::FEFaceValues<dim, spacedim> hp_fef(fe_collection_,
+                                           hp::QCollection<dim - 1>(quad_face),
+                                           update_values |
+                                             update_normal_vectors);
 
     for (const auto &face : interior_faces)
       {
@@ -4530,34 +4795,40 @@ namespace MetricFlowX
         const double ad_R    = ad_face;
         // ---- Left cell: state and normal
         // --------------------------------
-        fef.reinit(cell, f);
-        const double bn_L =
-          compute_interior_tangent_normal_product(cell,
-                                                  fef.get_normal_vectors()[0]);
+        hp_fef.reinit(cell, f);
+        const double bn_L = compute_interior_tangent_normal_product(
+          cell, hp_fef.get_present_fe_values().get_normal_vectors()[0]);
 
         std::vector<double> A_Lv(1), U_Lv(1);
-        fef[area_extractor].get_function_values(y_cell, A_Lv);
-        fef[velocity_extractor].get_function_values(y_cell, U_Lv);
+        hp_fef.get_present_fe_values()[area_extractor].get_function_values(
+          y_cell, A_Lv);
+        hp_fef.get_present_fe_values()[velocity_extractor].get_function_values(
+          y_cell, U_Lv);
         const double A_L = std::max(A_Lv[0], 1e-10);
         const double U_L = U_Lv[0];
 
-        std::vector<types::global_dof_index> ldofs_L(fe_->n_dofs_per_cell());
+        std::vector<types::global_dof_index> ldofs_L(
+          fe_collection_.max_dofs_per_cell());
+        ldofs_L.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs_L);
 
         // ---- Right cell: state and normal
         // --------------------------------
-        fef.reinit(nb, nb_f);
-        const double bn_R =
-          compute_interior_tangent_normal_product(nb,
-                                                  fef.get_normal_vectors()[0]);
+        hp_fef.reinit(nb, nb_f);
+        const double bn_R = compute_interior_tangent_normal_product(
+          nb, hp_fef.get_present_fe_values().get_normal_vectors()[0]);
 
         std::vector<double> A_Rv(1), U_Rv(1);
-        fef[area_extractor].get_function_values(y_cell, A_Rv);
-        fef[velocity_extractor].get_function_values(y_cell, U_Rv);
+        hp_fef.get_present_fe_values()[area_extractor].get_function_values(
+          y_cell, A_Rv);
+        hp_fef.get_present_fe_values()[velocity_extractor].get_function_values(
+          y_cell, U_Rv);
         const double A_R = std::max(A_Rv[0], 1e-10);
         const double U_R = U_Rv[0];
 
-        std::vector<types::global_dof_index> ldofs_R(fe_->n_dofs_per_cell());
+        std::vector<types::global_dof_index> ldofs_R(
+          fe_collection_.max_dofs_per_cell());
+        ldofs_R.resize(nb->get_fe().n_dofs_per_cell());
         nb->get_dof_indices(ldofs_R);
 
         // ---- Trace state
@@ -4578,11 +4849,13 @@ namespace MetricFlowX
         // w.r.t. w_L. Interior = L (trial nonzero), exterior =
         // trace (trial zero).
         // ================================================================
-        fef.reinit(cell, f);
-        for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
+        hp_fef.reinit(cell, f);
+        for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
           {
-            const double phi_A = fef[area_extractor].value(j, 0);
-            const double phi_U = fef[velocity_extractor].value(j, 0);
+            const double phi_A =
+              hp_fef.get_present_fe_values()[area_extractor].value(j, 0);
+            const double phi_U =
+              hp_fef.get_present_fe_values()[velocity_extractor].value(j, 0);
 
             const auto [dFA, dFU] =
               numerical_flux_jac(bn_L,
@@ -4610,11 +4883,13 @@ namespace MetricFlowX
         // w.r.t. w_R. Interior = R (trial nonzero), exterior =
         // trace (trial zero).
         // ================================================================
-        fef.reinit(nb, nb_f);
-        for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
+        hp_fef.reinit(nb, nb_f);
+        for (unsigned int j = 0; j < nb->get_fe().n_dofs_per_cell(); ++j)
           {
-            const double phi_A = fef[area_extractor].value(j, 0);
-            const double phi_U = fef[velocity_extractor].value(j, 0);
+            const double phi_A =
+              hp_fef.get_present_fe_values()[area_extractor].value(j, 0);
+            const double phi_U =
+              hp_fef.get_present_fe_values()[velocity_extractor].value(j, 0);
 
             const auto [dFA, dFU] =
               numerical_flux_jac(bn_R,
@@ -4699,21 +4974,19 @@ namespace MetricFlowX
     TimerOutput::Scope timer(computing_timer,
                              "assemble_jacobian_trace_boundary_block");
 
-    // FEValues and FEFaceValues read through the ghosted FE-range vector.  It
-    // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
-    // it holds every entry a locally owned cell can ask for, including the ones
-    // on its ghost neighbours.
-    const VectorType &y_cell = y_fe_relevant;
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
 
-    std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
-    std::vector<double>                  local_values(fe_->n_dofs_per_cell());
-    std::vector<double>                  A_int_v(1);
+    std::vector<types::global_dof_index> ldofs(
+      fe_collection_.max_dofs_per_cell());
+    std::vector<double> local_values(fe_collection_.max_dofs_per_cell());
+    std::vector<double> A_int_v(1);
 
-    const QGauss<dim - 1>       quad_face(1);
-    FEFaceValues<dim, spacedim> fef(*fe_, quad_face, update_values);
+    const QGauss<dim - 1>           quad_face(1);
+    hp::FEFaceValues<dim, spacedim> hp_fef(fe_collection_,
+                                           hp::QCollection<dim - 1>(quad_face),
+                                           update_values);
 
     (void)t;
 
@@ -4726,9 +4999,12 @@ namespace MetricFlowX
         const unsigned int       vid = cell->material_id();
         // const auto              &vpp = vessel_map.at(vid);
 
-        fef.reinit(cell, f);
+        hp_fef.reinit(cell, f);
+        const auto &fef = hp_fef.get_present_fe_values();
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
-        y_cell.extract_subvector_to(ldofs, local_values);
+        local_values.resize(ldofs.size());
+        y_relevant.extract_subvector_to(ldofs, local_values);
         fef[area_extractor].get_function_values_from_local_dof_values(
           local_values, A_int_v);
 
@@ -4770,7 +5046,7 @@ namespace MetricFlowX
             jacobian_matrix.add(u_row, u_row, 1.0);
 
             // \partialR2/\partial(A_int, U_int) — block (2,1)
-            for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
+            for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
               {
                 const double phi_A = fef[area_extractor].value(j, 0);
                 const double phi_U = fef[velocity_extractor].value(j, 0);
@@ -4780,6 +5056,37 @@ namespace MetricFlowX
                                     ldofs[j],
                                     -(phi_U - 4.0 * dc_int * phi_A));
               }
+          }
+        else if (terminal_links.count(bid))
+          {
+            const double sign       = terminal_ports.at(bid).outward_sign;
+            double       resistance = rcr_map.at(bid).R1;
+            if (!rcr_pc_dof.count(bid))
+              {
+                double conductance = 0.;
+                for (const auto &[other, edge_resistance] :
+                     terminal_links.at(bid))
+                  conductance += 1. / edge_resistance;
+                resistance = 1. / conductance;
+                for (const auto &[other, edge_resistance] :
+                     terminal_links.at(bid))
+                  jacobian_matrix.add(a_row,
+                                      terminal_pressure_dof(other),
+                                      -resistance / edge_resistance *
+                                        terminal_pressure_derivative(other, y));
+              }
+            jacobian_matrix.add(a_row,
+                                a_row,
+                                dPdA_hat - resistance * sign * U_hat_cur);
+            jacobian_matrix.add(a_row, u_row, -resistance * sign * A_hat_cur);
+            jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
+            jacobian_matrix.add(u_row, u_row, 1.);
+            for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
+              jacobian_matrix.add(u_row,
+                                  ldofs[j],
+                                  -fef[velocity_extractor].value(j, 0) -
+                                    sign * 4. * dc_int *
+                                      fef[area_extractor].value(j, 0));
           }
         else if (outlet_type == "RCR" && rcr_map.count(bid) &&
                  (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
@@ -4806,7 +5113,8 @@ namespace MetricFlowX
                 jacobian_matrix.add(u_row, u_row, 1.0);
 
                 // dres_U/d(A_int, U_int)
-                for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
+                for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell();
+                     ++j)
                   {
                     const double phi_A = fef[area_extractor].value(j, 0);
                     const double phi_U = fef[velocity_extractor].value(j, 0);
@@ -4832,7 +5140,8 @@ namespace MetricFlowX
                 jacobian_matrix.add(u_row, u_row, 1.0);
 
                 // dres_U/d(A_int, U_int)
-                for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
+                for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell();
+                     ++j)
                   {
                     const double phi_A = fef[area_extractor].value(j, 0);
                     const double phi_U = fef[velocity_extractor].value(j, 0);
@@ -4861,7 +5170,7 @@ namespace MetricFlowX
 
             // \partialR1 and \partialR2 /\partial(A_int,U_int)
             // via W1_int
-            for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
+            for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
               {
                 const double phi_A = fef[area_extractor].value(j, 0);
                 const double phi_U = fef[velocity_extractor].value(j, 0);
@@ -4896,9 +5205,26 @@ namespace MetricFlowX
         const double U_hat = y(face.u_hat_dof);
 
         // R_pc = A_hat*U_hat - (Pc - P_out)/R2
-        jacobian_matrix.add(pc_dof, face.a_hat_dof, U_hat);
-        jacobian_matrix.add(pc_dof, face.u_hat_dof, A_hat);
-        jacobian_matrix.add(pc_dof, pc_dof, -1.0 / rcr.R2);
+        const auto   bid = cell->face(f)->boundary_id();
+        const double sign =
+          terminal_links.count(bid) ? terminal_ports.at(bid).outward_sign : 1.;
+        jacobian_matrix.add(pc_dof, face.a_hat_dof, sign * U_hat);
+        jacobian_matrix.add(pc_dof, face.u_hat_dof, sign * A_hat);
+        if (terminal_links.count(bid))
+          {
+            double conductance = 0.;
+            for (const auto &[other, resistance] : terminal_links.at(bid))
+              {
+                conductance += 1. / resistance;
+                jacobian_matrix.add(pc_dof,
+                                    terminal_pressure_dof(other),
+                                    terminal_pressure_derivative(other, y) /
+                                      resistance);
+              }
+            jacobian_matrix.add(pc_dof, pc_dof, -conductance);
+          }
+        else
+          jacobian_matrix.add(pc_dof, pc_dof, -1.0 / rcr.R2);
 
         // res_A = P(Â) - R1*Q - Pc  ->  d(res_A)/dPc = -1
         jacobian_matrix.add(face.a_hat_dof, pc_dof, -1.0);
@@ -4916,34 +5242,19 @@ namespace MetricFlowX
     if (junctions.empty())
       return;
 
-    // FEValues and FEFaceValues read through the ghosted FE-range vector.  It
-    // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
-    // it holds every entry a locally owned cell can ask for, including the ones
-    // on its ghost neighbours.
-    const VectorType &y_cell = y_fe_relevant;
 
     const FEValuesExtractors::Scalar area_extractor(0);
     const FEValuesExtractors::Scalar velocity_extractor(1);
 
-    const QGauss<dim - 1> quad_face(1);
-    // Scalar DGQ values are reference-face data. Only these values are reused;
-    // all material, geometry and pressure evaluations below remain current.
-    std::array<std::unique_ptr<FEFaceValues<dim, spacedim>>,
-               GeometryInfo<dim>::faces_per_cell>
-      face_fe_values;
-    for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
-      {
-        face_fe_values[f] =
-          std::make_unique<FEFaceValues<dim, spacedim>>(*fe_,
-                                                        quad_face,
-                                                        update_values);
-        face_fe_values[f]->reinit(junctions.front().half_faces.front().cell, f);
-      }
+    const QGauss<dim - 1>           quad_face(1);
+    hp::FEFaceValues<dim, spacedim> hp_fef(fe_collection_,
+                                           hp::QCollection<dim - 1>(quad_face),
+                                           update_values);
 
     const double rho   = density;
     const double A_min = 1e-10;
 
-    std::vector<double> local_values(fe_->n_dofs_per_cell());
+    std::vector<double> local_values(fe_collection_.max_dofs_per_cell());
     std::vector<double> Av(1);
     std::vector<double> A_int, A_hat, U_hat, dP_hat, dc_hat_v, dc_int_v;
     std::vector<int>    orient;
@@ -4970,10 +5281,12 @@ namespace MetricFlowX
             const auto        &hf  = J.half_faces[i];
             const unsigned int vid = hf.cell->material_id();
 
-            cell_dofs[i].resize(fe_->n_dofs_per_cell());
+            cell_dofs[i].resize(hf.cell->get_fe().n_dofs_per_cell());
             hf.cell->get_dof_indices(cell_dofs[i]);
-            y_cell.extract_subvector_to(cell_dofs[i], local_values);
-            auto &fef = *face_fe_values[hf.face_no];
+            local_values.resize(cell_dofs[i].size());
+            y_relevant.extract_subvector_to(cell_dofs[i], local_values);
+            hp_fef.reinit(hf.cell, hf.face_no);
+            const auto &fef = hp_fef.get_present_fe_values();
             fef[area_extractor].get_function_values_from_local_dof_values(
               local_values, Av);
 
@@ -5057,9 +5370,12 @@ namespace MetricFlowX
 
             // \partial(-W_i)/\partial(A_int_i, U_int_i)
             const unsigned int vid = J.half_faces[i].cell->material_id();
-            auto              &fef = *face_fe_values[J.half_faces[i].face_no];
+            hp_fef.reinit(J.half_faces[i].cell, J.half_faces[i].face_no);
+            const auto &fef = hp_fef.get_present_fe_values();
 
-            for (unsigned int j = 0; j < fe_->n_dofs_per_cell(); ++j)
+            for (unsigned int j = 0;
+                 j < J.half_faces[i].cell->get_fe().n_dofs_per_cell();
+                 ++j)
               {
                 const double phi_A = fef[area_extractor].value(j, 0);
                 const double phi_U = fef[velocity_extractor].value(j, 0);
@@ -5122,13 +5438,15 @@ namespace MetricFlowX
     compute_pressure_impl(y, p, t, nullptr);
     if (!viscoelastic_wall)
       return;
-    std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
+    std::vector<types::global_dof_index> indices(
+      fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
+          indices.resize(cell->get_fe().n_dofs_per_cell());
           cell->get_dof_indices(indices);
           for (unsigned int i = 0; i < indices.size(); ++i)
-            if (fe_->system_to_component_index(i).first == 0)
+            if (cell->get_fe().system_to_component_index(i).first == 0)
               p(indices[i]) =
                 p(indices[i]) +
                 viscous_pressure(y, ydot, cell, support_point(cell, i));
@@ -5148,17 +5466,19 @@ namespace MetricFlowX
 
     p = 0.0;
 
-    std::vector<types::global_dof_index> ldofs(fe_->n_dofs_per_cell());
+    std::vector<types::global_dof_index> ldofs(
+      fe_collection_.max_dofs_per_cell());
 
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
           continue;
 
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
 
-        for (unsigned int i = 0; i < fe_->n_dofs_per_cell(); ++i)
-          if (fe_->system_to_component_index(i).first == 0)
+        for (unsigned int i = 0; i < cell->get_fe().n_dofs_per_cell(); ++i)
+          if (cell->get_fe().system_to_component_index(i).first == 0)
             {
               const double A             = y(ldofs[i]);
               const double base_pressure = compute_pressure_value(
@@ -5266,17 +5586,11 @@ namespace MetricFlowX
     const std::string dir =
       output_directory + (output_directory.empty() ? "" : "/");
 
-    // Restrict each field to the FE range and give it ghost entries.
     auto to_fe_ghosted = [this](const VectorType &src) {
-      VectorType owned(locally_owned_fe_dofs, mpi_communicator_);
-      for (const auto i : locally_owned_fe_dofs)
-        owned(i) = src(i);
-      owned.compress(VectorOperation::insert);
-
-      VectorType ghosted(locally_owned_fe_dofs,
-                         locally_relevant_fe_dofs,
+      VectorType ghosted(locally_owned_dofs_,
+                         locally_relevant_dofs_,
                          mpi_communicator_);
-      ghosted = owned;
+      ghosted = src;
       return ghosted;
     };
 
@@ -5287,15 +5601,16 @@ namespace MetricFlowX
     data_out.attach_dof_handler(dof_handler_);
 
     std::vector<DataComponentInterpretation::DataComponentInterpretation>
-      interp(4, DataComponentInterpretation::component_is_scalar);
+      interp(5, DataComponentInterpretation::component_is_scalar);
 
-    std::vector<std::string> names = {"area", "velocity", "A_hat", "U_hat"};
+    std::vector<std::string> names = {
+      "area", "velocity", "A_hat", "U_hat", "Pc"};
     data_out.add_data_vector(sol_fe,
                              names,
                              DataOut<dim, spacedim>::type_dof_data,
                              interp);
 
-    names = {"pressure", "unused", "unused_p2", "unused_p3"};
+    names = {"pressure", "unused", "unused_p2", "unused_p3", "unused_p4"};
     data_out.add_data_vector(p_fe,
                              names,
                              DataOut<dim, spacedim>::type_dof_data,
@@ -5342,43 +5657,49 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer, "compute_errors");
 
-    // Existing parameter files describe only the physical (A,U) fields.  The
-    // HDG state now also contains trace fields, so such an exact solution is
-    // not dimensionally compatible with the four-component finite element.
-    // Keep those runs usable and reserve error integration for a matching
-    // manufactured solution.
-    if (exact_solution.n_components != fe_->n_components())
+    // Four-component manufactured solutions predate the terminal field.
+    // Extend them by zero in Pc, which is excluded by both error masks.
+    if (exact_solution.n_components != 4 && exact_solution.n_components != 5)
       {
         pcout << "Skipping error computation: exact solution has "
-              << exact_solution.n_components << " components, while the finite"
-              << " element has " << fe_->n_components() << "." << std::endl;
+              << exact_solution.n_components << " components, expected 4 or 5."
+              << std::endl;
         return;
       }
-
-    // The FE has 4 components (A, U, A_hat, U_hat), so the masks select out of
-    // 4 and `exact_solution` must be a 4-component Function; components 2,3 are
-    // masked out.  Meaningful only for manufactured-solution verification runs.
-    const ComponentSelectFunction<spacedim> area_mask(0, 1.0, 4);
-    const ComponentSelectFunction<spacedim> vel_mask(1, 1.0, 4);
+    // The masks select the physical fields from the five-component element.
+    // Meaningful only for manufactured-solution verification runs.
+    const ComponentSelectFunction<spacedim> area_mask(0, 1.0, 5);
+    const ComponentSelectFunction<spacedim> vel_mask(1, 1.0, 5);
 
     Vector<float> diff(triangulation_.n_active_cells());
 
-    VectorType cell_sol(locally_owned_fe_dofs, mpi_communicator_);
-    for (const auto i : locally_owned_fe_dofs)
-      cell_sol(i) = solution(i);
-    cell_sol.compress(VectorOperation::insert);
-
-    VectorType cell_sol_ghosted(locally_owned_fe_dofs,
-                                locally_relevant_fe_dofs,
+    VectorType cell_sol_ghosted(locally_owned_dofs_,
+                                locally_relevant_dofs_,
                                 mpi_communicator_);
-    cell_sol_ghosted = cell_sol;
-
+    cell_sol_ghosted = solution;
     exact_solution.set_time(time);
+    std::vector<std::function<double(const Point<spacedim> &)>> values;
+    std::vector<std::function<Tensor<1, spacedim>(const Point<spacedim> &)>>
+      gradients;
+    for (unsigned int c = 0; c < 5; ++c)
+      {
+        values.emplace_back([this, c](const Point<spacedim> &point) {
+          return c < exact_solution.n_components ?
+                   exact_solution.value(point, c) :
+                   0.;
+        });
+        gradients.emplace_back([this, c](const Point<spacedim> &point) {
+          return c < exact_solution.n_components ?
+                   exact_solution.gradient(point, c) :
+                   Tensor<1, spacedim>();
+        });
+      }
+    const FunctionFromFunctionObjects<spacedim> exact(values, gradients);
 
     auto l2_error = [&](const ComponentSelectFunction<spacedim> &mask) {
       VectorTools::integrate_difference(dof_handler_,
                                         cell_sol_ghosted,
-                                        exact_solution,
+                                        exact,
                                         diff,
                                         QGauss<dim>(fe_degree + 3),
                                         VectorTools::L2_norm,
@@ -5390,7 +5711,7 @@ namespace MetricFlowX
     auto h1_error = [&](const ComponentSelectFunction<spacedim> &mask) {
       VectorTools::integrate_difference(dof_handler_,
                                         cell_sol_ghosted,
-                                        exact_solution,
+                                        exact,
                                         diff,
                                         QGauss<dim>(fe_degree + 3),
                                         VectorTools::H1_seminorm,
@@ -5447,7 +5768,7 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer, "check_mass_conservation");
 
-    // Force y_fe_relevant to reflect *this* y, not whatever trial iterate IDA
+    // Force y_relevant to reflect *this* y, not whatever trial iterate IDA
     // last evaluated a residual/Jacobian at.  Without this, the volume
     // integral below can read a stale snapshot, producing exact-zero dV/dt on
     // some steps and an overshooting "catch-up" jump on the next.
@@ -5455,7 +5776,9 @@ namespace MetricFlowX
 
     const FEValuesExtractors::Scalar area_extr(0);
     const QGauss<dim>                quad(fe_degree + 2);
-    FEValues<dim, spacedim> fev(*fe_, quad, update_values | update_JxW_values);
+    hp::FEValues<dim, spacedim>      hp_fev(fe_collection_,
+                                       hp::QCollection<dim>(quad),
+                                       update_values | update_JxW_values);
 
     std::vector<double> A_q(quad.size());
     double              local_volume = 0.0;
@@ -5463,8 +5786,9 @@ namespace MetricFlowX
       {
         if (!cell->is_locally_owned())
           continue;
-        fev.reinit(cell);
-        fev[area_extr].get_function_values(y_fe_relevant, A_q);
+        hp_fev.reinit(cell);
+        const auto &fev = hp_fev.get_present_fe_values();
+        fev[area_extr].get_function_values(y_relevant, A_q);
         for (unsigned int q = 0; q < quad.size(); ++q)
           local_volume += A_q[q] * fev.JxW(q);
       }
@@ -5485,9 +5809,9 @@ namespace MetricFlowX
 
             double A_hat = 0.0, U_hat = 0.0;
             get_face_trace(y_relevant, cell, f, A_hat, U_hat);
-            const double Q   = A_hat * U_hat;
-            const auto   bid = cell->face(f)->boundary_id();
-            local_net_flux += (bid == 0) ? Q : -Q;
+            const double Q            = A_hat * U_hat;
+            const double outward_sign = f == 1 ? 1. : -1.;
+            local_net_flux -= outward_sign * Q;
           }
       }
     const double net_flux =

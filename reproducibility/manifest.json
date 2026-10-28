@@ -3,7 +3,7 @@
   "status": "Canonical inputs for future current-code runs; archived results have not been validated or reproduced.",
   "units": "SI (m, kg, s, Pa); derived display units must be stated by postprocessing.",
   "source_manuscript": "2026_1d_blood_flow",
-  "code_baseline": "cc75f51e87d47459d86eb2e18e8cf0c3617736c4",
+  "code_baseline": "f922927df89e58a0bd316aca26d971f955d6c24e",
   "provenance": {
     "mms": {
       "source": "convergence_results/mms_single_vessel.prm",
@@ -12,7 +12,9 @@
         "Rename legacy parameter sections for current parser.",
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
         "Use final time 0.1 s from manuscript; original parameter uses 1 s.",
-        "One independent mesh per run; Dirichlet mode imposes exact A/U traces at both endpoints in supported executable revisions. Prescribed candidate inflow is unused in this mode."
+        "One independent mesh per run; Dirichlet mode imposes exact A/U traces at both endpoints in supported executable revisions. Prescribed candidate inflow is unused in this mode.",
+        "Use the native startup/IDA policy of PR #80; see doc/transient_parameters.md. Preserve the experiment spatial resolution, BDF order, physical inputs and output grid.",
+        "Keep scalar absolute/relative tolerances and disable the startup ramp for MMS accuracy measurements."
       ],
       "minimum_executable_revision": "cc75f51e87d47459d86eb2e18e8cf0c3617736c4"
     },
@@ -21,7 +23,9 @@
       "source_sha256": "4fd8e04d001bd5e3e64a67775cdf8c11fe69ee3dde075ba8be1a2c8a082a4a79",
       "adaptations": [
         "Rename legacy parameter sections for current parser.",
-        "Replace machine paths with runner tokens; keep one effective inflow assignment."
+        "Replace machine paths with runner tokens; keep one effective inflow assignment.",
+        "Use the native startup/IDA policy of PR #80; see doc/transient_parameters.md. Preserve the experiment spatial resolution, BDF order, physical inputs and output grid.",
+        "Use componentwise absolute tolerances (area fraction 1e-6, velocity 1e-6 m/s, capacitor pressure 0.01 Pa); ramp both relative and absolute tolerances from factor 100 during startup to factor one at 60% of the run, snapped down to an IDA output time."
       ]
     },
     "network37": {
@@ -29,7 +33,9 @@
       "source_sha256": "ca43494b14364caf78bd8250acd313df8d1688619704784326e1adae03646804",
       "adaptations": [
         "Rename legacy parameter sections for current parser.",
-        "Replace machine paths with runner tokens; keep one effective inflow assignment."
+        "Replace machine paths with runner tokens; keep one effective inflow assignment.",
+        "Use the native startup/IDA policy of PR #80; see doc/transient_parameters.md. Preserve the experiment spatial resolution, BDF order, physical inputs and output grid.",
+        "Use componentwise absolute tolerances (area fraction 1e-6, velocity 1e-6 m/s, capacitor pressure 0.01 Pa); ramp both relative and absolute tolerances from factor 100 during startup to factor one at 60% of the run, snapped down to an IDA output time."
       ]
     },
     "liver": {
@@ -39,7 +45,9 @@
         "Rename legacy parameter sections for current parser.",
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
         "Retain supplied tolerances 1e-6/1e-7; manuscript table lists 1e-8/1e-9. Review before final paper rerun.",
-        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs."
+        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs.",
+        "Use the native startup/IDA policy of PR #80; see doc/transient_parameters.md. Preserve the experiment spatial resolution, BDF order, physical inputs and output grid.",
+        "Use componentwise absolute tolerances (area fraction 1e-6, velocity 1e-6 m/s, capacitor pressure 0.01 Pa); ramp both relative and absolute tolerances from factor 100 during startup to factor one at 60% of the run, snapped down to an IDA output time."
       ]
     },
     "cerebral": {
@@ -50,7 +58,9 @@
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
         "Keep supplied maximum BDF order 2; manuscript describes orders through 5. Review before final paper rerun.",
         "Use the current pinned cerebral v2 dataset, not a private manuscript copy.",
-        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs."
+        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs.",
+        "Use the native startup/IDA policy of PR #80; see doc/transient_parameters.md. Preserve the experiment spatial resolution, BDF order, physical inputs and output grid.",
+        "Use componentwise absolute tolerances (area fraction 1e-6, velocity 1e-6 m/s, capacitor pressure 0.01 Pa); ramp both relative and absolute tolerances from factor 100 during startup to factor one at 60% of the run, snapped down to an IDA output time."
       ]
     },
     "network50k": {
@@ -60,7 +70,9 @@
         "Rename legacy parameter sections for current parser.",
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
         "Use corrected SI mesh from datasets_si_v1.json; archived paper meshes are not replayed.",
-        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs."
+        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs.",
+        "Use the native startup/IDA policy of PR #80; see doc/transient_parameters.md. Preserve the experiment spatial resolution, BDF order, physical inputs and output grid.",
+        "Use componentwise absolute tolerances (area fraction 1e-6, velocity 1e-6 m/s, capacitor pressure 0.01 Pa); ramp both relative and absolute tolerances from factor 100 during startup to factor one at 60% of the run, snapped down to an IDA output time."
       ]
     },
     "network100k": {
@@ -70,7 +82,9 @@
         "Rename legacy parameter sections for current parser.",
         "Replace machine paths with runner tokens; keep one effective inflow assignment.",
         "Use corrected SI mesh from datasets_si_v1.json; archived paper meshes are not replayed.",
-        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs."
+        "Keep imported Gamma (Total pressure factor) = 0 (static pressure); manuscript total-head formula corresponds to gamma=1. Authors must reconcile before final runs.",
+        "Use the native startup/IDA policy of PR #80; see doc/transient_parameters.md. Preserve the experiment spatial resolution, BDF order, physical inputs and output grid.",
+        "Use componentwise absolute tolerances (area fraction 1e-6, velocity 1e-6 m/s, capacitor pressure 0.01 Pa); ramp both relative and absolute tolerances from factor 100 during startup to factor one at 60% of the run, snapped down to an IDA output time."
       ]
     }
   },

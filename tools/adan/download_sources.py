@@ -38,7 +38,8 @@ def download(url, target, expected_sha256):
     return {"path": str(target), "url": url, "sha256": actual}
 
 
-def fetch(root=DEFAULT_DATA_DIR, include_atlas=False, atlas_permission=False):
+def fetch(root=DEFAULT_DATA_DIR, include_atlas=False, atlas_permission=False, include_veins=False):
+    include_atlas = include_atlas or include_veins
     if include_atlas and not atlas_permission:
         raise ValueError(
             "Atlas modification is restricted by HeMoLab terms. Use --atlas-permission only if you have the required written permission; otherwise use the CSV-only default."
@@ -65,6 +66,17 @@ def fetch(root=DEFAULT_DATA_DIR, include_atlas=False, atlas_permission=False):
                 receipts.append(receipt)
                 if i % 200 == 0:
                     print(f'Verified {i}/{len(atlas["files"])} surfaces', flush=True)
+    if include_veins:
+        atlas = source["venous_atlas"]
+        receipts.append(download(atlas["catalogue_url"], root/"source/venous_catalogue.json",
+                                 atlas["catalogue_sha256"]))
+        def fetch_vein(item):
+            name, checksum = item
+            filename = "SW_"+name+".vtk"
+            return download(atlas["base_url"]+"MESHES/venous/"+filename,
+                            root/"source/venous_surfaces"/filename, checksum)
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            receipts.extend(pool.map(fetch_vein, atlas["files"].items()))
     root.mkdir(parents=True, exist_ok=True)
     (root / "download_receipt.json").write_text(json.dumps(receipts, indent=2) + "\n")
     print(f"Verified {len(receipts)} source files in {root}")
@@ -84,5 +96,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Confirm that you hold the written permission required for your intended atlas use; this does not grant permission",
     )
+    parser.add_argument("--include-veins", action="store_true",
+                        help="Download the complete venous atlas too; implies --include-atlas")
     args = parser.parse_args()
-    fetch(args.data_dir, args.include_atlas, args.atlas_permission)
+    fetch(args.data_dir, args.include_atlas, args.atlas_permission, args.include_veins)

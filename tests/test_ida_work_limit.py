@@ -10,7 +10,7 @@ import tempfile
 
 def validate(executable, source_dir, destination):
     destination.mkdir(parents=True, exist_ok=True)
-    template = (source_dir / "parameters/constant.prm.in").read_text().replace("@SOURCE_DIR@", str(source_dir))
+    template = (source_dir / "tests/parameters/constant.prm.in").read_text().replace("@SOURCE_DIR@", str(source_dir))
     template = template.replace("= 4\n", "= 0\n").replace("= 1.1\n", "= 0.01\n")
     environment = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
     for limit in (1, 10000):

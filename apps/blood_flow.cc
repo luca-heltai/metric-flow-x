@@ -68,6 +68,11 @@ namespace MetricFlowX
         "Maximum step size",
         maximum_step_size_,
         "Native IDA maximum step size; zero leaves it unlimited.");
+      problem.add_parameter(
+        "Nonlinear convergence coefficient",
+        nonlinear_convergence_coefficient_,
+        "Positive native IDA Newton convergence coefficient (default 0.33). "
+        "Independent of the local time error tolerance.");
       problem.leave_subsection();
       problem.leave_subsection();
       tolerance_ramp_.add_parameters(problem);
@@ -98,6 +103,11 @@ namespace MetricFlowX
                problem.ida_parameters.minimum_step_size <= maximum_step_size_),
             ExcMessage(
               "IDA step limits require 0 <= minimum <= maximum (maximum=0 is unlimited)."));
+          AssertThrow(
+            std::isfinite(nonlinear_convergence_coefficient_) &&
+              nonlinear_convergence_coefficient_ > 0.,
+            ExcMessage(
+              "IDA nonlinear convergence coefficient must be positive."));
           tolerance_ramp_.validate(problem.ida_parameters.initial_time,
                                    problem.ida_parameters.final_time,
                                    problem.ida_parameters.output_period);
@@ -139,7 +149,7 @@ namespace MetricFlowX
             }
 
           // After setup_system(), so the vessel probe cells and DoF indices
-          // belong to the current mesh.  Opens HDG_IDA_Vessel_*.csv,
+          // belong to the current mesh. Opens the consolidated vessel probes,
           // mass_conservation.csv and ida_step_history.csv, and resets the
           // IDA counters for this cycle.
           if (!steady_hdg)
@@ -358,14 +368,20 @@ namespace MetricFlowX
             steady_hdg ? 500 : maximum_ida_steps_per_output_;
           const double minimum_step =
             steady_hdg ? 0. : ida_parameters.minimum_step_size;
-          const double maximum_step   = steady_hdg ? 0. : maximum_step_size_;
+          const double maximum_step = steady_hdg ? 0. : maximum_step_size_;
+          const double nonlinear_coefficient =
+            nonlinear_convergence_coefficient_;
           ida.differential_components = [&problem,
                                          &ida,
                                          &ida_errors,
                                          maximum_steps,
                                          minimum_step,
-                                         maximum_step]() -> IndexSet {
+                                         maximum_step,
+                                         nonlinear_coefficient]() -> IndexSet {
             ida_errors.install(ida, maximum_steps, minimum_step, maximum_step);
+            AssertThrow(IDASetNonlinConvCoef(internal::native_ida_memory(ida),
+                                             nonlinear_coefficient) == 0,
+                        ExcMessage("IDASetNonlinConvCoef failed."));
             RampSource::register_weights(internal::native_ida_memory(ida), ida);
             IndexSet is(problem.n_total_dofs);
             is.add_indices(problem.cell_dofs_owned);
@@ -384,27 +400,68 @@ namespace MetricFlowX
             if (!initial_output_seen)
               ++ic_residual_calls;
             problem.poll_ida_internal_step(ida, false, true);
+            // An inadmissible Newton trial is recoverable: IDA can shorten
+            // the step. Check collectively before any rank enters assembly.
+            if (problem.wall_model != "Square root" &&
+                !problem.has_admissible_wall_states(y))
+              return 1;
             problem.assemble_residual(t, y, ydot, res);
             return 0;
           };
 
-          std::unique_ptr<SerialDirectSolver> serial_direct;
+          struct DirectFactors
+          {
+            std::unique_ptr<SerialDirectSolver> serial;
+#if defined(DEAL_II_WITH_MUMPS) && DEAL_II_VERSION_GTE(9, 7, 0)
+            std::unique_ptr<SparseDirectMUMPS> native;
+#endif
+          } direct_factors;
           ida.setup_jacobian = [&problem,
                                 &initial_output_seen,
                                 &ic_jacobian_setups,
-                                &serial_direct](const double      t,
-                                                const VectorType &y,
-                                                const VectorType &ydot,
-                                                const double alpha) -> int {
+                                &direct_factors](const double      t,
+                                                 const VectorType &y,
+                                                 const VectorType &ydot,
+                                                 const double alpha) -> int {
             if (!initial_output_seen)
               ++ic_jacobian_setups;
             ++problem.ida_jacobian_evaluations;
             TimerOutput::Scope ts(problem.computing_timer, "setup_jacobian");
+            if (problem.wall_model != "Square root" &&
+                !problem.has_admissible_wall_states(y))
+              return 1;
             problem.assemble_jacobian(t, y, ydot, alpha);
             problem.linear_system_matrix.copy_from(problem.jacobian_matrix);
 
             if (problem.use_direct_solver)
               {
+#if defined(METRIC_FLOW_X_WITH_PETSC) && defined(DEAL_II_WITH_MUMPS) && \
+  !defined(DEAL_II_PETSC_WITH_MUMPS) && DEAL_II_VERSION_GTE(9, 7, 0)
+                // deal.II's native MUMPS accepts the distributed PETSc
+                // operator even when PETSc itself was built without MUMPS.
+                if (problem.n_mpi_processes > 1)
+                  {
+                    if (!direct_factors.native)
+                      problem.pcout
+                        << "Parallel direct solver: native deal.II MUMPS ("
+                        << problem.n_mpi_processes << " MPI ranks).\n";
+                    // The native wrapper's result scatter dereferences the
+                    // first owned index; reject empty ranks before entering it.
+                    AssertThrow(
+                      Utilities::MPI::min(
+                        problem.locally_owned_dofs_.n_elements(),
+                        problem.linear_system_matrix.get_mpi_communicator()) >
+                        0,
+                      ExcMessage(
+                        "Native deal.II MUMPS requires an owned DoF on every rank. Use fewer MPI ranks, PETSc MUMPS, or Use direct solver = false."));
+                    direct_factors.native = std::make_unique<SparseDirectMUMPS>(
+                      SparseDirectMUMPS::AdditionalData(),
+                      problem.linear_system_matrix.get_mpi_communicator());
+                    direct_factors.native->initialize(
+                      problem.linear_system_matrix);
+                    return 0;
+                  }
+#endif
 #ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
                 problem.direct_solver =
@@ -414,11 +471,12 @@ namespace MetricFlowX
                 AssertThrow(
                   problem.n_mpi_processes == 1,
                   ExcMessage(
-                    "Parallel direct solves require PETSc with MUMPS. Set Use direct solver = false."));
+                    "Parallel direct solves require native deal.II MUMPS or PETSc with MUMPS. Set Use direct solver = false."));
 #    ifdef DEAL_II_WITH_UMFPACK
-                if (!serial_direct)
-                  serial_direct = std::make_unique<SerialDirectSolver>();
-                serial_direct->initialize(problem.linear_system_matrix);
+                if (!direct_factors.serial)
+                  direct_factors.serial =
+                    std::make_unique<SerialDirectSolver>();
+                direct_factors.serial->initialize(problem.linear_system_matrix);
 #    else
                 AssertThrow(
                   false,
@@ -445,8 +503,12 @@ namespace MetricFlowX
           };
 
           ida.solve_with_jacobian =
-            [&problem, &initial_output_seen, &ic_linear_solves, &serial_direct](
-              const VectorType &r, VectorType &z, const double /*tol*/) -> int {
+            [&problem,
+             &initial_output_seen,
+             &ic_linear_solves,
+             &direct_factors](const VectorType &r,
+                              VectorType       &z,
+                              const double /*tol*/) -> int {
             if (!initial_output_seen)
               ++ic_linear_solves;
             ++problem.ida_linear_solves;
@@ -455,6 +517,14 @@ namespace MetricFlowX
 
             if (problem.use_direct_solver)
               {
+#if defined(METRIC_FLOW_X_WITH_PETSC) && defined(DEAL_II_WITH_MUMPS) && \
+  !defined(DEAL_II_PETSC_WITH_MUMPS) && DEAL_II_VERSION_GTE(9, 7, 0)
+                if (direct_factors.native)
+                  {
+                    direct_factors.native->vmult(z, r);
+                    return 0;
+                  }
+#endif
 #ifdef METRIC_FLOW_X_WITH_PETSC
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
                 problem.direct_solver->solve(problem.linear_system_matrix,
@@ -462,7 +532,7 @@ namespace MetricFlowX
                                              r);
 #  else
 #    ifdef DEAL_II_WITH_UMFPACK
-                serial_direct->vmult(z, r);
+                direct_factors.serial->vmult(z, r);
 #    else
                 AssertThrow(false,
                             ExcMessage(
@@ -772,8 +842,9 @@ namespace MetricFlowX
 
     std::string   run_mode_ = "transient";
     ToleranceRamp tolerance_ramp_;
-    long int      maximum_ida_steps_per_output_ = 500;
-    double        maximum_step_size_            = 0.;
+    long int      maximum_ida_steps_per_output_      = 500;
+    double        maximum_step_size_                 = 0.;
+    double        nonlinear_convergence_coefficient_ = 0.33;
   };
 } // namespace MetricFlowX
 

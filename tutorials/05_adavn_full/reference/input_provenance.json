@@ -1,0 +1,59 @@
+{
+  "source_doi": "10.3389/fphys.2023.1162391",
+  "source_sha256": "23d14886d2cd4e98ed5be7c89152259910d7e606d48d19157a854c3a1333cbae",
+  "license": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution": "M\u00fcller, Watanabe, Toro, Feij\u00f3o and Blanco (2023). Changes: full CSV extraction, SI conversion, metric embedding, resistive mean-flow reduction.",
+  "arterial_source_rows": 4041,
+  "venous_source_rows": 361,
+  "source_nodes": 4046,
+  "vtk_points": 8448,
+  "vtk_cells": 8804,
+  "inlet_node": 778,
+  "central_drain_nodes": [
+    3809,
+    3912,
+    3934
+  ],
+  "peripheral_connections": 1679,
+  "hydraulic_nodes": 5622,
+  "max_relative_cell_length_error": 2.8993290665624304e-13,
+  "geometry": "Nonanatomical metric embedding of four source 1D components; peripheral graph edges carry no spatial geometry.",
+  "duplicates_in_source_names": 83,
+  "mean_model": "Reference-geometry Poiseuille vessels, 15% source peripheral R before each arterial compartment, remaining 85% split in parallel by draining-vein endpoint radius cubed, venous endpoint impedances, prescribed CO and right-atrial reservoir pressure.",
+  "omitted_physics": [
+    "compliant vessel area response",
+    "heart and pulmonary circulation",
+    "pulsatile inertia",
+    "peripheral storage",
+    "coronary intramyocardial forcing",
+    "intracranial-pressure feedback",
+    "valves and Starling resistors"
+  ],
+  "hdg_model": "ADAVN mixed elastic walls, source arterial compliances, proximal R1=15% of source total R, remaining R coupled to residual venous compartments and impedance-matched 1D venous ports. Prescribed inflow and three right-atrial reservoir outlets; the transient tutorial uses a smooth 0.8 s pulse with mean 96.36 ml/s.",
+  "hdg_venous_reference_wave_speed_m_s": 2.0,
+  "residual_venous_compliance_m3_Pa": 9.992278607781323e-07,
+  "venous_compartments": 105,
+  "coronary_reduction": "General-bed terminal model also used for coronary ends; no layered myocardial model.",
+  "hdg_dural_classification": "Venous name contains sinus, excluding coronary_sinus; explicit approximation, not an additional source-table label.",
+  "hdg_omissions": [
+    "Kelvin-Voigt wall viscosity",
+    "radius-dependent venous reference wave speed",
+    "heart/pulmonary closed loop",
+    "coronary bed forcing",
+    "ICP feedback",
+    "venous valves/Starling resistors"
+  ],
+  "generator_sha256": {
+    "prepare_full.py": "2e110624430d75d10228cef30eea5a95ca116fc1c4cf4a74c60c31cad69fbdd0",
+    "build_vtk.py": "58f64d1380f57207e9e277ebbd95e95881b83e2865913090ca0dec86ae4ef763",
+    "recover_geometry.py": "28ccffd9f41fa4505da030e5e8b2b84a3d36de385e836257a2fb11fc782fb0f1"
+  },
+  "sha256": {
+    "adavn_full.vtk": "2122eecb6a3580f8597685c3d3c723aa30f19501f4f9152bb9e88ab473256697",
+    "edges.csv": "b5e342a1214ca1a5959d3da6a3bf704af7dd586a5178f7c9d49c86b341f2cc5c",
+    "outlets.csv": "2797d5f5f07ec33a21f0dbcde8dcc92a937f491c95c166c3e559574da7fdb142",
+    "mapping.json": "8f9e7272b283535c42f1711d48c06c074d1f254c8b09645f5e8c847cf274dff8",
+    "connections.csv": "53b396fcae707546c803b6dc53ba2bf148636afb45a5a6adad05c9633dd3c214"
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "base_commit": "f922927df89e58a0bd316aca26d971f955d6c24e",
+  "environment": {
+    "deal_ii": "9.8.0",
+    "compiler": "GCC 12.3.0",
+    "backend": "PETSc",
+    "MPI": "OpenMPI 5.0.10",
+    "native_MUMPS_integer_bits": 32,
+    "ranks": 32,
+    "threads_per_rank": 1,
+    "node": "shared gpu04 CPU cores"
+  },
+  "mesh": {
+    "cells": 8804,
+    "input_source_segments": 4402,
+    "capacitor_dofs": 1576,
+    "system_dofs": 89616,
+    "sha256": "09992b0c892a7d24ac0d12550ae99553f682d16deac4a3dae538f85c98cad563"
+  },
+  "partition_options": {
+    "junction_weight": 4,
+    "terminal_weight": 1,
+    "max_load_excess": 0.03
+  },
+  "old_capacitor_ownership": {
+    "max_per_rank": 1576
+  },
+  "partition_metrics": {
+    "zorder": {
+      "cells_min": 275,
+      "cells_max": 276,
+      "dofs_min": 2777,
+      "dofs_max": 2875,
+      "max_dofs_over_mean": 1.0266023924299232,
+      "max_capacitor_dofs_per_rank": 115,
+      "ghost_cells_total": 1001,
+      "physical_components_total": 309,
+      "physical_components_max": 69,
+      "effective_components_total": 303,
+      "effective_components_max": 69,
+      "cut_mesh_vertices": 497,
+      "remote_terminal_connections": 1662,
+      "neighbor_ranks_max": 27,
+      "empty_ranks": 0
+    },
+    "graph": {
+      "cells_min": 225,
+      "cells_max": 285,
+      "dofs_min": 2300,
+      "dofs_max": 2884,
+      "max_dofs_over_mean": 1.0298161042670952,
+      "max_capacitor_dofs_per_rank": 63,
+      "ghost_cells_total": 513,
+      "physical_components_total": 124,
+      "physical_components_max": 11,
+      "effective_components_total": 32,
+      "effective_components_max": 1,
+      "cut_mesh_vertices": 247,
+      "remote_terminal_connections": 569,
+      "neighbor_ranks_max": 10,
+      "empty_ranks": 0
+    }
+  },
+  "assembly_benchmark": {
+    "zorder": {
+      "residual_l2": 81641479.32764928,
+      "residual_min_s": 0.0049182235999999995,
+      "residual_median_s": 0.0054302887,
+      "residual_max_s": 0.005564424199999999,
+      "jacobian_min_s": 0.006490085,
+      "jacobian_median_s": 0.006620896,
+      "jacobian_max_s": 0.006892134
+    },
+    "graph": {
+      "residual_l2": 81641479.32764928,
+      "residual_min_s": 0.0047456359,
+      "residual_median_s": 0.0050224038,
+      "residual_max_s": 0.024328948,
+      "jacobian_min_s": 0.006508186,
+      "jacobian_median_s": 0.006727114,
+      "jacobian_max_s": 0.007071653
+    }
+  },
+  "trajectory": {
+    "rows": 3208,
+    "final_time_s": 8.0,
+    "max_absolute_differences": {
+      "pressure_Pa": 5.4569682106375694e-11,
+      "flow_m3_s": 3.4558944247975454e-18,
+      "area_m2": 2.2768245622195593e-18,
+      "velocity_m_s": 4.2049697057677804e-15
+    },
+    "max_relative_differences_with_scale_floor": {
+      "pressure_Pa": 7.548307290200253e-15,
+      "flow_m3_s": 9.80092969774952e-14,
+      "area_m2": 2.8297329436124645e-15,
+      "velocity_m_s": 9.714769331708947e-14
+    },
+    "scale_floors": {
+      "pressure_Pa": 1.0,
+      "flow_m3_s": 1e-10,
+      "area_m2": 1e-12,
+      "velocity_m_s": 1e-06
+    },
+    "candidate_elapsed_s": 128.26493042707443,
+    "reference_probe_sha256": "80683a120ccf6e2c0981356fd547e76131ca73feede4b90264f53c1e47c81972",
+    "candidate_probe_sha256": "78a54ec7b3cfec0d66718aa4b3923a4f534af4d006717821eb00fd80852d4af1"
+  },
+  "notes": [
+    "Zorder and graph benchmarks use the new local capacitor numbering in the same binary.",
+    "Physical components use mesh adjacency; effective components also include peripheral links.",
+    "Timings are exploratory measurements on a shared node, not controlled speedup claims.",
+    "Probe comparison covers eight selected straight input vessels at all 401 output times."
+  ],
+  "final_vtu": {
+    "cells": 8804,
+    "endpoint_scalar_samples": 88040,
+    "max_absolute_differences": {
+      "area": 0.0,
+      "velocity": 0.0,
+      "A_hat": 0.0,
+      "U_hat": 0.0,
+      "pressure": 0.0
+    },
+    "precision": "Float32 exported VTU arrays; endpoint samples only"
+  },
+  "validation": {
+    "petsc": {
+      "build": "DebugRelease",
+      "ctest_entries_passed": 98,
+      "build_dependency_entries": 4,
+      "MPI_ranks": [
+        1,
+        2,
+        4
+      ]
+    },
+    "trilinos": {
+      "build": "Release",
+      "ctest_entries_passed": 8,
+      "build_dependency_entries": 2,
+      "MPI_ranks": [
+        1,
+        2,
+        4
+      ]
+    },
+    "path_naming_python_checks_passed": 2,
+    "format": "clang-format 16.0.6",
+    "baseline_ownership_assertion": "failed at MPI2 before local capacitor ownership"
+  }
+}

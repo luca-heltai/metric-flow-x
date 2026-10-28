@@ -16,7 +16,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("--mpi", action="store_true")
+    parser.add_argument("--mpi-ranks", type=int, nargs="+", default=[1, 2, 4])
     args = parser.parse_args()
+    if 1 not in args.mpi_ranks or any(n < 1 for n in args.mpi_ranks):
+        parser.error("--mpi-ranks requires rank 1 and positive counts")
     executable = args.executable.resolve()
     launcher = shutil.which("mpirun")
     if args.mpi and launcher is None:
@@ -34,10 +37,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix="metric-flow-wall-") as temporary:
         for model in ("arterial", "venous"):
             original = (
-                executable.parent / "parameters" / f"wall_{model}.prm"
+                executable.parent / "tests" / "parameters" / f"wall_{model}.prm"
             ).read_text()
             for viscous in (False, True):
-                cases = [("native", n) for n in ((1, 2, 4) if args.mpi else (1,))]
+                cases = [("native", n) for n in (args.mpi_ranks if args.mpi else (1,))]
                 if viscous:
                     cases += [("IDA", 1)]
                 for policy, ranks in cases:
@@ -87,8 +90,8 @@ def main():
                             assert diagnostics[key] == 0, diagnostics
                         assert diagnostics["algebraic_defect"] <= 0.01, diagnostics
                         assert diagnostics["differential_defect"] <= 0.01, diagnostics
-                    with (folder / "HDG_IDA_Vessel_0.csv").open() as stream:
-                        records = list(csv.DictReader(stream))
+                    with (folder / "vessel_probes.csv").open() as stream:
+                        records = [row for row in csv.DictReader(stream) if int(row["vessel_id"]) == 0]
                     assert len(records) >= 2, records
                     final = records[-1]
                     assert math.isclose(
@@ -97,8 +100,8 @@ def main():
                     for key, value in final.items():
                         if not key.endswith("_label"):
                             assert math.isfinite(float(value)), final
-                    assert float(final["A_cm2"]) > 0.0, final
-                    results[model, viscous, policy, ranks] = float(final["P_dynpcm2"])
+                    assert float(final["area_m2"]) > 0.0, final
+                    results[model, viscous, policy, ranks] = float(final["pressure_Pa"])
         for model in ("arterial", "venous"):
             assert (
                 abs(
@@ -115,7 +118,9 @@ def main():
             ), results
             if args.mpi:
                 for viscous in (False, True):
-                    for ranks in (2, 4):
+                    for ranks in args.mpi_ranks:
+                        if ranks == 1:
+                            continue
                         assert math.isclose(
                             results[model, viscous, "native", 1],
                             results[model, viscous, "native", ranks],

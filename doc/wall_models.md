@@ -58,9 +58,11 @@ This solves for algebraic traces and differential-state time derivatives
 simultaneously while keeping the differential seed fixed; see
 [native viscoelastic consistency](initialization.md#native-viscoelastic-consistency).
 `Initial condition policy = IDA` remains available as an alternative.
-`Initial state source = steady network` uses the old
-inverse tube law and is rejected for every ADAVN model; use `rest` instead.
-The graph-only `Run mode = steady network` reconstruction is also rejected.
+`Initial state source = steady network` reconstructs reference-geometry graph
+pressures using the positive-tangent ADAVN branch connected to the reference
+state. Pressures outside the bracketed hyperbolic branch are errors.
+The graph-only `Run mode = steady network` uses the same reconstruction; it is
+a resistive approximation, not an equilibrium of the full compliant HDG model.
 The rest state seeds the terminal capacitor pressure from the selected law.
 
 Runnable, small synthetic examples are configured by CMake:

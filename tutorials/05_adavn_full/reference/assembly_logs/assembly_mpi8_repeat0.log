@@ -1,0 +1,29 @@
+BENCHMARK {"parameter_file":"/data/home/lheltai/codes/metric-flow-x-adan-full/build/adavn_beds/assembly.prm","deal_ii":"9.8.0","compiler":"12.3.0","mpi_ranks":8,"cells":8804,"dofs":89616,"startup_s":0.24068098800000001,"owned_cells_per_rank":[1100,1101,1100,1101,1100,1101,1100,1101],"ghost_cells_per_rank":[31,78,102,101,48,53,43,11],"residual_rank_median_s":[0.0088799276000000003,0.0088799545499999993,0.0088799671000000004,0.0088797480500000005,0.0088798710499999999,0.0088798821,0.0088798081000000008,0.0088800870500000007],"jacobian_rank_median_s":[0.01427553,0.0142603,0.014249935,0.014251234999999999,0.014495292,0.014247569999999999,0.01424482,0.0144118635],"derivative_rank_median_s":[4.0000000000000002e-09,5.5000000000000004e-09,4.0000000000000002e-09,4.4999999999999998e-09,4.0000000000000002e-09,4.0000000000000002e-09,4.0000000000000002e-09,5.0000000000000001e-09],"residual_min_s":0.0086145596999999997,"residual_median_s":0.0088800870500000007,"residual_max_s":0.0089632996000000003,"jacobian_min_s":0.014410278,"jacobian_median_s":0.014495292,"jacobian_max_s":0.014897562,"residual_l2":81641479.327649266,"residual_checksum":2546051947307.8525,"derivative_min_s":4.4999999999999998e-09,"derivative_median_s":5.5000000000000004e-09,"derivative_max_s":1.4999999999999999e-08}
+
+
++----------------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start           |      0.91s |            |
+|                                                    |            |            |
+| Section                                | no. calls |  wall time | % of total |
++----------------------------------------+-----------+------------+------------+
+| assemble_cell_residuals                |        61 |     0.177s |        19% |
+| assemble_jacobian_cell_block           |         7 |    0.0562s |       6.2% |
+| assemble_jacobian_trace_boundary_block |         7 |   0.00405s |      0.45% |
+| assemble_jacobian_trace_interior_block |         7 |  0.000148s |         0% |
+| assemble_jacobian_trace_junction_block |         7 |     0.026s |       2.9% |
+| assemble_residual                      |        61 |     0.538s |        59% |
+| assemble_trace_boundary_equations      |        61 |    0.0361s |         4% |
+| assemble_trace_continuity_equations    |        61 |  6.92e-05s |         0% |
+| assemble_trace_interior_equations      |        61 |   0.00113s |      0.12% |
+| assemble_trace_junction_equations      |        61 |     0.262s |        29% |
+| build_extended_sparsity_pattern        |         1 |    0.0689s |       7.6% |
+| build_face_dof_map                     |         1 |  0.000606s |         0% |
+| build_global_vessel_data               |         1 |   0.00416s |      0.46% |
+| build_per_cell_mass_inv                |         1 |   0.00189s |      0.21% |
+| build_rcr_dof_map                      |         1 |  0.000101s |         0% |
+| create_triangulation                   |         1 |     0.105s |        12% |
+| detect_junctions                       |         1 |  0.000558s |         0% |
+| initialize_params                      |         1 |    0.0475s |       5.2% |
+| setup_system                           |         1 |    0.0826s |       9.1% |
+| update_ghosted_vectors                 |        68 |    0.0109s |       1.2% |
++----------------------------------------+-----------+------------+------------+

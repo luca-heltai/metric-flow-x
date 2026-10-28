@@ -1,0 +1,22 @@
+{
+  "initial_state_source": "steady network",
+  "initial_condition_policy": "native",
+  "preparation_wall_s": 1.7863454839999999,
+  "ida_setup_and_ic_wall_s": 0.00442224,
+  "first_ida_output_interval_wall_s": 16.195177314999999,
+  "ic_residual_calls": 0,
+  "ic_jacobian_setups": 0,
+  "ic_linear_solves": 0,
+  "trace_iterations": 3,
+  "largest_trace_block": 8,
+  "algebraic_defect": 2.8331473184612844e-07,
+  "differential_defect": 3.2366084413434295e-12,
+  "native_pair_verified": true,
+  "tolerance_ramp_enabled": true,
+  "ramp_registrations": 1,
+  "ramp_weight_evaluations": 1005,
+  "ramp_stop_arms": 1,
+  "ramp_stop_releases": 1,
+  "ramp_last_relative_factor": 1,
+  "ramp_last_absolute_factor": 1
+}

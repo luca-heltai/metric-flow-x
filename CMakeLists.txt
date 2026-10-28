@@ -71,6 +71,7 @@ endforeach()
 
 set(METRIC_FLOW_X_SOURCES
   source/blood_flow_system.cc
+  source/vessel_partitioning.cc
   source/viscous_wall.cc
   source/blood_flow_initialization.cc
   source/inflow_series.cc
@@ -124,9 +125,9 @@ endforeach()
 add_library(MetricFlowX::metric_flow_x ALIAS metric_flow_x)
 
 
-# Mirror parameters/ into the build tree so tests and examples always use
-# configured files.  Template files end in .prm.in and are expanded with the
-# source tree location baked in.
+# Mirror parameters/ into the build tree so applications always use
+# configured files. Both .prm and .prm.in expand the source tree location;
+# the .in suffix is removed from template destinations.
 set(SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 file(GLOB_RECURSE PARAMETER_FILES CONFIGURE_DEPENDS
   RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/parameters"
@@ -140,6 +141,8 @@ foreach(parameter_file IN LISTS PARAMETER_FILES)
   if(parameter_file MATCHES "\\.prm\\.in$")
     string(REGEX REPLACE "\\.in$" "" parameter_destination "${parameter_destination}")
     configure_file("${parameter_source}" "${parameter_destination}" @ONLY)
+  elseif(parameter_file MATCHES "\\.prm$")
+    configure_file("${parameter_source}" "${parameter_destination}" @ONLY)
   else()
     configure_file("${parameter_source}" "${parameter_destination}" COPYONLY)
   endif()
@@ -148,7 +151,6 @@ endforeach()
 set(METRIC_FLOW_X_PARAMETER_DIR
   "${CMAKE_CURRENT_BINARY_DIR}/parameters/")
 add_compile_definitions(
-  PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/"
   METRIC_FLOW_X_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
@@ -157,6 +159,11 @@ list(GET METRIC_FLOW_X_BUILD_TYPES 0 _benchmark_variant)
 string(TOUPPER "${_benchmark_variant}" _benchmark_variant_upper)
 deal_ii_setup_target(benchmark_assembly ${_benchmark_variant_upper})
 target_link_libraries(benchmark_assembly metric_flow_x)
+
+add_executable(adavn_mean_flow EXCLUDE_FROM_ALL tools/adan/mean_flow.cc)
+target_include_directories(adavn_mean_flow SYSTEM PRIVATE third_party/rapidcsv)
+deal_ii_setup_target(adavn_mean_flow ${_benchmark_variant_upper})
+target_link_libraries(adavn_mean_flow metric_flow_x)
 
 # Add tests
 enable_testing()

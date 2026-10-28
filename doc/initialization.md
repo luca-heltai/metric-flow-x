@@ -55,6 +55,9 @@ R_e=\frac{2(\xi+2)\mu}{\pi}\int_e\frac{ds}{r(s)^4},\qquad
 Q_e=\frac{p_i-p_j}{R_e}.
 $$
 
+An optional VTK `viscosity` CELL_DATA array supplies dynamic viscosity in Pa s
+per vessel; absent data use the global viscosity parameter.
+
 The fixed reference geometry is the same `a_d` or linear-radius taper used by
 the 1D model. For `xi = 2`, this is Poiseuille's `8 mu L / (pi r^4)`. The tapered
 integral is analytic. Resistances have units Pa·s/m³, pressures Pa, and flows
@@ -67,6 +70,17 @@ Use the existing VTK or parameter/CSV terminal source. The steady outlet relatio
 is `p = P_out + (R1+R2) Q`; initialize `Pc = P_out + R2 Q` when `C > 0`, and
 allocate no capacitor state when `C = 0`. Missing anchors, invalid resistances,
 nonfinite data and an inadmissible pressure-to-area inverse are errors.
+
+An optional `Terminal connections CSV file` adds resistors between terminal
+boundary IDs. Its columns are `boundary0,boundary1,resistance`, with resistance
+in Pa s/m³. Linked endpoints use their physical pressure or capacitor pressure;
+a positive R1 is retained between the vessel and capacitor, on both arterial
+and venous ends. Signed fluxes permit inward flow at a venous port. Only independent
+outlets provide reservoir pressure anchors. Each hydraulically connected
+component needs an anchor, even if its 1D mesh has several disconnected parts.
+The coupled elastic graph supports ADAVN walls by inverting the positive-tangent
+branch connected to the reference area. A pressure outside that branch is an
+error, rather than a clipped initial state.
 
 Interpolate pressure according to accumulated resistance, invert the configured
 compliant tube law including the current external pressure, and set nodal
@@ -138,8 +152,9 @@ Jacobians; it does not approximate $F_{\dot y}$ by the block mass matrix.
 Physical column scales and equation sensitivity to final IDA error weights
 normalize the global sparse Newton system. It uses `Use direct solver` and the
 existing backend-specific direct or preconditioned GMRES solvers. Direct MPI
-solves with PETSc require MUMPS, as in the time integrator; otherwise select the
-iterative solver. No dense network-sized matrix is gathered to a root rank.
+solves with PETSc support either PETSc MUMPS or native deal.II MUMPS, as in the
+time integrator; otherwise select the iterative solver. Native deal.II MUMPS
+requires deal.II 9.7 or newer and nonempty DoF ownership on every rank. No dense network-sized matrix is gathered to a root rank.
 
 Backtracking requires a decreasing complete scaled residual and finite positive
 areas with positive elastic wave-speed modulus. The final check uses the same

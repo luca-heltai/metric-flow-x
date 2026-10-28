@@ -1,0 +1,18 @@
+{
+  "input_sha256": {
+    "adavn_full.vtk": "2122eecb6a3580f8597685c3d3c723aa30f19501f4f9152bb9e88ab473256697",
+    "edges.csv": "b5e342a1214ca1a5959d3da6a3bf704af7dd586a5178f7c9d49c86b341f2cc5c",
+    "outlets.csv": "2797d5f5f07ec33a21f0dbcde8dcc92a937f491c95c166c3e559574da7fdb142",
+    "mapping.json": "8f9e7272b283535c42f1711d48c06c074d1f254c8b09645f5e8c847cf274dff8",
+    "connections.csv": "53b396fcae707546c803b6dc53ba2bf148636afb45a5a6adad05c9633dd3c214"
+  },
+  "parameters_sha256": "00ee5ceb54821fde1f1601d117bbee210cefa8a7d78044b5edccc2f7ff4f33c6",
+  "slurm_transient_job": 47905,
+  "slurm_benchmark_job": 47910,
+  "fresh_preparation_matches_executed_inputs": true,
+  "generator_sha256": {
+    "prepare_full.py": "2e110624430d75d10228cef30eea5a95ca116fc1c4cf4a74c60c31cad69fbdd0",
+    "build_vtk.py": "58f64d1380f57207e9e277ebbd95e95881b83e2865913090ca0dec86ae4ef763",
+    "recover_geometry.py": "28ccffd9f41fa4505da030e5e8b2b84a3d36de385e836257a2fb11fc782fb0f1"
+  }
+}

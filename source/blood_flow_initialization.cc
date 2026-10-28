@@ -19,6 +19,53 @@ namespace MetricFlowX
   /// @cond INTERNAL
   namespace
   {
+    // Invert only the positive-tangent branch connected to the reference
+    // state. The arterial law need not remain monotone at arbitrary dilation.
+    double
+    reference_branch_area(const WallLaw &wall,
+                          const double   pressure,
+                          const double   reference_area,
+                          const double   thickness)
+    {
+      AssertThrow(std::isfinite(pressure),
+                  ExcMessage("Nonfinite seed pressure."));
+      double lo = reference_area, hi = reference_area;
+      for (unsigned int step = 0;
+           wall.elastic(lo, reference_area, thickness).pressure > pressure;
+           ++step)
+        {
+          AssertThrow(step < 100,
+                      ExcMessage(
+                        "Cannot bracket the ADAVN seed area below reference."));
+          lo *= .8;
+        }
+      for (unsigned int step = 0;
+           wall.elastic(hi, reference_area, thickness).pressure < pressure;
+           ++step)
+        {
+          AssertThrow(
+            step < 100 &&
+              wall.elastic(hi, reference_area, thickness).first > 0.,
+            ExcMessage(
+              "Seed pressure is outside the supported ADAVN reference branch."));
+          hi *= 1.1;
+        }
+      AssertThrow(
+        wall.elastic(hi, reference_area, thickness).first > 0.,
+        ExcMessage(
+          "Seed bracket leaves the hyperbolic ADAVN reference branch."));
+      for (unsigned int iteration = 0; iteration < 64; ++iteration)
+        {
+          const double middle = .5 * (lo + hi);
+          if (wall.elastic(middle, reference_area, thickness).pressure <
+              pressure)
+            lo = middle;
+          else
+            hi = middle;
+        }
+      return .5 * (lo + hi);
+    }
+
     using Index = types::global_dof_index;
 
     void
@@ -161,10 +208,6 @@ namespace MetricFlowX
     VectorType  &state,
     const double t)
   {
-    AssertThrow(
-      wall_model == "Square root",
-      ExcMessage(
-        "Steady network reconstruction requires Wall model = Square root; ADAVN has no supported steady-network inverse."));
     TimerOutput::Scope timer(computing_timer, "initialize_steady_network");
     AssertThrow(
       outlet_type == "RCR",
@@ -204,17 +247,36 @@ namespace MetricFlowX
            tube_resistance(p0.distance(p1),
                            std::sqrt(area(edge, p0) / numbers::PI),
                            std::sqrt(area(edge, p1) / numbers::PI),
-                           viscosity,
+                           vessel_map.at(edge.vessel_id).dynamic_viscosity,
                            friction_profile)});
       }
-    inflow_function.set_time(t);
-    const double inflow = inflow_series.empty() ?
-                            inflow_function.value(Point<1>(0.)) :
-                            inflow_series.value(t);
+    const double                               inflow = prescribed_inflow(t);
+    std::map<types::boundary_id, unsigned int> boundary_node, compartment_node;
+    for (const auto &[node, bid] : initial_graph_boundaries_)
+      boundary_node.emplace(bid, node);
+    for (const auto &[bid, links] : terminal_links)
+      {
+        const auto  node = boundary_node.at(bid);
+        const auto &r    = rcr_map.at(bid);
+        if (r.R1 > 0.)
+          {
+            const auto pc_node = static_cast<unsigned int>(injections.size());
+            injections.push_back(0.);
+            compartment_node[bid] = pc_node;
+            edges.push_back({node, pc_node, r.R1});
+          }
+        else
+          compartment_node[bid] = node;
+      }
+    for (const auto &[bid, links] : terminal_links)
+      for (const auto &[other, resistance] : links)
+        if (bid < other)
+          edges.push_back(
+            {compartment_node.at(bid), compartment_node.at(other), resistance});
     for (const auto &[node, bid] : initial_graph_boundaries_)
       if (bid == 0)
         injections[node] += inflow;
-      else
+      else if (!terminal_links.count(bid))
         {
           AssertThrow(
             rcr_map.count(bid),
@@ -243,7 +305,7 @@ namespace MetricFlowX
       Utilities::MPI::broadcast(mpi_communicator_, graph.edge_flows, 0);
     state = 0.;
     std::vector<std::pair<Index, double>> values;
-    std::vector<Index>                    ldofs(fe_->n_dofs_per_cell());
+    std::vector<Index> ldofs(fe_collection_.max_dofs_per_cell());
     try
       {
         for (const auto &cell : dof_handler_.active_cell_iterators())
@@ -260,9 +322,12 @@ namespace MetricFlowX
               const double sign =
                 compute_directional_vector(cell) * tangent >= 0. ? 1. : -1.;
               const auto &v = vessel_map.at(edge.vessel_id);
+              ldofs.resize(cell->get_fe().n_dofs_per_cell());
               cell->get_dof_indices(ldofs);
               for (unsigned int i = 0; i < ldofs.size(); ++i)
                 {
+                  if (cell->get_fe().system_to_component_index(i).first == 4)
+                    continue;
                   const auto   point = support_point(cell, i);
                   const double x =
                     std::clamp(((point - p0) * tangent) / p0.distance(p1),
@@ -273,7 +338,7 @@ namespace MetricFlowX
                                             tube_resistance(p0.distance(p1) * x,
                                                             r0,
                                                             r0 + x * (r1 - r0),
-                                                            viscosity,
+                                                            v.dynamic_viscosity,
                                                             friction_profile) /
                                               edges[n].resistance;
                   const double pressure =
@@ -281,19 +346,25 @@ namespace MetricFlowX
                     fraction * (graph.pressures[edge.node1] -
                                 graph.pressures[edge.node0]);
                   const double ad = compute_a_d_at_point(cell, point);
-                  const double root =
-                    std::sqrt(ad) +
-                    ad / v.beta_p *
-                      (pressure - v.p0 - v.p_d -
-                       external_pressure(
-                         {t, point, edge.vessel_id, cell->id()}));
-                  AssertThrow(
-                    std::isfinite(root) && root > 0.,
-                    ExcMessage(
-                      "The graph pressure has no admissible positive-area tube-law inverse."));
-                  const double a = root * root;
-                  const auto   component =
-                    fe_->system_to_component_index(i).first;
+                  const double transmural =
+                    pressure -
+                    external_pressure({t, point, edge.vessel_id, cell->id()});
+                  double a;
+                  if (v.wall.type == WallLaw::Type::square_root)
+                    {
+                      const double root =
+                        std::sqrt(ad) +
+                        ad / v.beta_p * (transmural - v.p0 - v.p_d);
+                      AssertThrow(
+                        std::isfinite(root) && root > 0.,
+                        ExcMessage(
+                          "The graph pressure has no admissible positive-area tube-law inverse."));
+                      a = root * root;
+                    }
+                  else
+                    a = reference_branch_area(v.wall, transmural, ad, v.h_wall);
+                  const auto component =
+                    cell->get_fe().system_to_component_index(i).first;
                   values.emplace_back(ldofs[i],
                                       component == 0 || component == 2 ?
                                         a :
@@ -312,9 +383,16 @@ namespace MetricFlowX
       if (rcr_pc_dof.count(bid) &&
           locally_owned_dofs_.is_element(rcr_pc_dof.at(bid)))
         {
-          const auto  &r = rcr_map.at(bid);
-          const double q = (graph.pressures[node] - r.P_out) / (r.R1 + r.R2);
-          state(rcr_pc_dof.at(bid)) = r.P_out + r.R2 * q;
+          if (terminal_links.count(bid))
+            state(rcr_pc_dof.at(bid)) =
+              graph.pressures[compartment_node.at(bid)];
+          else
+            {
+              const auto  &r = rcr_map.at(bid);
+              const double q =
+                (graph.pressures[node] - r.P_out) / (r.R1 + r.R2);
+              state(rcr_pc_dof.at(bid)) = r.P_out + r.R2 * q;
+            }
         }
     state.compress(VectorOperation::insert);
   }
@@ -339,14 +417,18 @@ namespace MetricFlowX
       use_componentwise_tolerances ? make_absolute_tolerances() : make_state();
     reinit_state(initial_trace_weights_);
     initial_trace_weights_ = 0.;
-    std::vector<Index> ldofs(fe_->n_dofs_per_cell());
+    std::vector<Index> ldofs(fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
+          ldofs.resize(cell->get_fe().n_dofs_per_cell());
           cell->get_dof_indices(ldofs);
           for (unsigned int i = 0; i < ldofs.size(); ++i)
             {
-              const auto   component = fe_->system_to_component_index(i).first;
+              const auto component =
+                cell->get_fe().system_to_component_index(i).first;
+              if (component == 4)
+                continue;
               const double ad =
                 compute_a_d_at_point(cell, support_point(cell, i));
               scales(ldofs[i]) =
@@ -453,6 +535,9 @@ namespace MetricFlowX
                 invalid = 1;
             if (Utilities::MPI::max(invalid, mpi_communicator_) != 0)
               continue;
+            if (wall_model != "Square root" &&
+                !has_admissible_wall_states(trial))
+              continue;
             assemble_g(trial, g);
             double norm = 0.;
             invalid     = 0;
@@ -506,18 +591,22 @@ namespace MetricFlowX
     state_dot           = 0.;
     VectorType residual = make_state();
     assemble_residual(t, state, state_dot, residual);
-    std::vector<Index> ldofs(fe_->n_dofs_per_cell());
-    Vector<double> local(fe_->n_dofs_per_cell()), rate(fe_->n_dofs_per_cell());
+    std::vector<Index> ldofs(fe_collection_.max_dofs_per_cell());
+    Vector<double>     local(fe_collection_.max_dofs_per_cell()),
+      rate(fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
+          ldofs.resize(cell->get_fe().n_dofs_per_cell());
           cell->get_dof_indices(ldofs);
+          local.reinit(ldofs.size());
+          rate.reinit(ldofs.size());
           residual.extract_subvector_to(ldofs.begin(),
                                         ldofs.end(),
                                         local.begin());
           per_cell_mass_inv[cell->active_cell_index()].vmult(rate, local);
           for (unsigned int i = 0; i < ldofs.size(); ++i)
-            if (fe_->system_to_component_index(i).first < 2)
+            if (cell->get_fe().system_to_component_index(i).first < 2)
               state_dot(ldofs[i]) = -rate[i];
         }
     for (const auto &[bid, index] : rcr_pc_dof)
@@ -578,18 +667,22 @@ namespace MetricFlowX
     for (const auto i : trace_dofs_owned)
       algebraic =
         std::max(algebraic, std::abs(residual(i)) / initial_trace_weights_(i));
-    std::vector<Index> ldofs(fe_->n_dofs_per_cell());
-    Vector<double> local(fe_->n_dofs_per_cell()), rate(fe_->n_dofs_per_cell());
+    std::vector<Index> ldofs(fe_collection_.max_dofs_per_cell());
+    Vector<double>     local(fe_collection_.max_dofs_per_cell()),
+      rate(fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
+          ldofs.resize(cell->get_fe().n_dofs_per_cell());
           cell->get_dof_indices(ldofs);
+          local.reinit(ldofs.size());
+          rate.reinit(ldofs.size());
           residual.extract_subvector_to(ldofs.begin(),
                                         ldofs.end(),
                                         local.begin());
           per_cell_mass_inv[cell->active_cell_index()].vmult(rate, local);
           for (unsigned int i = 0; i < ldofs.size(); ++i)
-            if (fe_->system_to_component_index(i).first < 2)
+            if (cell->get_fe().system_to_component_index(i).first < 2)
               {
                 const double scaled =
                   horizon * std::abs(rate[i]) / weight(ldofs[i]);
@@ -666,14 +759,18 @@ namespace MetricFlowX
           (algebraic ? 1. : horizon);
         scales(i) = std::max(1., std::abs(double(state(i)))) / horizon;
       }
-    std::vector<Index> indices(fe_->n_dofs_per_cell());
+    std::vector<Index> indices(fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
+          indices.resize(cell->get_fe().n_dofs_per_cell());
           cell->get_dof_indices(indices);
           for (unsigned int j = 0; j < indices.size(); ++j)
             {
-              const auto   component = fe_->system_to_component_index(j).first;
+              const auto component =
+                cell->get_fe().system_to_component_index(j).first;
+              if (component == 4)
+                continue;
               const double ad =
                 compute_a_d_at_point(cell, support_point(cell, j));
               scales(indices[j]) =
@@ -788,19 +885,40 @@ namespace MetricFlowX
 #  ifdef DEAL_II_PETSC_WITH_MUMPS
             PETScWrappers::SparseDirectMUMPS solver(control);
             solver.solve(linear_system_matrix, update, rhs);
-#  elif defined(DEAL_II_WITH_UMFPACK)
-            AssertThrow(
-              n_mpi_processes == 1,
-              ExcMessage(
-                "Native viscoelastic parallel direct initialization requires PETSc with MUMPS; set Use direct solver = false."));
-            SerialDirectSolver solver;
-            solver.initialize(linear_system_matrix);
-            solver.vmult(update, rhs);
 #  else
-            AssertThrow(
-              false,
-              ExcMessage(
-                "Native viscoelastic direct initialization needs UMFPACK or MUMPS; set Use direct solver = false."));
+#    if defined(DEAL_II_WITH_MUMPS) && DEAL_II_VERSION_GTE(9, 7, 0)
+            if (n_mpi_processes > 1)
+              {
+                AssertThrow(
+                  Utilities::MPI::min(
+                    locally_owned_dofs_.n_elements(),
+                    linear_system_matrix.get_mpi_communicator()) > 0,
+                  ExcMessage(
+                    "Native deal.II MUMPS requires an owned DoF on every rank. Use fewer MPI ranks, PETSc MUMPS, or Use direct solver = false."));
+                SparseDirectMUMPS solver(
+                  SparseDirectMUMPS::AdditionalData(),
+                  linear_system_matrix.get_mpi_communicator());
+                solver.initialize(linear_system_matrix);
+                solver.vmult(update, rhs);
+              }
+            else
+#    endif
+              {
+#    ifdef DEAL_II_WITH_UMFPACK
+                AssertThrow(
+                  n_mpi_processes == 1,
+                  ExcMessage(
+                    "Native viscoelastic parallel direct initialization requires native deal.II MUMPS or PETSc with MUMPS; set Use direct solver = false."));
+                SerialDirectSolver solver;
+                solver.initialize(linear_system_matrix);
+                solver.vmult(update, rhs);
+#    else
+              AssertThrow(
+                false,
+                ExcMessage(
+                  "Native viscoelastic direct initialization needs UMFPACK or MUMPS; set Use direct solver = false."));
+#    endif
+              }
 #  endif
 #else
             TrilinosWrappers::SolverDirect solver(control);
@@ -842,10 +960,14 @@ namespace MetricFlowX
             for (const auto &cell : dof_handler_.active_cell_iterators())
               if (cell->is_locally_owned())
                 {
+                  indices.resize(cell->get_fe().n_dofs_per_cell());
                   cell->get_dof_indices(indices);
                   const auto &vp = vessel_map.at(cell->material_id());
                   for (unsigned int j = 0; j < indices.size(); ++j)
-                    if (fe_->system_to_component_index(j).first % 2 == 0)
+                    if ((cell->get_fe().system_to_component_index(j).first ==
+                           0 ||
+                         cell->get_fe().system_to_component_index(j).first ==
+                           2))
                       {
                         const double area = trial(indices[j]);
                         if (!std::isfinite(area) || area <= 0.)

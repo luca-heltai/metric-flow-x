@@ -20,12 +20,16 @@
 
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_interface_values.h>
+#include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/fe_values_extractors.h>
 
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria.h>
+
+#include <deal.II/hp/fe_collection.h>
+#include <deal.II/hp/fe_values.h>
 
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
@@ -135,7 +139,25 @@ namespace MetricFlowX
       using SparseMatrix    = dealii::PETScWrappers::MPI::SparseMatrix;
       using PreconditionILU = dealii::PETScWrappers::PreconditionILU;
     } // namespace MPI
-    using SolverGMRES = dealii::PETScWrappers::SolverGMRES;
+    class SolverGMRES : public dealii::PETScWrappers::SolverGMRES
+    {
+    public:
+      using dealii::PETScWrappers::SolverGMRES::SolverGMRES;
+
+    protected:
+      void
+      set_solver_type(KSP &ksp) const override
+      {
+        dealii::PETScWrappers::SolverGMRES::set_solver_type(ksp);
+        // Classical Gram-Schmidt can lose orthogonality on the scaled DAE
+        // systems. PETSc options are applied after these defaults.
+        const auto error = KSPGMRESSetOrthogonalization(
+          ksp, KSPGMRESModifiedGramSchmidtOrthogonalization);
+        AssertThrow(error == 0,
+                    dealii::ExcMessage("PETSc GMRES setup error " +
+                                       std::to_string(error)));
+      }
+    };
 #elif defined(DEAL_II_WITH_TRILINOS)
     namespace MPI
     {
@@ -143,7 +165,7 @@ namespace MetricFlowX
       using SparseMatrix    = dealii::TrilinosWrappers::SparseMatrix;
       using PreconditionILU = dealii::TrilinosWrappers::PreconditionILU;
     } // namespace MPI
-    using SolverGMRES = dealii::SolverGMRES<MPI::Vector>;
+    using SolverGMRES             = dealii::SolverGMRES<MPI::Vector>;
 #else
 #  error DEAL_II_WITH_PETSC or DEAL_II_WITH_TRILINOS required
 #endif
@@ -159,8 +181,7 @@ namespace MetricFlowX
   //
   // Every unknown of the system is a DoF of `dof_handler_` (components 0,1
   // carry the cell values A, U; components 2,3 carry the face traces A_hat,
-  // U_hat), with the sole exception of the RCR capacitor pressures, which
-  // occupy the index range appended after dof_handler_.n_dofs().  Ownership of
+  // U_hat; component 4 carries RCR capacitor pressures). Ownership of
   // an unknown is consequently the ownership of the cell that carries it, as
   // determined by the Triangulation partitioning, and this class defines no
   // second ownership rule.
@@ -290,7 +311,8 @@ namespace MetricFlowX
       area,
       velocity,
       area_trace,
-      velocity_trace
+      velocity_trace,
+      capacitor_pressure
     };
 
     /** Context passed to the externally supplied pressure provider.
@@ -331,16 +353,17 @@ namespace MetricFlowX
 
     struct VesselProperties
     {
-      double  a0     = 0.0;
-      double  r_d    = 0.0;
-      double  a_d    = 0.0;
-      double  E      = 0.0;
-      double  h_wall = 0.0;
-      double  p_d    = 0.0;
-      double  p0     = 0.0;
-      double  L      = 0.0;
-      double  r_in   = 0.0;
-      double  r_out  = 0.0;
+      double  a0                = 0.0;
+      double  r_d               = 0.0;
+      double  a_d               = 0.0;
+      double  E                 = 0.0;
+      double  h_wall            = 0.0;
+      double  p_d               = 0.0;
+      double  p0                = 0.0;
+      double  L                 = 0.0;
+      double  r_in              = 0.0;
+      double  r_out             = 0.0;
+      double  dynamic_viscosity = 0.0; // Pa s; optional per-vessel VTK value
       WallLaw wall;
     };
 
@@ -376,6 +399,13 @@ namespace MetricFlowX
      */
     std::map<unsigned int, double>
     maximum_mach_numbers(const VectorType &state);
+
+    /** Collective domain check for a trial state before IDA assembly.
+     * Rejects nonfinite unknowns, nonpositive areas and non-hyperbolic ADAVN
+     * states at cell quadrature points and both cell/trace face states.
+     */
+    bool
+    has_admissible_wall_states(const VectorType &state) const;
 
     void
     report_flow_regime(const VectorType &state, const double t);
@@ -423,6 +453,8 @@ namespace MetricFlowX
     const DoFHandler<dim, spacedim> &
     dof_handler() const;
 
+    /** The interior element. For cell-local sizes and shape functions use
+     * cell->get_fe(), which includes the capacitor on terminal cells. */
     const FiniteElement<dim, spacedim> &
     finite_element() const;
 
@@ -783,6 +815,7 @@ namespace MetricFlowX
 
     std::string terminal_parameter_source = "VTK";
     std::string terminal_parameters_csv_file;
+    std::string terminal_connections_csv_file;
     double      default_terminal_r1    = 0.0;
     double      default_terminal_r2    = 1e8;
     double      default_terminal_c     = 0.0;
@@ -844,7 +877,7 @@ namespace MetricFlowX
     // numbering of the file and read on the group masters only.
     Vector<double> cell_vessel_ids, cell_a0, cell_r_d, cell_a_d, cell_E;
     Vector<double> cell_h_wall, cell_p_d, cell_p0, cell_L;
-    Vector<double> cell_r_in, cell_r_out;
+    Vector<double> cell_r_in, cell_r_out, cell_viscosity;
     Vector<double> point_boundary_id, point_R1, point_R2, point_C, point_P_out;
 
     // Fill vessel_map, rcr_map, terminal_boundary_ids and vessel_s_bounds so
@@ -852,29 +885,34 @@ namespace MetricFlowX
     void
     build_global_vessel_data();
 
+    void
+    partition_vessels(Triangulation<dim, spacedim> &mesh) const;
+
+#ifdef DEAL_II_WITH_METIS
+    std::string mesh_partitioning = "graph";
+#else
+    std::string mesh_partitioning = "zorder";
+#endif
+    unsigned int partition_junction_weight = 4;
+    unsigned int partition_terminal_weight = 1;
+    double       partition_imbalance       = 0.03;
+
+
     // -----------------------------------------------------------------------
     // Mesh and FE space
     //
-    //   FESystem( FE_DGQ(fe_degree), 2,   -> components 0,1 : cell  A, U
-    //             FE_DGQ(1),        2 )   -> components 2,3 : trace A_hat,
-    //             U_hat
-    //
-    // Solution vector layout: [ FE range | capacitor pressures ], the FE range
-    // being numbered by dof_handler_ and the capacitor block occupying the
-    // n_rcr_dofs indices starting at dof_handler_.n_dofs().
+    // Components 0,1: cell A,U; components 2,3: face traces A_hat,U_hat.
+    // Component 4: DG0 capacitor pressure on RCR terminal cells, FE_Nothing
+    // elsewhere. All state and matrix indices are native DoFHandler indices.
     // -----------------------------------------------------------------------
     parallel::fullydistributed::Triangulation<dim, spacedim> triangulation_;
     DoFHandler<dim, spacedim>                                dof_handler_;
-    std::unique_ptr<FiniteElement<dim, spacedim>>            fe_;
+    dealii::hp::FECollection<dim, spacedim>                  fe_collection_;
 
     types::global_dof_index n_total_dofs = 0;
 
     // -----------------------------------------------------------------------
     // Index sets
-    //
-    // The *_fe_dofs sets span the FE range only, sized dof_handler_.n_dofs(),
-    // as required by FEValues::get_function_values().  The unqualified sets
-    // span the full system, sized n_total_dofs.
     //
     // cell_dofs_owned and trace_dofs_owned come from DoFTools::extract_dofs()
     // with a ComponentMask, and hence identify the differential and the
@@ -882,14 +920,12 @@ namespace MetricFlowX
     // -----------------------------------------------------------------------
     IndexSet locally_owned_dofs_;
     IndexSet locally_relevant_dofs_;
-    IndexSet locally_owned_fe_dofs;
-    IndexSet locally_relevant_fe_dofs;
     IndexSet cell_dofs_owned;  // components 0,1 : differential rows
     IndexSet trace_dofs_owned; // components 2,3 : algebraic rows
     IndexSet rcr_dofs_owned;   // capacitor rows owned by this rank
     IndexSet differential_dofs_;
     IndexSet algebraic_dofs_;
-    std::array<IndexSet, 4> component_dofs_;
+    std::array<IndexSet, 5> component_dofs_;
 
     // -----------------------------------------------------------------------
     // Trace continuity
@@ -922,10 +958,11 @@ namespace MetricFlowX
     {
       types::global_dof_index a = numbers::invalid_dof_index;
       types::global_dof_index u = numbers::invalid_dof_index;
-      for (unsigned int i = 0; i < fe_->n_dofs_per_cell(); ++i)
+      for (unsigned int i = 0; i < fe_collection_[0].n_dofs_per_cell(); ++i)
         {
-          const unsigned int c = fe_->system_to_component_index(i).first;
-          if ((c == 2 || c == 3) && fe_->has_support_on_face(i, f))
+          const unsigned int c =
+            fe_collection_[0].system_to_component_index(i).first;
+          if ((c == 2 || c == 3) && fe_collection_[0].has_support_on_face(i, f))
             (c == 2 ? a : u) = ldofs[i];
         }
       return {a, u};
@@ -935,10 +972,8 @@ namespace MetricFlowX
     // Capacitor pressures as differential DAE unknowns, one per RCR terminal
     // with C > 0.
     //
-    // The terminal boundary ids are global data, so every rank enumerates the
-    // capacitor block identically.  A given Pc index is owned by the rank
-    // owning the unique cell holding that terminal face, so its row is always
-    // assembled locally.
+    // The boundary-id map identifies component-4 DoFs for terminal closures
+    // and distant resistor links. Ownership is inherited from DoFHandler.
     // -----------------------------------------------------------------------
     std::map<types::boundary_id, types::global_dof_index> rcr_pc_dof;
     types::global_dof_index                               n_rcr_dofs = 0;
@@ -949,7 +984,48 @@ namespace MetricFlowX
     void
     assemble_rcr_capacitor_equations(const VectorType &y,
                                      const VectorType &ydot,
-                                     VectorType       &F);
+                                     VectorType       &F,
+                                     const double      t);
+
+    // A resistor graph between terminal compartments. A terminal with C>0
+    // exposes Pc; a terminal with C=0 exposes its physical trace pressure.
+    // The CSV supplies one undirected edge per pair, in Pa s/m^3.
+    std::map<types::boundary_id,
+             std::vector<std::pair<types::boundary_id, double>>>
+      terminal_links;
+
+    struct TerminalPort
+    {
+      types::global_dof_index area, velocity;
+      unsigned int            vessel;
+      double                  reference_area;
+      int                     outward_sign;
+      Point<spacedim>         point;
+      CellId                  cell_id;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &area &velocity &vessel &reference_area &outward_sign &point
+          &cell_id;
+      }
+    };
+    std::map<types::boundary_id, TerminalPort> terminal_ports;
+
+    void
+    setup_terminal_connections();
+    void
+    build_terminal_connection_sparsity(DynamicSparsityPattern &dsp);
+    types::global_dof_index
+    terminal_pressure_dof(types::boundary_id bid) const;
+    double
+    terminal_pressure_derivative(types::boundary_id bid,
+                                 const VectorType  &y) const;
+    double
+    terminal_pressure(types::boundary_id bid,
+                      const VectorType  &y,
+                      double             t) const;
 
     void
     assemble_jacobian_rcr_capacitor_block(const VectorType &y);
@@ -1015,7 +1091,8 @@ namespace MetricFlowX
     {
       if (!viscoelastic_wall)
         return 0.;
-      std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
+      std::vector<types::global_dof_index> indices(
+        cell->get_fe().n_dofs_per_cell());
       cell->get_dof_indices(indices);
       const auto delta = cell->vertex(1) - cell->vertex(0);
       Point<dim> xi;
@@ -1025,9 +1102,9 @@ namespace MetricFlowX
                    1.);
       double area = 0., rate = 0.;
       for (unsigned int i = 0; i < indices.size(); ++i)
-        if (fe_->system_to_component_index(i).first == 0)
+        if (cell->get_fe().system_to_component_index(i).first == 0)
           {
-            const double phi = fe_->shape_value(i, xi);
+            const double phi = cell->get_fe().shape_value(i, xi);
             area += phi * y(indices[i]);
             rate += phi * ydot(indices[i]);
           }
@@ -1141,22 +1218,10 @@ namespace MetricFlowX
     VectorType theoretical_peak;
 
     // -----------------------------------------------------------------------
-    // Ghosted read vectors.
-    //
-    // All assembly reads go through these and all assembly writes go to a
-    // non-ghosted vector followed by compress(), which is the only
-    // communication in the whole assembly.
-    //
-    //   y_relevant    : full system, for direct y[dof] reads of trace and
-    //                   capacitor unknowns.
-    //   y_fe_relevant : FE range only, as required by
-    //                   FEValues::get_function_values(), which asserts that the
-    //                   vector has size dof_handler_.n_dofs().
-    //   y_fe_owned    : scratch used to build y_fe_relevant.
+    // The state uses the DoFHandler numbering, including terminal pressures.
+    // Import both the geometric ghost layer and distant terminal-link values.
     // -----------------------------------------------------------------------
     mutable VectorType y_relevant;
-    mutable VectorType y_fe_relevant;
-    mutable VectorType y_fe_owned;
     mutable VectorType residual_F;
 
     void
@@ -1196,6 +1261,9 @@ namespace MetricFlowX
 
     SUNDIALS::IDA<VectorType>::AdditionalData ida_parameters;
 
+    double
+    prescribed_inflow(double t);
+
     ParsedTools::Function<spacedim> rhs_function;
     ParsedTools::Function<spacedim> exact_solution;
     ParsedTools::Function<1>        inflow_function;
@@ -1213,12 +1281,13 @@ namespace MetricFlowX
     std::ofstream csv_terminal;
 
     // -----------------------------------------------------------------------
-    // CSV time-series output, one file per vessel.
-    //
-    // A probe is opened only on the rank owning the probed cell, so each file
-    // is written by exactly one rank and no output is duplicated.
+    // Midpoint probes are evaluated by their unique owning ranks and gathered
+    // into one ordered CSV on rank zero. An empty filename disables probes;
+    // an empty ID list selects all vessels.
     // -----------------------------------------------------------------------
-    std::map<unsigned int, std::ofstream> csv_vessel;
+    std::ofstream             csv_vessel;
+    std::string               output_vessel_csv_file = "vessel_probes.csv";
+    std::vector<unsigned int> vessel_probe_ids;
     // (vessel id, cell containing the vessel's arc-length midpoint, reference
     // coordinate of the midpoint inside that cell).
     std::vector<
@@ -1370,7 +1439,7 @@ namespace MetricFlowX
       const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
       const unsigned int                                              i) const
     {
-      const double xi = fe_->unit_support_point(i)[0];
+      const double xi = cell->get_fe().unit_support_point(i)[0];
       return cell->vertex(0) + xi * (cell->vertex(1) - cell->vertex(0));
     }
 

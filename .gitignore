@@ -67,6 +67,8 @@ doc/api/
 
 # Generated ADAN inputs, source caches and Python bytecode
 /build/
+/build-gpu*/
+/last_used_parameters.prm
 __pycache__/
 
 # Downloaded hepatic images, masks, meshes and generated line networks

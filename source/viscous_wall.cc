@@ -28,7 +28,9 @@ namespace MetricFlowX
                          const Point<spacedim>        &point) {
       if (!locally_owned_dofs_.is_element(row))
         return;
-      std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
+      std::vector<types::global_dof_index> indices(
+        fe_collection_.max_dofs_per_cell());
+      indices.resize(cell->get_fe().n_dofs_per_cell());
       cell->get_dof_indices(indices);
       Point<dim> xi;
       const auto delta = cell->vertex(1) - cell->vertex(0);
@@ -38,9 +40,9 @@ namespace MetricFlowX
                    1.);
       double area = 0., area_rate = 0.;
       for (unsigned int j = 0; j < indices.size(); ++j)
-        if (fe_->system_to_component_index(j).first == 0)
+        if (cell->get_fe().system_to_component_index(j).first == 0)
           {
-            const double phi = fe_->shape_value(j, xi);
+            const double phi = cell->get_fe().shape_value(j, xi);
             area += y_relevant(indices[j]) * phi;
             area_rate += rate(indices[j]) * phi;
           }
@@ -53,29 +55,32 @@ namespace MetricFlowX
         (*residual)(row) += weight * nu * area_rate;
       if (matrix)
         for (unsigned int j = 0; j < indices.size(); ++j)
-          if (fe_->system_to_component_index(j).first == 0)
+          if (cell->get_fe().system_to_component_index(j).first == 0)
             matrix->add(row,
                         indices[j],
-                        weight * fe_->shape_value(j, xi) *
+                        weight * cell->get_fe().shape_value(j, xi) *
                           (derivative ? nu : -.5 * nu / area * area_rate));
     };
-    const QGauss<dim>                    quadrature(fe_->tensor_degree() + 1);
-    FEValues<dim, spacedim>              values(*fe_,
-                                   quadrature,
-                                   update_values | update_gradients |
-                                     update_quadrature_points |
-                                     update_JxW_values);
-    const FEValuesExtractors::Scalar     velocity(1);
-    std::vector<types::global_dof_index> indices(fe_->n_dofs_per_cell());
+    const QGauss<dim>                quadrature(std::max(fe_degree, 1u) + 1);
+    hp::FEValues<dim, spacedim>      hp_values(fe_collection_,
+                                          hp::QCollection<dim>(quadrature),
+                                          update_values | update_gradients |
+                                            update_quadrature_points |
+                                            update_JxW_values);
+    const FEValuesExtractors::Scalar velocity(1);
+    std::vector<types::global_dof_index> indices(
+      fe_collection_.max_dofs_per_cell());
     for (const auto &cell : dof_handler_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
+          indices.resize(cell->get_fe().n_dofs_per_cell());
           cell->get_dof_indices(indices);
-          values.reinit(cell);
-          const auto tangent = compute_directional_vector(cell);
+          hp_values.reinit(cell);
+          const auto &values  = hp_values.get_present_fe_values();
+          const auto  tangent = compute_directional_vector(cell);
           for (unsigned int q = 0; q < quadrature.size(); ++q)
             for (unsigned int i = 0; i < indices.size(); ++i)
-              if (fe_->system_to_component_index(i).first == 1)
+              if (cell->get_fe().system_to_component_index(i).first == 1)
                 add(indices[i],
                     -values.JxW(q) *
                       (tangent * values[velocity].gradient(i, q)) / density,
@@ -90,10 +95,10 @@ namespace MetricFlowX
                                    !is_junction_face(cell->id(), face);
               const double normal = face == 0 ? -1. : 1.;
               for (unsigned int i = 0; i < indices.size(); ++i)
-                if (fe_->system_to_component_index(i).first == 1)
+                if (cell->get_fe().system_to_component_index(i).first == 1)
                   {
                     const double weight =
-                      normal * fe_->shape_value(i, xi) / density;
+                      normal * cell->get_fe().shape_value(i, xi) / density;
                     add(indices[i],
                         central ? .5 * weight : weight,
                         cell,
@@ -115,6 +120,7 @@ namespace MetricFlowX
       for (unsigned int i = 1; i < junction.n_vessels(); ++i)
         {
           const auto &row_half = junction.half_faces[i - 1];
+          indices.resize(row_half.cell->get_fe().n_dofs_per_cell());
           row_half.cell->get_dof_indices(indices);
           const auto trace = face_trace_dofs(indices, row_half.face_no);
           add(trace.second,

@@ -64,12 +64,13 @@ test()
       if (cell->is_locally_owned())
         {
           std::vector<types::global_dof_index> indices(
-            p.fe_->n_dofs_per_cell());
+            p.fe_collection_.max_dofs_per_cell());
+          indices.resize(cell->get_fe().n_dofs_per_cell());
           cell->get_dof_indices(indices);
           for (unsigned int k = 0; k < indices.size(); ++k)
             {
               const auto i = indices[k];
-              if (p.fe_->system_to_component_index(k).first % 2 == 0)
+              if (cell->get_fe().system_to_component_index(k).first % 2 == 0)
                 p.solution(i) =
                   p.solution(i) * (1. + .03 * std::cos(double(i)));
               else
@@ -87,10 +88,11 @@ test()
       if (cell->is_locally_owned())
         {
           std::vector<types::global_dof_index> indices(
-            p.fe_->n_dofs_per_cell());
+            p.fe_collection_.max_dofs_per_cell());
+          indices.resize(cell->get_fe().n_dofs_per_cell());
           cell->get_dof_indices(indices);
           for (unsigned int k = 0; k < indices.size(); ++k)
-            if (p.fe_->system_to_component_index(k).first == 0)
+            if (cell->get_fe().system_to_component_index(k).first == 0)
               {
                 const auto   i     = indices[k];
                 const auto   point = p.support_point(cell, k);

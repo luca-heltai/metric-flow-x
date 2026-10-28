@@ -12,7 +12,7 @@ import tempfile
 
 def validate(executable, source_dir, destination):
     destination.mkdir(parents=True, exist_ok=True)
-    template = (source_dir / "parameters/constant.prm.in").read_text().replace("@SOURCE_DIR@", str(source_dir))
+    template = (source_dir / "tests/parameters/constant.prm.in").read_text().replace("@SOURCE_DIR@", str(source_dir))
     cases = ((0., 10., .01, .05), (0., .4, .03, .07), (.17, .37, .03, .05))
     environment = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
     for number, (initial, final, period, cadence) in enumerate(cases):

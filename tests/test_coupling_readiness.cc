@@ -63,7 +63,7 @@ test()
 
   AssertThrow(flow.triangulation().n_active_cells() > 0, ExcInternalError());
   AssertThrow(flow.dof_handler().n_dofs() > 0, ExcInternalError());
-  AssertThrow(flow.finite_element().n_components() == 4, ExcInternalError());
+  AssertThrow(flow.finite_element().n_components() == 5, ExcInternalError());
   AssertThrow(flow.differential_dofs().n_elements() > 0, ExcInternalError());
   AssertThrow(flow.algebraic_dofs().n_elements() > 0, ExcInternalError());
   AssertThrow(flow.component_dofs(BloodFlowSystem<1, 3>::Component::area)

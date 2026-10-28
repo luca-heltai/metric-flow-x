@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dataset and manufactured-source test dependencies
-        run: python3 -m pip install numpy sympy
+        run: python3 -m pip install numpy scipy sympy
       - name: Test hepatic segmentation imports
         run: |
           python3 -m pip install -r tools/hepatic/requirements.txt
@@ -22,6 +22,8 @@ jobs:
           python3 -m unittest discover -s tests -p test_svv_boundary_ids.py -v
       - name: Test complete ADAN reconstruction
         run: python3 -m unittest discover -s tests -p test_adan_complete.py -v
+      - name: Test full arterial-venous ADAVN model and cycle analysis
+        run: python3 -m unittest discover -s tests -p 'test_adavn*.py' -v
       - name: Test ADAN56 reference areas
         run: python3 -m unittest discover -s tests -p test_adan56_areas.py -v
       - name: Check file and directory naming
@@ -51,6 +53,11 @@ jobs:
     container:
       image: dealii/dealii:v9.7.1-noble
       options: --user root
+    env:
+      # Native CTest MPI variants run inside this disposable root container.
+      OMPI_ALLOW_RUN_AS_ROOT: "1"
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
+      OMPI_MCA_rmaps_base_oversubscribe: "1"
 
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +65,7 @@ jobs:
         run: |
           cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DMETRIC_FLOW_X_BACKEND=${{ matrix.backend }}
           cmake --build build -j 2
+          cmake --build build --target adavn_mean_flow -j 2
           ctest --test-dir build -N
           ctest --test-dir build --no-tests=error --output-on-failure
           python3 tests/test_inflow_integration.py --executable build/blood_flow --mpi

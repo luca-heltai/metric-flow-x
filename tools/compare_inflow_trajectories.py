@@ -148,6 +148,8 @@ def read_parameters(case):
         terminal_enabled = values.pop(old_key).lower() == "true"
     for key in CSV_DEFAULTS:
         values.pop((flow, f"Output {key} CSV file"), None)
+    values.pop((flow, "Output vessel CSV file"), None)
+    values.pop((flow, "Vessel probe IDs"), None)
     if terminal_enabled is False:
         raise ValueError("Terminal CSV output is disabled")
     if values[(flow, "Use componentwise absolute tolerances")].lower() != "false":
@@ -221,8 +223,49 @@ def read_terminal_csv(path):
     return fields, rows
 
 
+def vessel_csv_path(directory, require_existing=False):
+    receipt = directory.parent / "last_used_parameters.prm"
+    if receipt.is_file():
+        values = parameter_values(receipt)
+        key = ("MetricFlowSystem<1, 3>", "Output vessel CSV file")
+        if key in values:
+            path = directory / values[key] if values[key] else None
+            if require_existing and path is not None and not path.is_file():
+                raise ValueError("Configured vessel CSV is missing: " + str(path))
+            return path
+    return directory / "vessel_probes.csv"
+
+
+def read_vessel_csv(path):
+    fields, rows = read_csv_data(path)
+    if fields != ["time_s", "vessel_id", "pressure_Pa", "flow_m3_s", "area_m2", "velocity_m_s"]:
+        raise ValueError("Unsupported consolidated vessel schema")
+    keys = [(float(row["time_s"]), float(row["vessel_id"])) for row in rows]
+    if any(vid < 0 or not vid.is_integer() for _, vid in keys) or keys != sorted(set(keys)):
+        raise ValueError("Duplicate, invalid or unordered consolidated vessel rows")
+    return fields, rows
+
+
 def read_csv(path):
     # Resolve historical logical tables from the configured consolidated file.
+    if path.stem.startswith("HDG_IDA_Vessel_"):
+        vid = path.stem.removeprefix("HDG_IDA_Vessel_")
+        consolidated_vessels = vessel_csv_path(path.parent)
+        if consolidated_vessels is None:
+            raise ValueError("Required vessel CSV output is disabled")
+        if vid.isdecimal() and consolidated_vessels.exists():
+            _, rows = read_vessel_csv(consolidated_vessels)
+            _, metadata = read_csv(path.parent/"network_terminals.csv")
+            labels = {f"boundary_{int(row['boundary_id'])}_label": row["label"]
+                      for row in metadata if int(row["vessel_id"]) == int(vid)}
+            fields = ["time_s", "P_dynpcm2", "Q_cm3ps", "A_cm2", "U_cmps", *labels]
+            converted = [dict(time_s=row["time_s"],
+                              P_dynpcm2=str(float(row["pressure_Pa"])*10),
+                              Q_cm3ps=str(float(row["flow_m3_s"])*1e6),
+                              A_cm2=str(float(row["area_m2"])*1e4),
+                              U_cmps=str(float(row["velocity_m_s"])*1e2), **labels)
+                         for row in rows if int(row["vessel_id"]) == int(vid)]
+            return fields, converted
     boundary = path.stem.removeprefix("terminal_")
     consolidated = terminal_csv_path(path.parent)
     if path.name.startswith("terminal_") and boundary.isdecimal() and consolidated and consolidated.exists():
@@ -250,6 +293,14 @@ def csv_output_files(directory):
             raise ValueError("Mixed consolidated and per-terminal CSV output")
         _, rows = read_terminal_csv(consolidated)
         files.update(f"terminal_{int(row['boundary_id'])}.csv" for row in rows)
+    vessels = vessel_csv_path(directory, require_existing=True)
+    if vessels and vessels.exists():
+        if vessels.parent.resolve() == directory.resolve():
+            files.discard(vessels.name)
+        if any(name.startswith("HDG_IDA_Vessel_") for name in files):
+            raise ValueError("Mixed consolidated and per-vessel CSV output")
+        _, rows = read_vessel_csv(vessels)
+        files.update(f"HDG_IDA_Vessel_{int(row['vessel_id'])}.csv" for row in rows)
     for canonical, actual in configured_csv_paths(directory).items():
         files.discard(canonical)
         if actual is not None and actual.is_file():
@@ -264,6 +315,9 @@ def physical_csv_files(directory):
     consolidated = terminal_csv_path(directory)
     if consolidated and consolidated.exists():
         files.add(consolidated)
+    vessels = vessel_csv_path(directory)
+    if vessels and vessels.exists():
+        files.add(vessels)
     for canonical, actual in configured_csv_paths(directory).items():
         files.discard(directory / canonical)
         if actual is not None and actual.is_file():

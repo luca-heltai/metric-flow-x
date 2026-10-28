@@ -123,15 +123,15 @@ end
                 assert abs(flux + q) < 1e-12, flux
             else:
                 assert abs(pressure - (1000. + 1.1e8 * flux)) < 1e-3
-        vessel = rows(output / "HDG_IDA_Vessel_0.csv")
+        vessel = rows(output / "vessel_probes.csv")
         assert len(vessel) == 1 and float(vessel[0]["time_s"]) == .17
-        for key in ("P_dynpcm2", "Q_cm3ps", "A_cm2", "U_cmps"):
+        for key in ("pressure_Pa", "flow_m3_s", "area_m2", "velocity_m_s"):
             assert math.isfinite(float(vessel[0][key]))
-        assert float(vessel[0]["A_cm2"]) > 0.
+        assert float(vessel[0]["area_m2"]) > 0.
         if mode == "steady network":
-            assert abs(float(vessel[0]["P_dynpcm2"]) / 10. -
+            assert abs(float(vessel[0]["pressure_Pa"]) -
                        (outlet_pressure + .5 * resistance * q)) < 1e-6
-            assert abs(float(vessel[0]["Q_cm3ps"]) * 1e-6 - q) < 1e-16
+            assert abs(float(vessel[0]["flow_m3_s"]) - q) < 1e-16
             assert not (output / "stationary_statistics.json").exists()
         else:
             stats = json.loads((output / "stationary_statistics.json").read_text())
