@@ -120,7 +120,22 @@ possible, but the prepared receipt is not updated by that separate invocation.
 | `mesh` | `mesh37-r0` through `mesh37-r3` | 37 segments; p3; refinements 0–3 |
 | `time` | `time37-r1-bdf1` through `time37-r2-bdf5` | p3; refinements 1,2; maximum BDF order 1–5 |
 | `applications` | `liver`, `cerebral` | 7999 and 19999 segments; p2; final time 2 s |
-| `scaling` | `network50k-np4` through `network100k-np12` | 50001/100001 segments; p3; 4,6,8,10,12 MPI ranks |
+| `fields` | `network50k-output`, `network100k-output` | Same large networks with solution output, 4 MPI ranks |
+| `scaling` | `network50k-np1` through `network100k-np64` | 50001/100001 segments; p3; 1,2,4,8,16,32,64 MPI ranks; no solution output |
+
+The runner accepts `--machine gpu04` (or `lnx`) and records the actual hostname,
+hardware, thread limits, executable hash and source revision in every `run.json`.
+Set `--executable-revision "$(git rev-parse HEAD)"` only for a binary built from
+that revision; `--build-provenance FILE` additionally verifies its SHA256 and
+revision against a build receipt. `--mpi-arg=--option` adds launcher options,
+including for a single rank. `process_wall_seconds` includes MPI startup, setup
+and final reporting; use solver statistics for solve timings.
+
+To restrict the scaling sweep to the physical cores available on a smaller
+machine, use `--suite scaling --ranks 1 2 4 8 16`. This selects canonical
+experiments without changing their process counts or numerical settings.
+Set `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`,
+`BLIS_NUM_THREADS` and `DEAL_II_NUM_THREADS` to `1` for timing runs.
 
 Run an entire supported suite sequentially, stopping on the first solver failure:
 
@@ -129,7 +144,7 @@ python3 scripts/reproduce_paper.py --suite benchmarks \
   --executable /path/to/build/blood_flow --output-root /path/to/benchmark-runs
 ```
 
-`--suite all --prepare-only` prepares all 43 configurations. `--suite all`
+`--suite all --prepare-only` prepares all 49 configurations. `--suite all`
 executes the full matrix, including the costly scaling cases. MMS execution
 requires a build containing the manufactured Dirichlet boundary support:
 

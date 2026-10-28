@@ -22,6 +22,13 @@ subsection MetricFlowSystem<1, 3>
   set Numerical flux type                  = HLL
   set Outlet boundary condition type       = RCR
   set Output directory                     = @OUTPUT_DIR@
+  set Write solution output = true
+  set Output terminal CSV file =
+  set Output network terminals CSV file = network_terminals.csv
+  set Output mass conservation CSV file = mass_conservation.csv
+  set Output IDA step history CSV file = ida_step_history.csv
+  set Output IDA internal steps CSV file = ida_internal_steps.csv
+  set Output flow regime CSV file = flow_regime.csv
   set Output filename                      = solution
   set Problem constants                    = 1.0
   set Theta Boundary (stability parameter) = 1

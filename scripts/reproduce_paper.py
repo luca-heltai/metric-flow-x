@@ -15,10 +15,27 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "reproducibility/manifest.json"
+
+
+def machine_info() -> dict:
+    """Record the execution host, independently of the chosen paper profile."""
+    info = {"hostname": platform.node(), "platform": platform.platform(),
+            "logical_cpus": os.cpu_count()}
+    for name, command in (("lscpu", ["lscpu", "--json"]),):
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            info[name] = json.loads(result.stdout)
+        except (OSError, subprocess.CalledProcessError, ValueError):
+            info[name] = None
+    memory = Path('/proc/meminfo')
+    if memory.is_file():
+        info['memory_total_kib'] = int(re.search(r'MemTotal:\s+(\d+)', memory.read_text())[1])
+    return info
 
 
 def sha256(path: Path) -> str:
@@ -112,17 +129,24 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
     mpi = args.mpi if args.mpi is not None else case["mpi"]
     command = []
     executable = None
+    build_provenance = None
     if not args.prepare_only:
         if args.runtime == "native":
             found = shutil.which(args.executable)
             if found is None:
                 raise ValueError(f"Executable not found or not executable: {args.executable}")
             executable = Path(found).resolve()
-            if mpi > 1:
+            if args.build_provenance:
+                build_provenance = json.loads(args.build_provenance.read_text())
+                if sha256(executable) != build_provenance['executable_sha256']:
+                    raise ValueError('Executable does not match --build-provenance')
+                if args.executable_revision != build_provenance['executable_revision']:
+                    raise ValueError('Executable revision does not match --build-provenance')
+            if mpi > 1 or args.mpi_arg:
                 launcher = shutil.which(args.mpi_launcher)
                 if launcher is None:
                     raise ValueError(f"MPI launcher not found: {args.mpi_launcher}")
-                command = [launcher, "-np", str(mpi)]
+                command = [launcher, *args.mpi_arg, "-np", str(mpi)]
             command += [str(executable), str(output / "parameters.prm")]
         else:
             for path in (mesh, output):
@@ -167,8 +191,12 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
         "execution_blocker": manifest["provenance"][base].get("execution_blocker"),
         "executable_sha256": sha256(executable) if executable else None,
         "platform": platform.platform(),
+        "machine": args.machine or platform.node().split('.')[0],
+        "hardware": machine_info(),
+        "build_provenance": build_provenance,
         "thread_environment": {key: os.environ.get(key) for key in
-                               ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")},
+                               ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+                                "BLIS_NUM_THREADS", "DEAL_II_NUM_THREADS")},
         "validation": "No comparison with archived paper results is performed.",
     }
     receipt_file = output / "run.json"
@@ -182,6 +210,7 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
         return 0
     receipt.update(status="running", started_utc=timestamp())
     save()
+    started = time.perf_counter()
     try:
         with (output / "solver.log").open("w") as log:
             result = subprocess.run(command, cwd=output, stdout=log, stderr=subprocess.STDOUT)
@@ -189,6 +218,7 @@ def run_case(case: dict, manifest: dict, args: argparse.Namespace) -> int:
                        status="completed" if result.returncode == 0 else "failed")
     except (OSError, KeyboardInterrupt) as error:
         receipt.update(status="failed", error=str(error), returncode=1)
+    receipt["process_wall_seconds"] = time.perf_counter() - started
     receipt["finished_utc"] = timestamp()
     save()
     print(f"{case['id']}: {receipt['status']}; log: {output / 'solver.log'}", flush=True)
@@ -199,11 +229,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("case", nargs="?", help="Experiment ID shown by --list")
     parser.add_argument("--list", action="store_true", help="List cases without downloading or running")
-    parser.add_argument("--suite", help="mms, benchmarks, mesh, time, applications, scaling, or all")
+    parser.add_argument("--suite", help="mms, benchmarks, mesh, time, applications, scaling, fields, or all")
     parser.add_argument("--dataset-root", type=Path, default=ROOT)
     parser.add_argument("--output-root", type=Path, default=ROOT / "paper-runs")
     parser.add_argument("--executable", default="blood_flow")
     parser.add_argument("--executable-revision", help="Known source revision of a reused executable (user supplied)")
+    parser.add_argument("--build-provenance", type=Path, help="Build receipt containing executable revision and SHA256")
+    parser.add_argument("--machine", help="Paper machine profile name (default: short hostname)")
+    parser.add_argument("--ranks", nargs='+', type=int,
+                        help="Select MPI counts from --suite scaling (e.g. 1 2 4 8 16)")
     parser.add_argument("--runtime", choices=("native", "docker", "podman", "apptainer"), default="native")
     parser.add_argument("--image", help="Explicit container tag or digest; tags are recorded without claiming a resolved digest")
     parser.add_argument("--container-workdir", type=Path, default=ROOT,
@@ -211,6 +245,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--mpi", type=int, help="Override the manifest MPI count")
     parser.add_argument("--mpi-launcher", default="mpirun", help="MPI launcher executable")
+    parser.add_argument("--mpi-arg", action="append", default=[],
+                        help="Extra launcher argument (repeat; use --mpi-arg=--option)")
     parser.add_argument("--final-time", type=float, help="Override final time for a separately recorded smoke run")
     args = parser.parse_args(argv)
     manifest = json.loads(MANIFEST.read_text())
@@ -224,12 +260,20 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("Choose one case ID or --suite")
     if args.mpi is not None and args.mpi < 1:
         parser.error("--mpi must be positive")
+    if args.machine and not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', args.machine):
+        parser.error('Invalid --machine profile name')
+    if args.ranks is not None:
+        available = {case['mpi'] for case in cases if case['suite'] == 'scaling'}
+        if args.suite != 'scaling' or args.mpi is not None or not set(args.ranks) <= available:
+            parser.error('--ranks requires --suite scaling, canonical counts, and no --mpi override')
     if args.final_time is not None and (not math.isfinite(args.final_time) or args.final_time <= 0):
         parser.error("--final-time must be finite and positive")
     if args.runtime != "native" and not args.prepare_only and not args.image:
         parser.error("Container execution requires an explicit --image tag or digest")
     selected = [case for case in cases if case["id"] == args.case or
                 (args.suite and args.suite in ("all", case["suite"]))]
+    if args.ranks is not None:
+        selected = [case for case in selected if case['mpi'] in args.ranks]
     if not selected:
         parser.error("Unknown case or suite; use --list")
     args.dataset_root = args.dataset_root.resolve()

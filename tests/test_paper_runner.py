@@ -39,9 +39,48 @@ class PaperRunnerTest(unittest.TestCase):
     def test_list_and_matrix_cover_paper_sweeps(self):
         result = self.invoke("--list")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(result.stdout.splitlines()), 43)
-        for case in ("mms-p1-n4", "mms-p3-n64", "time37-r2-bdf5", "network100k-np12"):
+        self.assertEqual(len(result.stdout.splitlines()), 49)
+        for case in ("mms-p1-n4", "mms-p3-n64", "time37-r2-bdf5", "network100k-np64"):
             self.assertIn(case, result.stdout)
+
+    def test_every_manifest_setting_exists_in_its_template(self):
+        manifest = json.loads(RUNNER.MANIFEST.read_text())
+        for case in manifest['runs']:
+            template = ROOT / f"reproducibility/parameters/{case['base']}.prm.in"
+            text = template.read_text()
+            for key, value in case['settings'].items():
+                with self.subTest(case=case['id'], key=key):
+                    text = RUNNER.replace_setting(text, key, value)
+
+    def test_machine_and_launcher_are_recorded(self):
+        executable = self.root / 'solver'
+        executable.write_text('#!/bin/sh\nexit 0\n')
+        executable.chmod(0o755)
+        launcher = self.root / 'launcher'
+        launcher.write_text('#!/bin/sh\nexit 0\n')
+        launcher.chmod(0o755)
+        revision = 'a' * 40
+        provenance = self.root / 'build.json'
+        provenance.write_text(json.dumps({'executable_revision': revision,
+                                         'executable_sha256': RUNNER.sha256(executable)}))
+        result = self.invoke('bifurcation', '--executable', str(executable), '--machine', 'lnx',
+                             '--mpi-launcher', str(launcher), '--mpi-arg=--report-bindings',
+                             '--executable-revision', revision, '--build-provenance', str(provenance))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt = json.loads((self.root / 'runs/bifurcation/run.json').read_text())
+        self.assertEqual(receipt['machine'], 'lnx')
+        self.assertTrue(receipt['hardware']['hostname'])
+        self.assertEqual(receipt['command'][:4], [str(launcher), '--report-bindings', '-np', '1'])
+        self.assertGreater(receipt['process_wall_seconds'], 0)
+        self.assertEqual(receipt['build_provenance']['executable_revision'], revision)
+
+    def test_rank_selection_rejects_misleading_overrides(self):
+        for options in (('--suite', 'benchmarks', '--ranks', '1'),
+                        ('--suite', 'scaling', '--ranks', '3'),
+                        ('--suite', 'scaling', '--mpi', '2', '--ranks', '1')):
+            result = self.invoke(*options, '--prepare-only')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('--ranks requires', result.stderr)
 
     def test_every_canonical_template_sets_isolated_output_directory(self):
         for template in (ROOT / "reproducibility/parameters").glob("*.prm.in"):

@@ -467,84 +467,258 @@
       "paper": "19999-vessel cerebral application"
     },
     {
+      "id": "network50k-np1",
+      "base": "network50k",
+      "suite": "scaling",
+      "mpi": 1,
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
+    },
+    {
+      "id": "network50k-np2",
+      "base": "network50k",
+      "suite": "scaling",
+      "mpi": 2,
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
+    },
+    {
       "id": "network50k-np4",
       "base": "network50k",
       "suite": "scaling",
       "mpi": 4,
-      "settings": {},
-      "paper": "Strong scaling and pressure fields"
-    },
-    {
-      "id": "network50k-np6",
-      "base": "network50k",
-      "suite": "scaling",
-      "mpi": 6,
-      "settings": {},
-      "paper": "Strong scaling and pressure fields"
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
     },
     {
       "id": "network50k-np8",
       "base": "network50k",
       "suite": "scaling",
       "mpi": 8,
-      "settings": {},
-      "paper": "Strong scaling and pressure fields"
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
     },
     {
-      "id": "network50k-np10",
+      "id": "network50k-np16",
       "base": "network50k",
       "suite": "scaling",
-      "mpi": 10,
-      "settings": {},
-      "paper": "Strong scaling and pressure fields"
+      "mpi": 16,
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
     },
     {
-      "id": "network50k-np12",
+      "id": "network50k-np32",
       "base": "network50k",
       "suite": "scaling",
-      "mpi": 12,
+      "mpi": 32,
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
+    },
+    {
+      "id": "network50k-np64",
+      "base": "network50k",
+      "suite": "scaling",
+      "mpi": 64,
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
+    },
+    {
+      "id": "network50k-output",
+      "base": "network50k",
+      "suite": "fields",
+      "mpi": 4,
       "settings": {},
-      "paper": "Strong scaling and pressure fields"
+      "paper": "Pressure fields and vessel waveforms (not timed scaling)"
+    },
+    {
+      "id": "network100k-np1",
+      "base": "network100k",
+      "suite": "scaling",
+      "mpi": 1,
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
+    },
+    {
+      "id": "network100k-np2",
+      "base": "network100k",
+      "suite": "scaling",
+      "mpi": 2,
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
     },
     {
       "id": "network100k-np4",
       "base": "network100k",
       "suite": "scaling",
       "mpi": 4,
-      "settings": {},
-      "paper": "Strong scaling and pressure fields"
-    },
-    {
-      "id": "network100k-np6",
-      "base": "network100k",
-      "suite": "scaling",
-      "mpi": 6,
-      "settings": {},
-      "paper": "Strong scaling and pressure fields"
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
     },
     {
       "id": "network100k-np8",
       "base": "network100k",
       "suite": "scaling",
       "mpi": 8,
-      "settings": {},
-      "paper": "Strong scaling and pressure fields"
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
     },
     {
-      "id": "network100k-np10",
+      "id": "network100k-np16",
       "base": "network100k",
       "suite": "scaling",
-      "mpi": 10,
-      "settings": {},
-      "paper": "Strong scaling and pressure fields"
+      "mpi": 16,
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
     },
     {
-      "id": "network100k-np12",
+      "id": "network100k-np32",
       "base": "network100k",
       "suite": "scaling",
-      "mpi": 12,
+      "mpi": 32,
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
+    },
+    {
+      "id": "network100k-np64",
+      "base": "network100k",
+      "suite": "scaling",
+      "mpi": 64,
+      "settings": {
+        "Write solution output": "false",
+        "Print current statistics": "false",
+        "Output terminal CSV file": "",
+        "Output network terminals CSV file": "",
+        "Output mass conservation CSV file": "",
+        "Output IDA step history CSV file": "",
+        "Output IDA internal steps CSV file": "",
+        "Output flow regime CSV file": ""
+      },
+      "paper": "Strong scaling without solution output"
+    },
+    {
+      "id": "network100k-output",
+      "base": "network100k",
+      "suite": "fields",
+      "mpi": 4,
       "settings": {},
-      "paper": "Strong scaling and pressure fields"
+      "paper": "Pressure fields and vessel waveforms (not timed scaling)"
     }
   ],
   "supplemental_archive": {
