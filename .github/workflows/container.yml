@@ -25,6 +25,8 @@ jobs:
         run: |
           bash -n scripts/run_container.sh scripts/run_docker.sh
           python3 tests/test_container_inputs.py
+          python3 tests/test_path_names.py
+          python3 tools/check_bibliography.py
 
   prepare:
     if: github.repository == 'luca-heltai/metric-flow-x' && ((github.event_name == 'schedule' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))

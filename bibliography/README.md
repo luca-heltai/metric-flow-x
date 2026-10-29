@@ -4,7 +4,7 @@
 entries from the historical `doc/references.bib` and `latex/metric_flow.bib`
 with the manuscript bibliography supplied in `paper/blood_flow.bib` for the
 1.0.0 release. A copy of that submission bibliography, with trailing whitespace removed, is retained in
-[`arxiv-submission.bib`](arxiv-submission.bib). Missing entries are copied
+[`arxiv_submission.bib`](arxiv_submission.bib). Missing entries are copied
 from this source; existing canonical entries retain their metadata.
 
 ## Manuscript status
