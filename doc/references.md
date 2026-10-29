@@ -28,7 +28,7 @@ Software citation metadata is available in
 
 ## Related literature
 
-The canonical bibliography in [`bibliography/references.bib`](../bibliography/references.bib) contains the literature currently associated with the repository's numerical context. It includes work on one-dimensional blood-flow models, discontinuous Galerkin and hybridizable DG methods, approximate Riemann solvers, and blood-flow benchmarks. The metadata policy and unresolved keys are recorded in [`bibliography/README.md`](../bibliography/README.md).
+The canonical bibliography in [`bibliography/references.bib`](https://github.com/luca-heltai/metric-flow-x/blob/v1.0.0/bibliography/references.bib) contains the literature associated with the repository's numerical context. It includes work on one-dimensional blood-flow models, discontinuous Galerkin and hybridizable DG methods, approximate Riemann solvers, and blood-flow benchmarks. The metadata policy and manuscript bibliography provenance are recorded in [`bibliography/README.md`](https://github.com/luca-heltai/metric-flow-x/blob/v1.0.0/bibliography/README.md).
 
 The complete bibliography is rendered below.
 
