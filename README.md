@@ -1,5 +1,14 @@
 # MetricFlowX
 
+**Version 1.0.0** accompanies the arXiv submission by Raksha Devi, Luca Heltai
+and Lucas O. Müller, *An HDG-type discretization of 1D embedded blood flow in
+complex networks with Riemann-coupled junctions*. The manuscript is awaiting
+announcement and a public arXiv identifier.
+
+[Release](https://github.com/luca-heltai/metric-flow-x/releases/tag/v1.0.0)
+· [Website](https://luca-heltai.github.io/metric-flow-x/)
+· [Citation](CITATION.cff) · [Release notes](doc/releases/v1.0.0.md)
+
 MetricFlowX is a standalone deal.II library for the one-dimensional blood-flow
 DAE embedded in three-dimensional geometry. It contains the distributed mesh,
 DG/HDG discretization, RCR terminal models, junction equations, residual
@@ -91,6 +100,8 @@ The [container guide](doc/containers.md) describes the downloadable launcher
 for Docker, Podman, and Apptainer, the compiled library SDK, and publication
 of versioned images. A container runtime is the only required host dependency.
 Images become available after the container publication workflow succeeds.
+The release image is `ghcr.io/luca-heltai/metric-flow-x:1.0.0` for Linux AMD64
+and ARM64. Release assets include a launcher pinned to its immutable digest.
 
 ## Building
 

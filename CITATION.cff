@@ -1,6 +1,10 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "MetricFlow-X solver"
+title: "MetricFlowX"
+version: 1.0.0
+date-released: 2026-10-29
+url: "https://luca-heltai.github.io/metric-flow-x/"
+license: MIT
 abstract: >-
   A C++/deal.II implementation of an MPI-parallel implicit solver for one-dimensional **navier-stokes flow models** defined on **metric networks embedded in three-dimensional space**. The space discretization is based on an HDG-type (hybridized) monolithic system, which is then solved in time via the SUNDIALS Differential-Algebraic equation solver (IDA).
 repository-code: "https://github.com/luca-heltai/metric-flow-x"
@@ -9,3 +13,15 @@ authors:
     family-names: Devi
   - given-names: Luca
     family-names: Heltai
+preferred-citation:
+  type: unpublished
+  title: "An HDG-type discretization of 1D embedded blood flow in complex networks with Riemann-coupled junctions"
+  authors:
+    - given-names: Raksha
+      family-names: Devi
+    - given-names: Luca
+      family-names: Heltai
+    - given-names: Lucas O.
+      family-names: Müller
+  year: 2026
+  notes: "Submitted to arXiv; announcement and public identifier pending."

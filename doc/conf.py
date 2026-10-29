@@ -3,7 +3,9 @@ import sys
 import io
 import glob
 
-project = "MetricFlow-X"
+project = "MetricFlowX"
+release = "1.0.0"
+version = "1.0"
 author = "Raksha Devi and Luca Heltai"
 html_baseurl = "https://luca-heltai.github.io/metric-flow-x/"
 default_role = "any"
@@ -35,7 +37,7 @@ suppress_warnings = [
 ]
 
 html_theme = "furo"
-html_title = project
+html_title = f"{project} {version}"
 html_logo = "logo.png"
 html_favicon = "favicon.png"
 html_theme_options = {

@@ -4,7 +4,7 @@
 
 Raksha Devi, Luca Heltai and Lucas O. Müller.
 *An HDG-type discretization of 1D embedded blood flow in complex networks
-with Riemann-coupled junctions*. In preparation, 2026.
+with Riemann-coupled junctions*. Submitted to arXiv, 2026; public identifier pending.
 {cite}`devi2026hdg`
 
 ```bibtex
@@ -13,13 +13,18 @@ with Riemann-coupled junctions*. In preparation, 2026.
   title = {An {HDG}-type discretization of {1D} embedded blood flow in complex
            networks with {Riemann}-coupled junctions},
   year = {2026},
-  note = {In preparation}
+  note = {Submitted to arXiv; announcement and public identifier pending}
 }
 ```
 
 The [software repository](https://github.com/luca-heltai/metric-flow-x)
-contains the executable, library and parameter files. The manuscript has no
-public DOI or preprint URL yet.
+contains the executable, library and parameter files.
+[MetricFlowX 1.0.0](https://github.com/luca-heltai/metric-flow-x/releases/tag/v1.0.0)
+accompanies this submission. The manuscript is undergoing arXiv technical and
+moderation checks and has no public DOI or preprint URL yet. A temporary
+submission number is not an arXiv identifier and must not be used as one.
+Software citation metadata is available in
+[`CITATION.cff`](https://github.com/luca-heltai/metric-flow-x/blob/v1.0.0/CITATION.cff).
 
 ## Related literature
 

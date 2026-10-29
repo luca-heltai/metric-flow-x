@@ -12,13 +12,12 @@ architecture. Dataset downloads and simulation output require additional space.
 
 ## Standalone launcher
 
-Download the launcher from a versioned GitHub release when one is available.
-The release launcher has the immutable image digest embedded. After this infrastructure is merged, the development
-launcher can be downloaded without cloning the repository:
+Download the launcher from the MetricFlowX 1.0.0 GitHub release. It has the
+immutable image digest embedded and needs no repository checkout:
 
 ```bash
 curl --fail --location \
-  https://raw.githubusercontent.com/luca-heltai/metric-flow-x/main/scripts/run_container.sh \
+  https://github.com/luca-heltai/metric-flow-x/releases/download/v1.0.0/run_container.sh \
   --output run_container.sh
 bash run_container.sh --help
 ```
@@ -54,8 +53,10 @@ bash run_container.sh --image ghcr.io/luca-heltai/metric-flow-x@sha256:DIGEST \
   --workdir /path/to/case parameters.prm
 ```
 
-`DIGEST` must be replaced with a published image digest. `main` becomes available after a successful publication from `main`;
-`:main` is the moving development image; `:sha-COMMIT` identifies the source
+`DIGEST` must be replaced with the published image digest in the release's
+`container-image.txt`. The versioned image is
+`ghcr.io/luca-heltai/metric-flow-x:1.0.0`, also tagged `v1.0.0`, `1.0`, `1`
+and `latest`. `:main` is the moving development image; `:sha-COMMIT` identifies the source
 revision used to build an image. A documentation-only commit does not create
 a new image or change its recorded build revision.
 Record the digest for archival reproduction because registry tags can move.
@@ -97,10 +98,11 @@ rootful Podman and conversion to Apptainer SIF; both execute the installed
 library consumer. Rootless Podman remains a separate environment-dependent check. These checks establish infrastructure
 operation; they do not validate the paper's scientific results.
 
-Image generation runs only on `main`, scheduled at midnight in `Europe/Rome`
-(including daylight-saving changes). GitHub may delay scheduled jobs. Pull
-requests run lightweight launcher/fingerprint checks; pushes, tags and manual
-dispatches do not generate images.
+Development image generation runs on `main`, scheduled at midnight in
+`Europe/Rome` (including daylight-saving changes), or by manual dispatch.
+GitHub may delay scheduled jobs. A `vMAJOR.MINOR.PATCH` tag builds and tests
+the exact tagged source revision for a release. The tag must match the CMake
+project version. Pull requests run lightweight launcher/fingerprint checks.
 
 Before building, the workflow hashes tracked sources, headers, build files,
 vendored dependencies, the launcher and container verification contracts.
@@ -118,9 +120,10 @@ index and fingerprint tag wait for Podman and Apptainer checks as well. The
 CI runtime installation uses the official Ubuntu HTTPS archives with bounded
 retries and timeouts. A workflow artifact records the digest and a launcher
 pinned to it. Public release snapshots can also distribute that launcher;
-the initial integrated preview is available in the
-[paper workflow preview release](https://github.com/luca-heltai/metric-flow-x/releases/tag/container-paper-preview-20261022-2).
-The workflow does not merge pull requests or publish releases automatically.
+the [MetricFlowX 1.0.0 release](https://github.com/luca-heltai/metric-flow-x/releases/tag/v1.0.0)
+includes the digest-pinned launcher and checksums. Release tags publish the
+GitHub release only after both architectures and all runtime checks succeed.
+Release builds do not move the development `main` image tag.
 
 Anonymous use requires a public GHCR package. Publication checks anonymous
 index access instead of inferring it from repository visibility. If a package

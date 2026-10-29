@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23)
 
-project(MetricFlowX VERSION 0.1.0 LANGUAGES CXX)
+project(MetricFlowX VERSION 1.0.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
