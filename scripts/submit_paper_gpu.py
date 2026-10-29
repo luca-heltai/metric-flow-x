@@ -91,14 +91,17 @@ def prepare(args) -> list[tuple[str, list[str], Path]]:
         (profile / 'machine.tex').write_text(source_profile.read_text())
     else:
         (profile / 'machine.tex').write_text('% AUTO_FROM_SCALING_HARDWARE\n')
-    # All MPI ranks stay on this node. PRRTE's local launcher does not require
-    # Slurm's unavailable pmix plugin, and remains inside the job's CPU cgroup.
-    launcher = root / 'jobs/mpirun-local.sh'
+    # OpenMPI 5 uses PRRTE's Slurm integration; direct srun would need the
+    # cluster's missing PMIx plugin. Slurm only runs the PRRTE daemons, so its
+    # MPI plugin must be "none". Preserve Slurm's inherited CPU affinity:
+    # task/affinity alone cannot stop MPI rebinding ranks outside their job.
+    launcher = root / 'jobs/mpirun-slurm.sh'
     launcher.write_text('''#!/usr/bin/env bash
 set -euo pipefail
 : "${SLURM_JOB_ID:?Run inside a Slurm allocation}"
-exec mpirun --prtemca ras '^slurm' --host "localhost:${SLURM_NTASKS:?}" \\
-  --map-by core --bind-to core "$@"
+export SLURM_MPI_TYPE=none
+exec mpirun --prtemca ras slurm --prtemca plm slurm \\
+  --map-by core --bind-to none "$@"
 ''')
     launcher.chmod(0o755)
     setup = f'''#!/usr/bin/env bash

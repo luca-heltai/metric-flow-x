@@ -167,8 +167,15 @@ Slurm selects nodes within the requested partition. Each complete scaling sweep
 holds one exclusive node; independent output jobs can use different nodes.
 Add `--node COMPUTE_NODE` only when every job must use one specific host.
 No accelerator is requested:
-these are CPU/MPI measurements. The generated launcher uses OpenMPI 5 with local
-PRRTE resource discovery and binds each rank to one core within the allocation.
+these are CPU/MPI measurements. The generated `jobs/mpirun-slurm.sh` launcher
+uses OpenMPI 5 with PRRTE's Slurm resource discovery and process launcher. It
+sets `SLURM_MPI_TYPE=none` for Slurm's daemon bootstrap: this cluster has `pmi2`
+but no `pmix` plugin, and OpenMPI 5 cannot use `pmi2` for direct `srun` launches.
+MPI ranks inherit the CPU affinity assigned by Slurm and share their job's
+cores; MPI core binding is disabled. This matters on this cluster, which uses
+`task/affinity` without `task/cgroup`: MPI rebinding could otherwise move every
+concurrent job onto the same first cores of the node. The launcher does not
+pin individual ranks to individual cores.
 Check that this launch method and the generated Slurm resource options match
 your scheduler configuration; inspect the scripts with `--dry-run` before a
 first submission on another system. Thread limits cover OpenMP, BLAS and deal.II.

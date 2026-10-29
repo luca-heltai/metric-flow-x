@@ -3,6 +3,7 @@
 import importlib.util
 import ast
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -41,7 +42,11 @@ class PaperGpuSubmissionTest(unittest.TestCase):
         for base in ('network50k', 'network100k'):
             for ranks in (1, 2, 4, 8, 16, 32, 64):
                 self.assertIn(f'{base}-np{ranks} ', scaling)
-        self.assertIn('--prtemca ras', (root / 'jobs/mpirun-local.sh').read_text())
+        launcher = (root / 'jobs/mpirun-slurm.sh').read_text()
+        self.assertIn('--prtemca ras slurm --prtemca plm slurm', launcher)
+        self.assertIn('--bind-to none', launcher)
+        self.assertNotIn('--host', launcher)
+        self.assertNotIn('^slurm', launcher)
         self.assertIn('--executable-revision "$revision"', scaling)
         self.assertIn('--build-provenance', scaling)
         self.assertEqual(len(json.loads((root / 'output-cases.json').read_text())), 35)
@@ -50,6 +55,30 @@ class PaperGpuSubmissionTest(unittest.TestCase):
             for block in re.findall(r"<<'(PY\w+)'\n(.*?)\n\1", script.read_text(), re.S):
                 ast.parse(block[1])
         self.assertIn('finalize_paper_output.py', (root / 'jobs/collect.sh').read_text())
+
+    def test_launcher_uses_slurm_bootstrap_and_preserves_runner_arguments(self):
+        self.assertEqual(GPU.main([*self.options, '--dry-run']), 0)
+        fake_mpirun = self.root / 'mpirun'
+        fake_mpirun.write_text(
+            '#!/usr/bin/env python3\n'
+            'import json, os, sys\n'
+            'print(json.dumps([os.environ.get("SLURM_MPI_TYPE"), sys.argv[1:]]))\n')
+        fake_mpirun.chmod(0o755)
+        launcher = self.root / 'runs/jobs/mpirun-slurm.sh'
+        env = dict(os.environ, PATH=str(self.root) + os.pathsep + os.environ['PATH'],
+                   SLURM_JOB_ID='123', SLURM_MPI_TYPE='pmi2')
+        arguments = ['--report-bindings', '-np', '4', '/a path/blood_flow', '/a path/input.prm']
+        result = subprocess.run(['bash', str(launcher), *arguments], env=env,
+                                capture_output=True, text=True, check=True)
+        mpi_type, command = json.loads(result.stdout)
+        self.assertEqual(mpi_type, 'none')
+        self.assertEqual(command, ['--prtemca', 'ras', 'slurm', '--prtemca', 'plm', 'slurm',
+                                   '--map-by', 'core', '--bind-to', 'none', *arguments])
+        env.pop('SLURM_JOB_ID')
+        result = subprocess.run(['bash', str(launcher), *arguments], env=env,
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Run inside a Slurm allocation', result.stderr)
 
     def test_smoke_does_not_export_paper_measurements(self):
         self.assertEqual(GPU.main([*self.options, '--dry-run', '--smoke']), 0)
