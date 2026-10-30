@@ -66,6 +66,13 @@ This lets an embedding Domain retain and transfer all imported properties
 while preparing the mesh. Construct the flow before its observing Domain so
 that the mesh outlives the Domain. Ordinary `setup()` keeps native mesh setup.
 
+Generated networks can populate `flow.triangulation()` directly and call
+`setup(const NetworkPhysics &)`. This skips VTK input and accepts the existing
+`VesselProperties`, native RCR terminal coefficients and terminal resistors in
+memory. Geometry and connectivity remain distributed; only coefficient tables
+are replicated, as in the file-based solver. See [the embedding API](doc/api.md)
+for ownership, identifiers and initialization requirements.
+
 An optional prescribed surrounding pressure can be supplied with
 `set_external_pressure_provider()`. The provider receives time, physical
 point, vessel id, and the incident centerline `CellId`, and returns pressure

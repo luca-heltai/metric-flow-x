@@ -367,6 +367,31 @@ namespace MetricFlowX
       WallLaw wall;
     };
 
+    /** Native R1/R2 in Pa s/m^3, C in m^3/Pa and P_out in Pa. */
+    struct RCRPhysics
+    {
+      double      R1 = 0., R2 = 0., C = 0., P_out = 0.;
+      std::string label;
+    };
+
+    struct TerminalConnection
+    {
+      types::boundary_id boundary0 = 0, boundary1 = 0;
+      double             resistance = 0.;
+    };
+
+    /** Replicated coefficient tables for an externally prepared mesh.
+     * These contain no vertex coordinates or cell connectivity. Vessel keys
+     * are compact execution material ids 0,...,N-1, independent of a caller's
+     * physical identifiers. Boundary 0 is inflow and 255 denotes a junction.
+     */
+    struct NetworkPhysics
+    {
+      std::map<unsigned int, VesselProperties> vessels;
+      std::map<types::boundary_id, RCRPhysics> terminals;
+      std::vector<TerminalConnection>          terminal_connections;
+    };
+
     void
     initialize_params(const std::string &filename = "");
 
@@ -386,6 +411,16 @@ namespace MetricFlowX
 
     void
     setup(const MeshInitializer &initialize_mesh);
+
+    /** Set up native DoFs on the already populated triangulation().
+     * Called collectively with identical coefficient tables on every rank.
+     * The caller owns refinement, partitioning and material/boundary ids.
+     * No input file or serial copy of the mesh is required. This path uses
+     * the native rest seed and consistency preparation; the optional static
+     * coarse-graph warm start requires the file-based input path.
+     */
+    void
+    setup(const NetworkPhysics &physics);
 
     VectorType
     make_state() const;
@@ -851,12 +886,9 @@ namespace MetricFlowX
 
     ExternalPressureProvider external_pressure_provider;
 
-    struct RCRPhysics
-    {
-      double      R1, R2, C, P_out;
-      std::string label;
-    };
     std::map<unsigned int, RCRPhysics> rcr_map;
+    bool                               in_memory_physics = false;
+    std::vector<TerminalConnection>    input_terminal_connections;
     // Coarse-mesh incidence, replicated before partitioning; output owners
     // need labels even when the terminal itself belongs to another rank.
     std::map<unsigned int, std::set<types::boundary_id>> vessel_terminals;

@@ -541,6 +541,195 @@ namespace MetricFlowX
   }
 
   template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::setup(const NetworkPhysics &physics)
+  {
+    bool valid = triangulation_.n_global_active_cells() > 0 &&
+                 dof_handler_.n_dofs() == 0 && !physics.vessels.empty() &&
+                 physics.vessels.size() < std::numeric_limits<int>::max() &&
+                 initial_state_source == "rest";
+    std::vector<double> coefficients;
+    const auto          text = [&](const std::string &value) {
+      coefficients.push_back(value.size());
+      for (const unsigned char c : value)
+        coefficients.push_back(c);
+    };
+    text(wall_model);
+    text(outlet_type);
+    coefficients.push_back(physics.vessels.size());
+    unsigned int expected = 0;
+    for (const auto &[id, v] : physics.vessels)
+      {
+        valid =
+          valid && id == expected++ && id < numbers::invalid_material_id &&
+          v.a0 > 0. && v.a_d > 0. && v.r_d > 0. && v.L > 0. &&
+          v.dynamic_viscosity >= 0. &&
+          ((v.r_in == 0. && v.r_out == 0.) || (v.r_in > 0. && v.r_out > 0.));
+        coefficients.push_back(id);
+        for (const double value : {v.a0,
+                                   v.r_d,
+                                   v.a_d,
+                                   v.E,
+                                   v.h_wall,
+                                   v.p_d,
+                                   v.p0,
+                                   v.L,
+                                   v.r_in,
+                                   v.r_out,
+                                   v.dynamic_viscosity,
+                                   static_cast<double>(v.wall.type),
+                                   v.wall.ee,
+                                   v.wall.ec,
+                                   v.wall.epsilon0,
+                                   v.wall.epsilonr,
+                                   v.wall.stiffness,
+                                   v.wall.m,
+                                   v.wall.n,
+                                   v.wall.reference_pressure,
+                                   v.wall.km})
+          {
+            valid = valid && std::isfinite(value);
+            coefficients.push_back(value);
+          }
+        if (v.wall.type == WallLaw::Type::square_root)
+          valid =
+            valid && wall_model == "Square root" && v.E > 0. && v.h_wall > 0.;
+        else if (v.wall.type == WallLaw::Type::artery)
+          valid =
+            valid &&
+            (wall_model == "ADAVN arterial" || wall_model == "ADAVN mixed") &&
+            v.wall.ee > 0. && v.wall.ec >= 0. && v.wall.epsilon0 >= 0. &&
+            v.wall.epsilonr > 0. && v.h_wall > 0. && v.wall.km >= 0.;
+        else if (v.wall.type == WallLaw::Type::vein ||
+                 v.wall.type == WallLaw::Type::dural_sinus)
+          valid =
+            valid &&
+            (wall_model == "ADAVN venous" || wall_model == "ADAVN mixed") &&
+            v.wall.stiffness > 0. && v.wall.m > 0. && v.wall.n <= 0. &&
+            v.wall.km >= 0.;
+        else
+          valid = false;
+      }
+    coefficients.push_back(physics.terminals.size());
+    for (const auto &[id, terminal] : physics.terminals)
+      {
+        valid = valid && id != 0 && id != 255 &&
+                id != numbers::invalid_boundary_id && terminal.R1 >= 0. &&
+                terminal.R2 > 0. && terminal.C >= 0.;
+        coefficients.push_back(id);
+        for (const double value :
+             {terminal.R1, terminal.R2, terminal.C, terminal.P_out})
+          {
+            valid = valid && std::isfinite(value);
+            coefficients.push_back(value);
+          }
+        text(terminal.label);
+      }
+    coefficients.push_back(physics.terminal_connections.size());
+    std::set<std::pair<types::boundary_id, types::boundary_id>> connections;
+    for (const auto &connection : physics.terminal_connections)
+      {
+        const auto a = connection.boundary0, b = connection.boundary1;
+        valid = valid && a != b && physics.terminals.count(a) &&
+                physics.terminals.count(b) &&
+                std::isfinite(connection.resistance) &&
+                connection.resistance > 0. &&
+                connections.emplace(std::min(a, b), std::max(a, b)).second;
+        coefficients.insert(coefficients.end(),
+                            {static_cast<double>(a),
+                             static_cast<double>(b),
+                             connection.resistance});
+      }
+    AssertThrow(
+      Utilities::MPI::min(valid ? 1u : 0u, mpi_communicator_) == 1,
+      ExcMessage(
+        "In-memory setup requires a prepared mesh, undistributed DoFs, "
+        "compact vessel ids, valid physics and the native rest seed."));
+    // Only coefficient tables are compared. No mesh geometry or incidence is
+    // collected, including when a rank owns no cells.
+    const auto reference =
+      Utilities::MPI::broadcast(mpi_communicator_, coefficients, 0);
+    AssertThrow(Utilities::MPI::min(coefficients == reference ? 1u : 0u,
+                                    mpi_communicator_) == 1,
+                ExcMessage(
+                  "In-memory physics must be identical on every rank."));
+
+    std::map<unsigned int, unsigned int> degree;
+    for (const auto &cell : triangulation_.active_cell_iterators())
+      if (!cell->is_artificial())
+        for (const auto vertex : cell->vertex_indices())
+          ++degree[cell->vertex_index(vertex)];
+    std::map<types::boundary_id, std::pair<unsigned int, unsigned int>> ports;
+    for (const auto &cell : triangulation_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          valid = valid && physics.vessels.count(cell->material_id()) &&
+                  cell->vertex(0).distance(cell->vertex(1)) > 0.;
+          for (const auto vertex : cell->vertex_indices())
+            for (unsigned int d = 0; d < spacedim; ++d)
+              valid = valid && std::isfinite(cell->vertex(vertex)[d]);
+          for (const auto face : cell->face_indices())
+            if (cell->face(face)->at_boundary() &&
+                degree[cell->face(face)->vertex_index(0)] == 1)
+              {
+                const auto bid = cell->face(face)->boundary_id();
+                valid          = valid && bid != 255;
+                if (bid != 0)
+                  {
+                    valid      = valid && physics.terminals.count(bid);
+                    auto &port = ports[bid];
+                    port.first = cell->material_id();
+                    ++port.second;
+                  }
+              }
+        }
+    AssertThrow(Utilities::MPI::min(valid ? 1u : 0u, mpi_communicator_) == 1,
+                ExcMessage(
+                  "Prepared mesh has invalid geometry or missing physics."));
+    std::map<types::boundary_id, std::pair<unsigned int, unsigned int>>
+      global_ports;
+    for (const auto &entries :
+         Utilities::MPI::all_gather(mpi_communicator_, ports))
+      for (const auto &[bid, port] : entries)
+        {
+          auto &global = global_ports[bid];
+          global.first = port.first;
+          global.second += port.second;
+        }
+    AssertThrow(
+      global_ports.size() == physics.terminals.size() &&
+        std::all_of(global_ports.begin(),
+                    global_ports.end(),
+                    [](const auto &entry) { return entry.second.second == 1; }),
+      ExcMessage("Each terminal must identify exactly one mesh endpoint."));
+
+    vessel_map.clear();
+    for (const auto &[id, v] : physics.vessels)
+      {
+        VesselPhysicalProperties value;
+        static_cast<VesselProperties &>(value) = v;
+        value.beta_p                           = compute_beta_p(v.E, v.h_wall);
+        if (v.wall.type != WallLaw::Type::square_root)
+          {
+            const double tangent = v.wall.elastic(v.a_d, v.a_d, v.h_wall).first;
+            AssertThrow(std::isfinite(tangent) && tangent > 0.,
+                        ExcMessage(
+                          "Non-hyperbolic in-memory reference state."));
+          }
+        vessel_map.emplace(id, value);
+      }
+    rcr_map = physics.terminals;
+    vessel_terminals.clear();
+    for (const auto &[bid, port] : global_ports)
+      vessel_terminals[port.first].insert(bid);
+    input_terminal_connections = physics.terminal_connections;
+    in_memory_physics          = true;
+    setup_system();
+    initialize_terminal_capacitors();
+    build_per_cell_mass_inv();
+  }
+
+  template <int dim, int spacedim>
   VectorType
   BloodFlowSystem<dim, spacedim>::make_state() const
   {
@@ -1454,67 +1643,71 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer, "build_global_vessel_data");
 
-    vessel_map.clear();
-
-    unsigned int max_vid = 0;
-    for (unsigned int i = 0; i < cell_vessel_ids.size(); ++i)
-      max_vid =
-        std::max(max_vid, static_cast<unsigned int>(cell_vessel_ids[i]));
-    const unsigned int n_vid = max_vid + 1;
-
-    for (unsigned int i = 0; i < cell_vessel_ids.size(); ++i)
+    if (!in_memory_physics)
       {
-        const unsigned int vid = static_cast<unsigned int>(cell_vessel_ids[i]);
-        if (vessel_map.count(vid))
-          continue;
+        vessel_map.clear();
 
-        const unsigned int data_index = wall_model == "Square root" ? vid : i;
-        VesselPhysicalProperties vp;
-        vp.a0     = cell_a0[data_index];
-        vp.E      = cell_E[data_index];
-        vp.h_wall = cell_h_wall[data_index];
-        vp.p_d    = cell_p_d[data_index];
-        vp.p0     = cell_p0[data_index];
-        vp.a_d    = cell_a_d[data_index];
-        vp.L      = cell_L[data_index];
-        vp.dynamic_viscosity =
-          cell_viscosity.size() ? cell_viscosity[data_index] : viscosity;
-        vp.r_d  = cell_r_d[data_index];
-        vp.r_in = (cell_r_in.size() > data_index) ? cell_r_in[data_index] : 0.0;
-        vp.r_out =
-          (cell_r_out.size() > data_index) ? cell_r_out[data_index] : 0.0;
-        vp.beta_p = compute_beta_p(vp.E, vp.h_wall);
-        if (wall_model != "Square root")
+        for (unsigned int i = 0; i < cell_vessel_ids.size(); ++i)
           {
-            const unsigned int type =
-              wall_input.count("adavn_wall_type") ?
-                static_cast<unsigned int>(wall_input.at("adavn_wall_type")[i]) :
-                (wall_model == "ADAVN arterial" ? 1u : 2u);
-            vp.wall.type               = static_cast<WallLaw::Type>(type);
-            vp.wall.reference_pressure = wall_input.at("adavn_p_ref")[i];
-            vp.wall.km = viscoelastic_wall ? wall_input.at("adavn_K_m")[i] : 0.;
-            if (type == 1)
+            const unsigned int vid =
+              static_cast<unsigned int>(cell_vessel_ids[i]);
+            if (vessel_map.count(vid))
+              continue;
+
+            const unsigned int data_index =
+              wall_model == "Square root" ? vid : i;
+            VesselPhysicalProperties vp;
+            vp.a0     = cell_a0[data_index];
+            vp.E      = cell_E[data_index];
+            vp.h_wall = cell_h_wall[data_index];
+            vp.p_d    = cell_p_d[data_index];
+            vp.p0     = cell_p0[data_index];
+            vp.a_d    = cell_a_d[data_index];
+            vp.L      = cell_L[data_index];
+            vp.dynamic_viscosity =
+              cell_viscosity.size() ? cell_viscosity[data_index] : viscosity;
+            vp.r_d = cell_r_d[data_index];
+            vp.r_in =
+              (cell_r_in.size() > data_index) ? cell_r_in[data_index] : 0.0;
+            vp.r_out =
+              (cell_r_out.size() > data_index) ? cell_r_out[data_index] : 0.0;
+            vp.beta_p = compute_beta_p(vp.E, vp.h_wall);
+            if (wall_model != "Square root")
               {
-                vp.wall.ee       = wall_input.at("adavn_E_e")[i];
-                vp.wall.ec       = wall_input.at("adavn_E_c")[i];
-                vp.wall.epsilon0 = wall_input.at("adavn_epsilon_0")[i];
-                vp.wall.epsilonr = wall_input.at("adavn_epsilon_r")[i];
+                const unsigned int type =
+                  wall_input.count("adavn_wall_type") ?
+                    static_cast<unsigned int>(
+                      wall_input.at("adavn_wall_type")[i]) :
+                    (wall_model == "ADAVN arterial" ? 1u : 2u);
+                vp.wall.type               = static_cast<WallLaw::Type>(type);
+                vp.wall.reference_pressure = wall_input.at("adavn_p_ref")[i];
+                vp.wall.km =
+                  viscoelastic_wall ? wall_input.at("adavn_K_m")[i] : 0.;
+                if (type == 1)
+                  {
+                    vp.wall.ee       = wall_input.at("adavn_E_e")[i];
+                    vp.wall.ec       = wall_input.at("adavn_E_c")[i];
+                    vp.wall.epsilon0 = wall_input.at("adavn_epsilon_0")[i];
+                    vp.wall.epsilonr = wall_input.at("adavn_epsilon_r")[i];
+                  }
+                else
+                  {
+                    vp.wall.stiffness = wall_input.at("adavn_venous_K")[i];
+                    vp.wall.m         = wall_input.at("adavn_venous_m")[i];
+                    vp.wall.n         = wall_input.at("adavn_venous_n")[i];
+                  }
+                AssertThrow(
+                  vp.wall.elastic(vp.a_d, vp.a_d, vp.h_wall).first > 0.,
+                  ExcMessage("Non-hyperbolic ADAVN reference state in vessel " +
+                             std::to_string(vid)));
               }
-            else
-              {
-                vp.wall.stiffness = wall_input.at("adavn_venous_K")[i];
-                vp.wall.m         = wall_input.at("adavn_venous_m")[i];
-                vp.wall.n         = wall_input.at("adavn_venous_n")[i];
-              }
-            AssertThrow(vp.wall.elastic(vp.a_d, vp.a_d, vp.h_wall).first > 0.,
-                        ExcMessage(
-                          "Non-hyperbolic ADAVN reference state in vessel " +
-                          std::to_string(vid)));
+
+
+            vessel_map[vid] = vp;
           }
-
-
-        vessel_map[vid] = vp;
       }
+    const unsigned int n_vid =
+      vessel_map.empty() ? 1 : vessel_map.rbegin()->first + 1;
 
     // Arc-length bounds: local extrema first, then a global min/max so that
     // every rank ends up with the same [s_min, s_max] per vessel.
@@ -1907,28 +2100,38 @@ namespace MetricFlowX
   {
     terminal_links.clear();
     terminal_ports.clear();
-    if (terminal_connections_csv_file.empty())
+    if (in_memory_physics ? input_terminal_connections.empty() :
+                            terminal_connections_csv_file.empty())
       return;
     AssertThrow(
       outlet_type == "RCR" && !viscoelastic_wall,
       ExcMessage(
         "Terminal connections require RCR boundaries and elastic walls."));
-    rapidcsv::Document csv(terminal_connections_csv_file);
-    for (const auto &column : {"boundary0", "boundary1", "resistance"})
-      AssertThrow(csv.GetColumnIdx(column) >= 0,
-                  ExcMessage("Terminal connections CSV requires column " +
-                             std::string(column)));
-    std::set<std::pair<types::boundary_id, types::boundary_id>> pairs;
-    for (size_t row = 0; row < csv.GetRowCount(); ++row)
+    std::vector<TerminalConnection> connections = input_terminal_connections;
+    if (!in_memory_physics)
       {
-        const auto   a = csv.GetCell<types::boundary_id>("boundary0", row);
-        const auto   b = csv.GetCell<types::boundary_id>("boundary1", row);
-        const double resistance = csv.GetCell<double>("resistance", row);
+        rapidcsv::Document csv(terminal_connections_csv_file);
+        for (const auto &column : {"boundary0", "boundary1", "resistance"})
+          AssertThrow(csv.GetColumnIdx(column) >= 0,
+                      ExcMessage("Terminal connections CSV requires column " +
+                                 std::string(column)));
+        for (size_t row = 0; row < csv.GetRowCount(); ++row)
+          connections.push_back(
+            {csv.GetCell<types::boundary_id>("boundary0", row),
+             csv.GetCell<types::boundary_id>("boundary1", row),
+             csv.GetCell<double>("resistance", row)});
+      }
+    std::set<std::pair<types::boundary_id, types::boundary_id>> pairs;
+    for (size_t row = 0; row < connections.size(); ++row)
+      {
+        const auto   a          = connections[row].boundary0;
+        const auto   b          = connections[row].boundary1;
+        const double resistance = connections[row].resistance;
         AssertThrow(a != b && a != 0 && b != 0 && a != 255 && b != 255 &&
                       rcr_map.count(a) && rcr_map.count(b) &&
                       std::isfinite(resistance) && resistance > 0.,
-                    ExcMessage("Invalid terminal connection at CSV row " +
-                               std::to_string(row + 2)));
+                    ExcMessage("Invalid terminal connection at entry " +
+                               std::to_string(row + 1)));
         AssertThrow(pairs.emplace(std::min(a, b), std::max(a, b)).second,
                     ExcMessage("Duplicate undirected terminal connection."));
         for (const auto bid : {a, b})
