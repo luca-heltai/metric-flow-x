@@ -3,8 +3,8 @@
 **Blood flow on vascular networks, from individual vessels to large trees.**
 
 [MetricFlowX 1.0.0](https://github.com/luca-heltai/metric-flow-x/releases/tag/v1.0.0)
-is the software release accompanying the arXiv submission by Devi, Heltai and
-Müller. The manuscript is awaiting announcement and a public arXiv identifier.
+is the software release accompanying the preprint by Devi, Heltai and Müller,
+available as [arXiv:2610.40080](https://arxiv.org/abs/2610.40080).
 See the [release notes](releases/v1.0.0.md) and [container guide](containers.md).
 
 MetricFlowX computes pulse propagation in compliant vessels represented by
@@ -53,7 +53,8 @@ for parameter files, dataset downloads and development.
 
 Raksha Devi, Luca Heltai and Lucas O. Müller.
 *An HDG-type discretization of 1D embedded blood flow in complex networks
-with Riemann-coupled junctions*. **Submitted to arXiv, 2026; public identifier pending.**
+with Riemann-coupled junctions*. [arXiv:2610.40080](https://arxiv.org/abs/2610.40080),
+2026. DOI: [10.48550/arXiv.2610.40080](https://doi.org/10.48550/arXiv.2610.40080).
 {cite}`devi2026hdg`
 
 The figures on this site illustrate the manuscript's archived simulations.

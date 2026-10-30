@@ -1,9 +1,10 @@
 # MetricFlowX
 
-**Version 1.0.0** accompanies the arXiv submission by Raksha Devi, Luca Heltai
+**Version 1.0.0** accompanies the arXiv preprint by Raksha Devi, Luca Heltai
 and Lucas O. Müller, *An HDG-type discretization of 1D embedded blood flow in
-complex networks with Riemann-coupled junctions*. The manuscript is awaiting
-announcement and a public arXiv identifier.
+complex networks with Riemann-coupled junctions*, available as
+[arXiv:2610.40080](https://arxiv.org/abs/2610.40080) (2026),
+DOI: [10.48550/arXiv.2610.40080](https://doi.org/10.48550/arXiv.2610.40080).
 
 [Release](https://github.com/luca-heltai/metric-flow-x/releases/tag/v1.0.0)
 · [Website](https://luca-heltai.github.io/metric-flow-x/)

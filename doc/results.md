@@ -1,9 +1,10 @@
 # Examples from the manuscript
 
 These figures come from the manuscript by Devi, Heltai and Müller
-{cite}`devi2026hdg`, submitted to arXiv and awaiting announcement. They show the numerical
-questions addressed by the method: pulse propagation, conservation across
-many junctions, and adaptive integration of the global DAE.
+{cite}`devi2026hdg`, available as
+[arXiv:2610.40080](https://arxiv.org/abs/2610.40080). They show the numerical
+questions addressed by the method: pulse propagation, conservation across many
+junctions, and adaptive integration of the global DAE.
 
 The images are archived manuscript results, not a validation of the current
 development revision. Their source paths and checksums are recorded in the

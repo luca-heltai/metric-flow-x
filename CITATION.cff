@@ -14,7 +14,7 @@ authors:
   - given-names: Luca
     family-names: Heltai
 preferred-citation:
-  type: unpublished
+  type: article
   title: "An HDG-type discretization of 1D embedded blood flow in complex networks with Riemann-coupled junctions"
   authors:
     - given-names: Raksha
@@ -24,4 +24,7 @@ preferred-citation:
     - given-names: Lucas O.
       family-names: Müller
   year: 2026
-  notes: "Submitted to arXiv; announcement and public identifier pending."
+  date-published: 2026-10-29
+  journal: arXiv
+  doi: "10.48550/arXiv.2610.40080"
+  url: "https://arxiv.org/abs/2610.40080"

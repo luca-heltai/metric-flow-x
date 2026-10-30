@@ -1,7 +1,10 @@
 {
   "manuscript_title": "An HDG-type discretization of 1D embedded blood flow in complex networks with Riemann-coupled junctions",
   "manuscript_revision": "f7e92b6",
-  "status": "Submitted to arXiv, 2026; announcement and public identifier pending",
+  "status": "Available on arXiv, 2026",
+  "arxiv_id": "2610.40080",
+  "doi": "10.48550/arXiv.2610.40080",
+  "url": "https://arxiv.org/abs/2610.40080",
   "source_root": "2026_1d_blood_flow",
   "note": "Archived figures copied from the manuscript. No simulations or comparisons with the current solver were performed for this documentation update.",
   "files": [

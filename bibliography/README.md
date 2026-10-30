@@ -9,11 +9,12 @@ from this source; existing canonical entries retain their metadata.
 
 ## Manuscript status
 
-The maintainer supplied an arXiv receipt confirming submission. The
-`devi2026hdg` entry therefore says “Submitted to arXiv; announcement and public
-identifier pending.” No public arXiv identifier or DOI has been supplied;
-neither is inferred from the temporary submission number. `CITATION.cff`
-records software version 1.0.0 and the manuscript as the preferred citation.
+The preprint by Raksha Devi, Luca Heltai and Lucas O. Müller is available as
+[arXiv:2610.40080](https://arxiv.org/abs/2610.40080), submitted on 29 October
+2026, with DOI [10.48550/arXiv.2610.40080](https://doi.org/10.48550/arXiv.2610.40080).
+The `devi2026hdg` entry uses the public arXiv metadata and includes the preprint
+identifier, subject class, DOI and URL. `CITATION.cff` records software version
+1.0.0 and the preprint as the preferred citation.
 
 ## Metadata policy
 
