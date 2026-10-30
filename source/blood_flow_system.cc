@@ -4547,6 +4547,118 @@ namespace MetricFlowX
     destination.compress(VectorOperation::add);
   }
 
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::add_external_pressure_state_jacobian(
+    const double                    t,
+    const VectorType               &y,
+    const ExternalPressureProvider &provider,
+    MatrixType                     &destination) const
+  {
+    TimerOutput::Scope timer(computing_timer,
+                             "add_external_pressure_state_jacobian");
+    AssertThrow(provider,
+                ExcMessage("An external-pressure provider cannot be empty."));
+    AssertDimension(destination.m(), n_total_dofs);
+    AssertDimension(destination.n(), n_total_dofs);
+    if (numerical_flux_type == NumericalFluxType::HLL)
+      {
+        auto *self = const_cast<BloodFlowSystem *>(this);
+        self->update_ghosted_vectors(y);
+        const FEValuesExtractors::Scalar area(0), velocity(1);
+        const QGauss<dim - 1>            quadrature(1);
+        hp::FEFaceValues<dim, spacedim>  values(
+          fe_collection_,
+          hp::QCollection<dim - 1>(quadrature),
+          update_values | update_normal_vectors | update_quadrature_points);
+        const double area_floor = 1.e-10;
+        for (const auto &face : interior_faces)
+          {
+            const double raw_trace_area = y_relevant[face.trace.a_hat_dof];
+            const double trace_area     = std::max(raw_trace_area, area_floor);
+            const double trace_velocity = y_relevant[face.trace.u_hat_dof];
+            const double reference_area =
+              compute_a_d_at_face(face.cell, face.face_no);
+            for (unsigned int side = 0; side < 2; ++side)
+              {
+                const auto &cell  = side == 0 ? face.cell : face.neighbor;
+                const auto &other = side == 0 ? face.neighbor : face.cell;
+                const unsigned int f =
+                  side == 0 ? face.face_no : face.neighbor_face_no;
+                values.reinit(cell, f);
+                const auto         &fev = values.get_present_fe_values();
+                std::vector<double> a(1), u(1);
+                fev[area].get_function_values(y_relevant, a);
+                fev[velocity].get_function_values(y_relevant, u);
+                const double cell_area = std::max(a[0], area_floor);
+                const double bn = compute_interior_tangent_normal_product(
+                  cell, fev.get_normal_vectors()[0]);
+                const auto  &point = fev.quadrature_point(0);
+                const double p_cell =
+                  external_pressure({t, point, cell->material_id(), cell->id()},
+                                    &provider);
+                const double p_other = external_pressure(
+                  {t, point, other->material_id(), other->id()}, &provider);
+                const double c_cell  = compute_wave_speed(cell_area,
+                                                         cell->material_id(),
+                                                         reference_area);
+                const double c_trace = compute_wave_speed(trace_area,
+                                                          other->material_id(),
+                                                          reference_area);
+                const double c       = .5 * (c_cell + c_trace),
+                             mean_u  = .5 * (u[0] + trace_velocity);
+                // In a supersonic branch the fixed pressure flux comes from
+                // one side and its state derivative is zero.
+                if (mean_u - c >= 0. || mean_u + c <= 0.)
+                  continue;
+                const double cell_dc =
+                  a[0] > area_floor ?
+                    compute_wave_speed_derivative(cell_area,
+                                                  cell->material_id(),
+                                                  reference_area) :
+                    0.;
+                const double trace_dc =
+                  raw_trace_area > area_floor ?
+                    compute_wave_speed_derivative(trace_area,
+                                                  other->material_id(),
+                                                  reference_area) :
+                    0.;
+                const auto derivative =
+                  [&](double da, double du, double dat, double dut) {
+                    const double dc = .5 * (cell_dc * da + trace_dc * dat);
+                    // F=M*ydot-R: negate the derivative of the raw HLL flux.
+                    return -.5 * bn * (p_cell - p_other) / density *
+                           (.5 * (du + dut) / c - mean_u * dc / (c * c));
+                  };
+                std::vector<types::global_dof_index> indices(
+                  cell->get_fe().n_dofs_per_cell());
+                cell->get_dof_indices(indices);
+                for (unsigned int j = 0; j < indices.size(); ++j)
+                  {
+                    const double entry = derivative(fev[area].value(j, 0),
+                                                    fev[velocity].value(j, 0),
+                                                    0.,
+                                                    0.);
+                    if (entry != 0.)
+                      destination.add(face.trace.u_hat_dof, indices[j], entry);
+                  }
+                destination.add(face.trace.u_hat_dof,
+                                face.trace.a_hat_dof,
+                                derivative(0., 0., 1., 0.));
+                destination.add(face.trace.u_hat_dof,
+                                face.trace.u_hat_dof,
+                                derivative(0., 0., 0., 1.));
+              }
+          }
+      }
+    else if (numerical_flux_type == NumericalFluxType::LAX_FRIEDRICHS ||
+             numerical_flux_type == NumericalFluxType::HLL_HDG)
+      {
+        // Their prescribed-pressure fluxes have no state-dependent weights.
+      }
+    destination.compress(VectorOperation::add);
+  }
+
   // ============================================================================
   // assemble_jacobian
   //
@@ -4643,6 +4755,11 @@ namespace MetricFlowX
     jacobian_matrix.compress(VectorOperation::insert);
     if (viscoelastic_wall)
       assemble_viscous_wall(y, ydot, nullptr, &jacobian_matrix, false);
+    if (external_pressure_provider)
+      add_external_pressure_state_jacobian(t,
+                                           y,
+                                           external_pressure_provider,
+                                           jacobian_matrix);
     state_jacobian_matrix_.copy_from(jacobian_matrix);
   }
 

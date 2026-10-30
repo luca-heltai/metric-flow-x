@@ -176,6 +176,80 @@ test()
                         ", action=" + Utilities::to_string(scale)));
         }
 
+      // A discontinuous pressure by incident CellId gives unequal traces at
+      // ordinary interior faces. Continuous pressure would hide HLL weights.
+      const Flow::ExternalPressureProvider pressure = [](const auto &point) {
+        unsigned int ordinal = 0;
+        for (const auto child : point.cell_id.get_child_indices())
+          ordinal = 2 * ordinal + child;
+        return 50. * (1. + ordinal) + 13. * point.point[0];
+      };
+      DynamicSparsityPattern pattern(y.size(),
+                                     y.size(),
+                                     flow.locally_owned_dofs());
+      const auto            &prototype = flow.state_jacobian_matrix();
+      for (const auto row : flow.locally_owned_dofs())
+        for (auto entry = prototype.begin(row); entry != prototype.end(row);
+             ++entry)
+          pattern.add(row, entry->column());
+      for (const auto flux : {Flow::NumericalFluxType::HLL,
+                              Flow::NumericalFluxType::LAX_FRIEDRICHS,
+                              Flow::NumericalFluxType::HLL_HDG})
+        {
+          flow.set_numerical_flux(flux);
+          MatrixType pressure_jacobian;
+          pressure_jacobian.reinit(flow.locally_owned_dofs(),
+                                   flow.locally_owned_dofs(),
+                                   pattern,
+                                   comm);
+          flow.add_external_pressure_state_jacobian(.17,
+                                                    y,
+                                                    pressure,
+                                                    pressure_jacobian);
+          pressure_jacobian.vmult(action, direction);
+          forward  = 0.;
+          backward = 0.;
+          flow.add_external_pressure_residual(.17, plus, pressure, forward);
+          flow.add_external_pressure_residual(.17, minus, pressure, backward);
+          forward -= backward;
+          forward *= .5 / epsilon;
+          forward -= action;
+          AssertThrow(
+            forward.l2_norm() < 1.e-6 * action.l2_norm() + 1.e-11,
+            ExcMessage(
+              "Prescribed-pressure state derivative disagrees with finite differences."));
+          if (flux == Flow::NumericalFluxType::HLL && refinement > 0)
+            AssertThrow(
+              action.l2_norm() > 1.e-8,
+              ExcMessage(
+                "Refined HLL pressure traces did not exercise a state derivative."));
+          else if (flux == Flow::NumericalFluxType::LAX_FRIEDRICHS ||
+                   flux == Flow::NumericalFluxType::HLL_HDG || refinement == 0)
+            AssertThrow(action.l2_norm() == 0., ExcInternalError());
+          flow.add_external_pressure_state_jacobian(.17,
+                                                    y,
+                                                    pressure,
+                                                    pressure_jacobian);
+          pressure_jacobian.vmult(forward, direction);
+          forward.add(-2., action);
+          AssertThrow(forward.l2_norm() < 1.e-12,
+                      ExcMessage("Pressure Jacobian is not additive."));
+        }
+      flow.set_numerical_flux(Flow::NumericalFluxType::HLL);
+      flow.set_external_pressure_provider(pressure);
+      flow.assemble_state_jacobian(.17, y, rate);
+      flow.state_jacobian_matrix().vmult(action, direction);
+      flow.assemble_residual(.17, plus, rate, forward);
+      flow.assemble_residual(.17, minus, rate, backward);
+      forward -= backward;
+      forward *= .5 / epsilon;
+      forward -= action;
+      AssertThrow(
+        forward.l2_norm() < 1.e-6 * action.l2_norm() + 1.e-10,
+        ExcMessage(
+          "Fixed-provider native Jacobian disagrees with finite differences."));
+      flow.clear_external_pressure_provider();
+
       AssertThrow(!std::ifstream("unused_in_memory_input.vtk"),
                   ExcMessage(
                     "The in-memory test unexpectedly has a mesh input file."));

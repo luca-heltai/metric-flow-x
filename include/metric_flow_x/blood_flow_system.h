@@ -348,9 +348,9 @@ namespace MetricFlowX
      *
      * This is an external datum, not a BloodFlowSystem state variable.  Its
      * derivative with respect to A, y, and ydot is therefore zero.
-     * The provider is called while assembling residuals (and while computing
-     * pressure output), but state and derivative Jacobian assembly does not
-     * call it because its value is held fixed and has zero native derivative.
+     * State differentiation holds provider values fixed, but includes the
+     * dependence of HLL pressure-flux weights on native flow state. There is
+     * no pressure-provider contribution to dF/dydot.
      */
     using ExternalPressureProvider =
       std::function<double(const PressureEvaluationPoint &)>;
@@ -599,6 +599,18 @@ namespace MetricFlowX
                                    const VectorType               &y,
                                    const ExternalPressureProvider &provider,
                                    VectorType &destination) const;
+
+    /** Add d(pressure-only F)/dy with provider values held fixed.
+     * Destination must have the native state-Jacobian layout and sparsity.
+     * HLL weights depend on flow state even though the provider itself does
+     * not. This contribution is zero for LF and HLL-HDG fluxes.
+     */
+    void
+    add_external_pressure_state_jacobian(
+      const double                    t,
+      const VectorType               &y,
+      const ExternalPressureProvider &provider,
+      MatrixType                     &destination) const;
 
     // Jacobian dF/dy + alpha * dF/dydot.
     void

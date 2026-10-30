@@ -79,9 +79,10 @@ point, vessel id, and the incident centerline `CellId`, and returns pressure
 in the same units as the network data. MetricFlowX uses
 `p_internal = p_tube(A) + p_external(t, x, vessel_id)` in momentum fluxes,
 RCR pressure relations, junction total-head equations, and pressure output.
-The default provider is zero; the provider is external data and is not
-linearized as part of either native Jacobian. It is called during residual
-assembly and pressure output, but not during Jacobian assembly.
+The default provider is zero. Its values are external data held fixed when
+linearizing native state. HLL pressure-flux weights depend on flow state, and
+the state Jacobian includes this dependence. The provider has no time-derivative
+state contribution.
 
 Embedding applications that own a pressure field can call
 `add_external_pressure_residual(t, y, provider, destination)`. This adds only
@@ -89,6 +90,13 @@ the external-pressure part of the native residual, using additive semantics;
 it does not install or replace the system's provider. The candidate state is
 used for the state-dependent numerical-flux branch, while the supplied
 pressure remains independent of the native flow unknowns.
+
+`add_external_pressure_state_jacobian(t, y, provider, destination)` adds the
+flow-state derivative of that same pressure-only residual. The destination
+must have native state-Jacobian dimensions and sparsity. Embedding applications
+with their own pressure coefficients assemble this block separately from the
+derivative with respect to those coefficients. This block is zero for LF and
+HLL-HDG; HLL uses the analytic derivative of its state-dependent weights.
 
 The state layout is deliberately not split into separate area and velocity
 vectors. Component values are identified with
