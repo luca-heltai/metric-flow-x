@@ -84,8 +84,15 @@ test()
       Flow flow(comm);
       flow.initialize_params("network_physics.prm");
       mesh(flow, refinement);
-      const auto input = physics();
-      flow.setup(input);
+      const auto input    = physics();
+      const auto packed   = Utilities::pack(input);
+      const auto received = Utilities::unpack<Flow::NetworkPhysics>(packed);
+      flow.setup(received);
+      AssertThrow(received.terminals.at(2).label == "venous" &&
+                    received.terminal_connections[0].boundary0 == 1 &&
+                    received.terminal_connections[0].boundary1 == 2 &&
+                    received.terminal_connections[0].resistance == 1.e9,
+                  ExcMessage("Coefficient serialization lost terminal data."));
       AssertThrow(flow.triangulation().n_global_active_cells() ==
                     2u * (1u << refinement),
                   ExcInternalError());
@@ -96,6 +103,11 @@ test()
           AssertThrow(actual.r_in == expected.r_in &&
                         actual.r_out == expected.r_out &&
                         actual.a_d == expected.a_d &&
+                        actual.a0 == expected.a0 &&
+                        actual.r_d == expected.r_d && actual.E == expected.E &&
+                        actual.h_wall == expected.h_wall &&
+                        actual.p_d == expected.p_d &&
+                        actual.p0 == expected.p0 && actual.L == expected.L &&
                         actual.dynamic_viscosity == expected.dynamic_viscosity,
                       ExcMessage("In-memory coefficients changed."));
         }

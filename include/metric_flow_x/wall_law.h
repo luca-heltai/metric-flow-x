@@ -26,6 +26,14 @@ namespace MetricFlowX
     double ee = 0., ec = 0., epsilon0 = 0., epsilonr = 0.;
     double stiffness = 0., m = 0., n = 0., reference_pressure = 0., km = 0.;
 
+    template <class Archive>
+    void
+    serialize(Archive &archive, const unsigned int)
+    {
+      archive &type &ee &ec &epsilon0 &epsilonr &stiffness &m &n
+        &reference_pressure &km;
+    }
+
     struct Elastic
     {
       double pressure, first, second;

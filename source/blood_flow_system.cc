@@ -548,15 +548,6 @@ namespace MetricFlowX
                  dof_handler_.n_dofs() == 0 && !physics.vessels.empty() &&
                  physics.vessels.size() < std::numeric_limits<int>::max() &&
                  initial_state_source == "rest";
-    std::vector<double> coefficients;
-    const auto          text = [&](const std::string &value) {
-      coefficients.push_back(value.size());
-      for (const unsigned char c : value)
-        coefficients.push_back(c);
-    };
-    text(wall_model);
-    text(outlet_type);
-    coefficients.push_back(physics.vessels.size());
     unsigned int expected = 0;
     for (const auto &[id, v] : physics.vessels)
       {
@@ -565,7 +556,6 @@ namespace MetricFlowX
           v.a0 > 0. && v.a_d > 0. && v.r_d > 0. && v.L > 0. &&
           v.dynamic_viscosity >= 0. &&
           ((v.r_in == 0. && v.r_out == 0.) || (v.r_in > 0. && v.r_out > 0.));
-        coefficients.push_back(id);
         for (const double value : {v.a0,
                                    v.r_d,
                                    v.a_d,
@@ -589,7 +579,6 @@ namespace MetricFlowX
                                    v.wall.km})
           {
             valid = valid && std::isfinite(value);
-            coefficients.push_back(value);
           }
         if (v.wall.type == WallLaw::Type::square_root)
           valid =
@@ -610,22 +599,17 @@ namespace MetricFlowX
         else
           valid = false;
       }
-    coefficients.push_back(physics.terminals.size());
     for (const auto &[id, terminal] : physics.terminals)
       {
         valid = valid && id != 0 && id != 255 &&
                 id != numbers::invalid_boundary_id && terminal.R1 >= 0. &&
                 terminal.R2 > 0. && terminal.C >= 0.;
-        coefficients.push_back(id);
         for (const double value :
              {terminal.R1, terminal.R2, terminal.C, terminal.P_out})
           {
             valid = valid && std::isfinite(value);
-            coefficients.push_back(value);
           }
-        text(terminal.label);
       }
-    coefficients.push_back(physics.terminal_connections.size());
     std::set<std::pair<types::boundary_id, types::boundary_id>> connections;
     for (const auto &connection : physics.terminal_connections)
       {
@@ -635,16 +619,16 @@ namespace MetricFlowX
                 std::isfinite(connection.resistance) &&
                 connection.resistance > 0. &&
                 connections.emplace(std::min(a, b), std::max(a, b)).second;
-        coefficients.insert(coefficients.end(),
-                            {static_cast<double>(a),
-                             static_cast<double>(b),
-                             connection.resistance});
       }
     AssertThrow(
       Utilities::MPI::min(valid ? 1u : 0u, mpi_communicator_) == 1,
       ExcMessage(
         "In-memory setup requires a prepared mesh, undistributed DoFs, "
         "compact vessel ids, valid physics and the native rest seed."));
+    auto       coefficients = Utilities::pack(physics);
+    const auto controls =
+      Utilities::pack(std::vector<std::string>{wall_model, outlet_type});
+    coefficients.insert(coefficients.end(), controls.begin(), controls.end());
     // Only coefficient tables are compared. No mesh geometry or incidence is
     // collected, including when a rank owns no cells.
     const auto reference =

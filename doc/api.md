@@ -24,6 +24,13 @@ mesh remains distributed and setup does not construct a replicated coarse graph.
 The existing global reductions compute straight-vessel arclength bounds for
 native taper interpolation across partitions.
 
+The coefficient value types support deal.II's `Utilities::pack`,
+`Utilities::unpack` and MPI exchanges. A distributed mesh owner can therefore
+prepare vessel coefficients at their physical owners and exchange only these
+records to build the replicated native tables. This communication does not
+require the physical graph's coordinates or interior connectivity. These are
+in-process coefficient records, not a versioned persistent network format.
+
 For example, after preparing a single straight `0.1 m` vessel with material id
 zero, inflow boundary zero and terminal boundary one:
 

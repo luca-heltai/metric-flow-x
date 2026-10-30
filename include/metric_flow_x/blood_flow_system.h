@@ -58,6 +58,10 @@
 
 #include <deal.II/sundials/ida.h>
 
+#include <boost/serialization/map.hpp>
+#include <boost/serialization/string.hpp>
+#include <boost/serialization/vector.hpp>
+
 #include <metric_flow_x/inflow_series.h>
 #include <metric_flow_x/parsed_tools/constants.h>
 #include <metric_flow_x/parsed_tools/function.h>
@@ -365,6 +369,14 @@ namespace MetricFlowX
       double  r_out             = 0.0;
       double  dynamic_viscosity = 0.0; // Pa s; optional per-vessel VTK value
       WallLaw wall;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &a0 &r_d &a_d &E &h_wall &p_d &p0 &L &r_in &r_out
+          &dynamic_viscosity &wall;
+      }
     };
 
     /** Native R1/R2 in Pa s/m^3, C in m^3/Pa and P_out in Pa. */
@@ -372,12 +384,26 @@ namespace MetricFlowX
     {
       double      R1 = 0., R2 = 0., C = 0., P_out = 0.;
       std::string label;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &R1 &R2 &C &P_out &label;
+      }
     };
 
     struct TerminalConnection
     {
       types::boundary_id boundary0 = 0, boundary1 = 0;
       double             resistance = 0.;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &boundary0 &boundary1 &resistance;
+      }
     };
 
     /** Replicated coefficient tables for an externally prepared mesh.
@@ -390,6 +416,13 @@ namespace MetricFlowX
       std::map<unsigned int, VesselProperties> vessels;
       std::map<types::boundary_id, RCRPhysics> terminals;
       std::vector<TerminalConnection>          terminal_connections;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &vessels &terminals &terminal_connections;
+      }
     };
 
     void
