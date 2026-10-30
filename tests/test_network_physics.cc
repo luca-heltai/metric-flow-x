@@ -72,6 +72,7 @@ test()
           << "subsection MetricFlowSystem<1, 3>\n"
           << " set Vtk file path for mesh input = unused_in_memory_input.vtk\n"
           << " set Wall model = Square root\n"
+          << " set Numerical flux type = HLL\n"
           << " set Outlet boundary condition type = RCR\n"
           << " set Number of global refinement = 0\n"
           << " set Finite element degree = 1\n"
@@ -120,6 +121,61 @@ test()
       AssertThrow(std::isfinite(residual.l2_norm()) && rate.l2_norm() > 0.,
                   ExcMessage(
                     "Nonzero forcing did not reach the native equations."));
+      // Nonuniform interior and trace states expose derivatives of the HLL
+      // wave speeds. A uniform rest state makes those terms vanish.
+      auto direction = flow.make_state();
+      for (const auto component :
+           {Flow::Component::area, Flow::Component::area_trace})
+        for (const auto i : flow.component_dofs(component))
+          if (flow.locally_owned_dofs().is_element(i))
+            {
+              y[i] *= 1. + .1 * std::sin(.3 * (i + 1));
+              direction[i] = .03 * y[i] * (1. + .1 * std::cos(.2 * (i + 1)));
+            }
+      for (const auto component :
+           {Flow::Component::velocity, Flow::Component::velocity_trace})
+        for (const auto i : flow.component_dofs(component))
+          if (flow.locally_owned_dofs().is_element(i))
+            {
+              y[i]         = .1 + .07 * std::sin(.4 * (i + 1));
+              direction[i] = .07 * std::cos(.37 * (i + 1));
+            }
+      y.compress(VectorOperation::insert);
+      direction.compress(VectorOperation::insert);
+      flow.assemble_state_jacobian(.17, y, rate);
+      auto action = flow.make_state();
+      flow.state_jacobian_matrix().vmult(action, direction);
+      const double epsilon = 1.e-5;
+      auto         plus = y, minus = y;
+      plus.add(epsilon, direction);
+      minus.add(-epsilon, direction);
+      auto forward = flow.make_state(), backward = flow.make_state();
+      flow.assemble_residual(.17, plus, rate, forward);
+      flow.assemble_residual(.17, minus, rate, backward);
+      forward -= backward;
+      forward *= .5 / epsilon;
+      forward -= action;
+      for (const auto component : {Flow::Component::area,
+                                   Flow::Component::velocity,
+                                   Flow::Component::area_trace,
+                                   Flow::Component::velocity_trace})
+        {
+          double error = 0., scale = 0.;
+          for (const auto i : flow.component_dofs(component))
+            if (flow.locally_owned_dofs().is_element(i))
+              {
+                error += forward[i] * forward[i];
+                scale += action[i] * action[i];
+              }
+          error = std::sqrt(Utilities::MPI::sum(error, comm));
+          scale = std::sqrt(Utilities::MPI::sum(scale, comm));
+          AssertThrow(error < 1.e-6 * scale + 1.e-10,
+                      ExcMessage(
+                        "Nonuniform HLL state derivative mismatch: error=" +
+                        Utilities::to_string(error) +
+                        ", action=" + Utilities::to_string(scale)));
+        }
+
       AssertThrow(!std::ifstream("unused_in_memory_input.vtk"),
                   ExcMessage(
                     "The in-memory test unexpectedly has a mesh input file."));

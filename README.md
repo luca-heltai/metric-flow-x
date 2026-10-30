@@ -228,6 +228,9 @@ The suite covers residual and Jacobian finite differences, mass assembly,
 junctions, VTK input, and a coupling-readiness test that exercises state
 creation, DAE masks, component extraction, split Jacobians, and constitutive
 observables without using ImmersX.
+The Square root HLL regression also uses nonuniform interior and trace states
+and checks each component against finite differences, including the derivatives
+of the state-dependent wave speeds.
 
 The formulation and derivation remain documented in `doc/math.md` and
 `latex/blood_flow.tex`.

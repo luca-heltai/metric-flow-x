@@ -3315,29 +3315,29 @@ namespace MetricFlowX
     std::array<double, 2> result = {
       {(s_R * FAL_j - s_L * FAR_j + s_R * s_L * (dA_R - dA_L)) * inv,
        (s_R * FUL_j - s_L * FUR_j + s_R * s_L * (dU_R - dU_L)) * inv}};
-    if (wall_model != "Square root")
-      {
-        const double du = .5 * (dU_L + dU_R);
-        const double dc =
-          .5 * (compute_wave_speed_derivative(A_L, vid_L, ad_L) * dA_L +
-                compute_wave_speed_derivative(A_R, vid_R, ad_R) * dA_R);
-        const double dsL = du - dc, dsR = du + dc;
-        const auto   flux = hll_flux(
-          bn_L, bn_R, A_L, U_L, A_R, U_R, vid_L, vid_R, ad_L, ad_R, 0., 0.);
-        const std::array<double, 2> left = {
-          scalar_area_flux(bn_L, A_L, U_L),
-          scalar_momentum_flux(
-            bn_L, U_L, compute_pressure_value(A_L, vid_L, ad_L), density)};
-        const std::array<double, 2> right = {
-          scalar_area_flux(bn_R, A_R, U_R),
-          scalar_momentum_flux(
-            bn_R, U_R, compute_pressure_value(A_R, vid_R, ad_R), density)};
-        const std::array<double, 2> jump = {A_R - A_L, U_R - U_L};
-        for (unsigned int i = 0; i < 2; ++i)
-          result[i] +=
-            inv * (dsR * left[i] - dsL * right[i] +
-                   (dsR * s_L + s_R * dsL) * jump[i] - (dsR - dsL) * flux[i]);
-      }
+    // The HLL wave speeds depend on state for every wall law.
+    {
+      const double du = .5 * (dU_L + dU_R);
+      const double dc =
+        .5 * (compute_wave_speed_derivative(A_L, vid_L, ad_L) * dA_L +
+              compute_wave_speed_derivative(A_R, vid_R, ad_R) * dA_R);
+      const double dsL = du - dc, dsR = du + dc;
+      const auto   flux = hll_flux(
+        bn_L, bn_R, A_L, U_L, A_R, U_R, vid_L, vid_R, ad_L, ad_R, 0., 0.);
+      const std::array<double, 2> left = {
+        scalar_area_flux(bn_L, A_L, U_L),
+        scalar_momentum_flux(
+          bn_L, U_L, compute_pressure_value(A_L, vid_L, ad_L), density)};
+      const std::array<double, 2> right = {
+        scalar_area_flux(bn_R, A_R, U_R),
+        scalar_momentum_flux(
+          bn_R, U_R, compute_pressure_value(A_R, vid_R, ad_R), density)};
+      const std::array<double, 2> jump = {A_R - A_L, U_R - U_L};
+      for (unsigned int i = 0; i < 2; ++i)
+        result[i] +=
+          inv * (dsR * left[i] - dsL * right[i] +
+                 (dsR * s_L + s_R * dsL) * jump[i] - (dsR - dsL) * flux[i]);
+    }
     return result;
   }
 
