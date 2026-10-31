@@ -425,10 +425,31 @@ namespace MetricFlowX
     derivative_jacobian_is_current_ = false;
 
     ParameterAcceptor::initialize(filename,
-                                  "last_used_parameters.prm",
+                                  "",
                                   ParameterHandler::Short,
                                   this->prm,
                                   ParameterHandler::Short);
+
+    std::string parameter_output_error;
+    if (this_mpi_process == 0)
+      try
+        {
+          if (!output_directory.empty())
+            std::filesystem::create_directories(output_directory);
+          const auto snapshot = std::filesystem::path(output_directory) /
+                                "last_used_parameters.prm";
+          this->prm.print_parameters(snapshot.string(),
+                                     ParameterHandler::Short);
+        }
+      catch (const std::exception &error)
+        {
+          parameter_output_error = error.what();
+        }
+    parameter_output_error =
+      Utilities::MPI::broadcast(mpi_communicator_, parameter_output_error, 0);
+    AssertThrow(parameter_output_error.empty(),
+                ExcMessage("Could not write parameter snapshot: " +
+                           parameter_output_error));
 
     AssertThrow(
       wall_model == "Square root" || wall_model == "ADAVN arterial" ||

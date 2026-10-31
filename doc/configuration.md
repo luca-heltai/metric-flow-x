@@ -2,6 +2,8 @@
 
 The application uses deal.II's `ParameterAcceptor`. `BloodFlowSystem<1, 3>::initialize_params()` reads the file passed on the command line. For compatibility, its registered parameter section remains named `MetricFlowSystem<1, 3>`; it contains an `IDA parameters` subsection and the `Metric Flow Parameters` constants section. Example files under `parameters/` are the best source for complete syntax; files from older experiments can contain legacy sections and should not be assumed interchangeable.
 
+Initialization writes `last_used_parameters.prm` in the configured `Output directory`, creating that directory when needed. Only rank zero writes the snapshot; a write failure is reported collectively. An empty output directory retains the current working directory.
+
 ## System parameters
 
 The following entries are registered by `BloodFlowSystem` in `include/metric_flow_x/blood_flow_system.h` and `source/blood_flow_system.cc`:

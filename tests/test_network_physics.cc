@@ -4,6 +4,9 @@
 
 #include <metric_flow_x/blood_flow_system.h>
 
+#include <filesystem>
+#include <fstream>
+
 #include "tests.h"
 
 using namespace MetricFlowX;
@@ -67,9 +70,12 @@ test()
   const auto size = Utilities::MPI::n_mpi_processes(comm);
   if (rank == 0)
     {
+      std::ofstream marker("last_used_parameters.prm");
+      marker << "caller-owned marker\n";
       std::ofstream prm("network_physics.prm");
       prm << "subsection Functions\n set Inflow function = 2e-9*(1+t)\nend\n"
           << "subsection MetricFlowSystem<1, 3>\n"
+          << " set Output directory = network-physics-output\n"
           << " set Vtk file path for mesh input = unused_in_memory_input.vtk\n"
           << " set Wall model = Square root\n"
           << " set Numerical flux type = HLL\n"
@@ -84,6 +90,18 @@ test()
       ParameterAcceptor::clear();
       Flow flow(comm);
       flow.initialize_params("network_physics.prm");
+      const std::filesystem::path snapshot(
+        "network-physics-output/last_used_parameters.prm");
+      AssertThrow(std::filesystem::is_regular_file(snapshot) &&
+                    std::filesystem::file_size(snapshot) > 0,
+                  ExcMessage(
+                    "Parameter snapshot is outside the output directory."));
+      std::ifstream marker("last_used_parameters.prm");
+      std::string   marker_text;
+      std::getline(marker, marker_text);
+      AssertThrow(marker_text == "caller-owned marker",
+                  ExcMessage(
+                    "Parameter initialization overwrote a caller file."));
       mesh(flow, refinement);
       const auto input    = physics();
       const auto packed   = Utilities::pack(input);
@@ -282,6 +300,31 @@ test()
       AssertThrow(Utilities::MPI::sum(caught ? 1u : 0u, comm) == size,
                   ExcMessage("Invalid input was not rejected collectively."));
     }
+  if (rank == 0)
+    {
+      std::ofstream blocked("snapshot-directory-file");
+      blocked << "not a directory\n";
+      std::ifstream input("network_physics.prm");
+      std::ofstream invalid("snapshot-failure.prm");
+      invalid << input.rdbuf() << "\nsubsection MetricFlowSystem<1, 3>\n"
+              << " set Output directory = snapshot-directory-file\nend\n";
+    }
+  MPI_Barrier(comm);
+  ParameterAcceptor::clear();
+  {
+    Flow flow(comm);
+    bool caught = false;
+    try
+      {
+        flow.initialize_params("snapshot-failure.prm");
+      }
+    catch (const ExceptionBase &)
+      {
+        caught = true;
+      }
+    AssertThrow(Utilities::MPI::sum(caught ? 1u : 0u, comm) == size,
+                ExcMessage("Snapshot write failure was not collective."));
+  }
   deallog.depth_file(10);
   deallog << "MetricFlowX in-memory physics: PASSED" << std::endl;
 }
