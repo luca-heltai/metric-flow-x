@@ -58,6 +58,10 @@
 
 #include <deal.II/sundials/ida.h>
 
+#include <boost/serialization/map.hpp>
+#include <boost/serialization/string.hpp>
+#include <boost/serialization/vector.hpp>
+
 #include <metric_flow_x/inflow_series.h>
 #include <metric_flow_x/parsed_tools/constants.h>
 #include <metric_flow_x/parsed_tools/function.h>
@@ -344,9 +348,9 @@ namespace MetricFlowX
      *
      * This is an external datum, not a BloodFlowSystem state variable.  Its
      * derivative with respect to A, y, and ydot is therefore zero.
-     * The provider is called while assembling residuals (and while computing
-     * pressure output), but state and derivative Jacobian assembly does not
-     * call it because its value is held fixed and has zero native derivative.
+     * State differentiation holds provider values fixed, but includes the
+     * dependence of HLL pressure-flux weights on native flow state. There is
+     * no pressure-provider contribution to dF/dydot.
      */
     using ExternalPressureProvider =
       std::function<double(const PressureEvaluationPoint &)>;
@@ -365,10 +369,73 @@ namespace MetricFlowX
       double  r_out             = 0.0;
       double  dynamic_viscosity = 0.0; // Pa s; optional per-vessel VTK value
       WallLaw wall;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &a0 &r_d &a_d &E &h_wall &p_d &p0 &L &r_in &r_out
+          &dynamic_viscosity &wall;
+      }
+    };
+
+    /** Native R1/R2 in Pa s/m^3, C in m^3/Pa and P_out in Pa. */
+    struct RCRPhysics
+    {
+      double      R1 = 0., R2 = 0., C = 0., P_out = 0.;
+      std::string label;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &R1 &R2 &C &P_out &label;
+      }
+    };
+
+    struct TerminalConnection
+    {
+      types::boundary_id boundary0 = 0, boundary1 = 0;
+      double             resistance = 0.;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &boundary0 &boundary1 &resistance;
+      }
+    };
+
+    /** Replicated coefficient tables for an externally prepared mesh.
+     * These contain no vertex coordinates or cell connectivity. Vessel keys
+     * are compact execution material ids 0,...,N-1, independent of a caller's
+     * physical identifiers. Boundary 0 is inflow and 255 denotes a junction.
+     */
+    struct NetworkPhysics
+    {
+      std::map<unsigned int, VesselProperties> vessels;
+      std::map<types::boundary_id, RCRPhysics> terminals;
+      std::vector<TerminalConnection>          terminal_connections;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &vessels &terminals &terminal_connections;
+      }
     };
 
     void
     initialize_params(const std::string &filename = "");
+
+    /** Read parameters and write their snapshot to an explicit path.
+     * Parent directories are created by rank zero. An empty output filename
+     * disables the snapshot. Call collectively; write failures are reported
+     * on every rank.
+     */
+    void
+    initialize_params(const std::string &filename,
+                      const std::string &output_filename);
 
     void
     setup();
@@ -386,6 +453,16 @@ namespace MetricFlowX
 
     void
     setup(const MeshInitializer &initialize_mesh);
+
+    /** Set up native DoFs on the already populated triangulation().
+     * Called collectively with identical coefficient tables on every rank.
+     * The caller owns refinement, partitioning and material/boundary ids.
+     * No input file or serial copy of the mesh is required. This path uses
+     * the native rest seed and consistency preparation; the optional static
+     * coarse-graph warm start requires the file-based input path.
+     */
+    void
+    setup(const NetworkPhysics &physics);
 
     VectorType
     make_state() const;
@@ -531,6 +608,18 @@ namespace MetricFlowX
                                    const VectorType               &y,
                                    const ExternalPressureProvider &provider,
                                    VectorType &destination) const;
+
+    /** Add d(pressure-only F)/dy with provider values held fixed.
+     * Destination must have the native state-Jacobian layout and sparsity.
+     * HLL weights depend on flow state even though the provider itself does
+     * not. This contribution is zero for LF and HLL-HDG fluxes.
+     */
+    void
+    add_external_pressure_state_jacobian(
+      const double                    t,
+      const VectorType               &y,
+      const ExternalPressureProvider &provider,
+      MatrixType                     &destination) const;
 
     // Jacobian dF/dy + alpha * dF/dydot.
     void
@@ -851,12 +940,9 @@ namespace MetricFlowX
 
     ExternalPressureProvider external_pressure_provider;
 
-    struct RCRPhysics
-    {
-      double      R1, R2, C, P_out;
-      std::string label;
-    };
     std::map<unsigned int, RCRPhysics> rcr_map;
+    bool                               in_memory_physics = false;
+    std::vector<TerminalConnection>    input_terminal_connections;
     // Coarse-mesh incidence, replicated before partitioning; output owners
     // need labels even when the terminal itself belongs to another rank.
     std::map<unsigned int, std::set<types::boundary_id>> vessel_terminals;
