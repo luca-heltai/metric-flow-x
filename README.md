@@ -32,7 +32,7 @@ observable `P(A)`; it is not an additional DAE unknown.
 #include <metric_flow_x/blood_flow_system.h>
 
 MetricFlowX::BloodFlowSystem<1, 3> flow(MPI_COMM_WORLD);
-flow.initialize_params("network.prm");
+flow.initialize_params("network.prm", "output/last_used_parameters.prm");
 flow.setup();
 
 auto y     = flow.make_state();

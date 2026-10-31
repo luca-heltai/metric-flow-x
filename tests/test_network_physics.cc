@@ -89,9 +89,10 @@ test()
     {
       ParameterAcceptor::clear();
       Flow flow(comm);
-      flow.initialize_params("network_physics.prm");
+      flow.initialize_params("network_physics.prm",
+                             "parameter-snapshots/last_used_parameters.prm");
       const std::filesystem::path snapshot(
-        "network-physics-output/last_used_parameters.prm");
+        "parameter-snapshots/last_used_parameters.prm");
       AssertThrow(std::filesystem::is_regular_file(snapshot) &&
                     std::filesystem::file_size(snapshot) > 0,
                   ExcMessage(
@@ -300,6 +301,11 @@ test()
       AssertThrow(Utilities::MPI::sum(caught ? 1u : 0u, comm) == size,
                   ExcMessage("Invalid input was not rejected collectively."));
     }
+  std::ifstream legacy_snapshot("last_used_parameters.prm");
+  std::string   legacy_line;
+  std::getline(legacy_snapshot, legacy_line);
+  AssertThrow(!legacy_line.empty() && legacy_line != "caller-owned marker",
+              ExcMessage("The legacy snapshot path changed."));
   if (rank == 0)
     {
       std::ofstream blocked("snapshot-directory-file");
@@ -313,10 +319,17 @@ test()
   ParameterAcceptor::clear();
   {
     Flow flow(comm);
+    flow.initialize_params("snapshot-failure.prm", "");
+  }
+  ParameterAcceptor::clear();
+  {
+    Flow flow(comm);
     bool caught = false;
     try
       {
-        flow.initialize_params("snapshot-failure.prm");
+        flow.initialize_params(
+          "snapshot-failure.prm",
+          "snapshot-directory-file/last_used_parameters.prm");
       }
     catch (const ExceptionBase &)
       {

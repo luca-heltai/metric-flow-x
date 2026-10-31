@@ -428,6 +428,15 @@ namespace MetricFlowX
     void
     initialize_params(const std::string &filename = "");
 
+    /** Read parameters and write their snapshot to an explicit path.
+     * Parent directories are created by rank zero. An empty output filename
+     * disables the snapshot. Call collectively; write failures are reported
+     * on every rank.
+     */
+    void
+    initialize_params(const std::string &filename,
+                      const std::string &output_filename);
+
     void
     setup();
 

@@ -421,6 +421,15 @@ namespace MetricFlowX
   void
   BloodFlowSystem<dim, spacedim>::initialize_params(const std::string &filename)
   {
+    initialize_params(filename, "last_used_parameters.prm");
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::initialize_params(
+    const std::string &filename,
+    const std::string &output_filename)
+  {
     TimerOutput::Scope t(computing_timer, "initialize_params");
     derivative_jacobian_is_current_ = false;
 
@@ -431,15 +440,14 @@ namespace MetricFlowX
                                   ParameterHandler::Short);
 
     std::string parameter_output_error;
-    if (this_mpi_process == 0)
+    if (this_mpi_process == 0 && !output_filename.empty())
       try
         {
-          if (!output_directory.empty())
-            std::filesystem::create_directories(output_directory);
-          const auto snapshot = std::filesystem::path(output_directory) /
-                                "last_used_parameters.prm";
-          this->prm.print_parameters(snapshot.string(),
-                                     ParameterHandler::Short);
+          const auto parent =
+            std::filesystem::path(output_filename).parent_path();
+          if (!parent.empty())
+            std::filesystem::create_directories(parent);
+          this->prm.print_parameters(output_filename, ParameterHandler::Short);
         }
       catch (const std::exception &error)
         {
