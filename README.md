@@ -32,7 +32,7 @@ observable `P(A)`; it is not an additional DAE unknown.
 #include <metric_flow_x/blood_flow_system.h>
 
 MetricFlowX::BloodFlowSystem<1, 3> flow(MPI_COMM_WORLD);
-flow.initialize_params("network.prm");
+flow.initialize_params("network.prm", "output/last_used_parameters.prm");
 flow.setup();
 
 auto y     = flow.make_state();
@@ -66,15 +66,23 @@ This lets an embedding Domain retain and transfer all imported properties
 while preparing the mesh. Construct the flow before its observing Domain so
 that the mesh outlives the Domain. Ordinary `setup()` keeps native mesh setup.
 
+Generated networks can populate `flow.triangulation()` directly and call
+`setup(const NetworkPhysics &)`. This skips VTK input and accepts the existing
+`VesselProperties`, native RCR terminal coefficients and terminal resistors in
+memory. Geometry and connectivity remain distributed; only coefficient tables
+are replicated, as in the file-based solver. See [the embedding API](doc/api.md)
+for ownership, identifiers and initialization requirements.
+
 An optional prescribed surrounding pressure can be supplied with
 `set_external_pressure_provider()`. The provider receives time, physical
 point, vessel id, and the incident centerline `CellId`, and returns pressure
 in the same units as the network data. MetricFlowX uses
 `p_internal = p_tube(A) + p_external(t, x, vessel_id)` in momentum fluxes,
 RCR pressure relations, junction total-head equations, and pressure output.
-The default provider is zero; the provider is external data and is not
-linearized as part of either native Jacobian. It is called during residual
-assembly and pressure output, but not during Jacobian assembly.
+The default provider is zero. Its values are external data held fixed when
+linearizing native state. HLL pressure-flux weights depend on flow state, and
+the state Jacobian includes this dependence. The provider has no time-derivative
+state contribution.
 
 Embedding applications that own a pressure field can call
 `add_external_pressure_residual(t, y, provider, destination)`. This adds only
@@ -82,6 +90,13 @@ the external-pressure part of the native residual, using additive semantics;
 it does not install or replace the system's provider. The candidate state is
 used for the state-dependent numerical-flux branch, while the supplied
 pressure remains independent of the native flow unknowns.
+
+`add_external_pressure_state_jacobian(t, y, provider, destination)` adds the
+flow-state derivative of that same pressure-only residual. The destination
+must have native state-Jacobian dimensions and sparsity. Embedding applications
+with their own pressure coefficients assemble this block separately from the
+derivative with respect to those coefficients. This block is zero for LF and
+HLL-HDG; HLL uses the analytic derivative of its state-dependent weights.
 
 The state layout is deliberately not split into separate area and velocity
 vectors. Component values are identified with
@@ -221,6 +236,9 @@ The suite covers residual and Jacobian finite differences, mass assembly,
 junctions, VTK input, and a coupling-readiness test that exercises state
 creation, DAE masks, component extraction, split Jacobians, and constitutive
 observables without using ImmersX.
+The Square root HLL regression also uses nonuniform interior and trace states
+and checks each component against finite differences, including the derivatives
+of the state-dependent wave speeds.
 
 The formulation and derivation remain documented in `doc/math.md` and
 `latex/blood_flow.tex`.

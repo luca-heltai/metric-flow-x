@@ -188,7 +188,7 @@ the nonlinear solve. See the [SUNDIALS IDAS documentation](https://sundials.read
 
 ## Logs and parameter receipt
 
-`ParameterAcceptor::initialize()` writes `last_used_parameters.prm` after reading the input. deal.II logging is controlled by `Verbosity (console depth)`, and rank zero is the visible writer in the MPI run.
+The one-argument `initialize_params()` writes `last_used_parameters.prm` in the current working directory after reading the input. The two-argument overload accepts an explicit snapshot filename; an empty filename disables it. Rank zero writes the file and reports failures collectively. deal.II logging is controlled by `Verbosity (console depth)`, and rank zero is the visible writer in the MPI run.
 
 ## Status
 
