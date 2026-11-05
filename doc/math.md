@@ -193,7 +193,14 @@ in momentum fluxes, terminal pressure relations, junction head equations and
 pressure output. The provider receives time, position, vessel ID and the
 incident centerline `CellId`. It is sampled during residual assembly and
 pressure output, and held fixed during native Jacobian assembly. It does
-not alter the tube-law wave speed or capacitor dynamics.
+not alter the tube-law wave speed.
+
+Connections between terminals use physical pressure at both ends. A terminal
+without a capacitor includes its surrounding pressure; a capacitor pressure
+is already a physical unknown. The surrounding pressure at an algebraic
+terminal therefore also enters a neighbouring capacitor's discharge.
+Connected terminal pressures are sampled on their owning ranks and exchanged
+as scalars, so field-backed providers need only evaluate locally relevant cells.
 
 `add_external_pressure_residual(t, y, provider, destination)` adds this
 contribution without replacing the installed provider. These interfaces

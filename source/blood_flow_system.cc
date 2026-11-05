@@ -2213,21 +2213,61 @@ namespace MetricFlowX
   }
 
   template <int dim, int spacedim>
+  std::map<types::boundary_id, double>
+  BloodFlowSystem<dim, spacedim>::terminal_external_pressures(
+    const double                    t,
+    const ExternalPressureProvider *provider) const
+  {
+    if (terminal_ports.empty() ||
+        (provider == nullptr && !external_pressure_provider))
+      return {};
+    std::map<types::boundary_id, double> local, result;
+    std::string                          error;
+    try
+      {
+        for (const auto &[bid, port] : terminal_ports)
+          if (locally_owned_dofs_.is_element(port.area))
+            {
+              const double pressure =
+                external_pressure({t, port.point, port.vessel, port.cell_id},
+                                  provider);
+              AssertThrow(std::isfinite(pressure),
+                          ExcMessage(
+                            "Nonfinite connected-terminal external pressure."));
+              local.emplace(bid, pressure);
+            }
+      }
+    catch (const std::exception &exception)
+      {
+        error = exception.what();
+      }
+    for (const auto &message :
+         Utilities::MPI::all_gather(mpi_communicator_, error))
+      AssertThrow(message.empty(), ExcMessage(message));
+    // A field-backed provider need only evaluate cells visible on this rank.
+    // Distant connected endpoints exchange their scalar pressure, not FE data.
+    for (const auto &part :
+         Utilities::MPI::all_gather(mpi_communicator_, local))
+      result.insert(part.begin(), part.end());
+    AssertDimension(result.size(), terminal_ports.size());
+    return result;
+  }
+
+  template <int dim, int spacedim>
   double
-  BloodFlowSystem<dim, spacedim>::terminal_pressure(types::boundary_id bid,
-                                                    const VectorType  &y,
-                                                    double             t) const
+  BloodFlowSystem<dim, spacedim>::terminal_pressure(
+    types::boundary_id                          bid,
+    const VectorType                           &y,
+    const std::map<types::boundary_id, double> &external_pressures) const
   {
     const auto it = rcr_pc_dof.find(bid);
     if (it != rcr_pc_dof.end())
       return y(it->second);
     const auto &port = terminal_ports.at(bid);
-    return compute_physical_pressure(std::max(y(port.area), 1e-10),
-                                     port.vessel,
-                                     port.reference_area,
-                                     t,
-                                     port.point,
-                                     port.cell_id);
+    return compute_pressure_value(std::max(y(port.area), 1e-10),
+                                  port.vessel,
+                                  port.reference_area) +
+           (external_pressures.empty() ? 0. : external_pressures.at(bid));
   }
 
   template <int dim, int spacedim>
@@ -4017,6 +4057,8 @@ namespace MetricFlowX
     if (outlet_type == "Dirichlet")
       exact_solution.set_time(t);
 
+    const auto terminal_pressures = terminal_external_pressures(t, provider);
+
     for (const auto &face : boundary_faces)
       {
         const auto        &cell = face.cell;
@@ -4032,14 +4074,29 @@ namespace MetricFlowX
 
         if (pressure_only)
           {
-            if (outlet_type == "RCR" && rcr_map.count(bid) &&
-                (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
+            if (terminal_links.count(bid))
               {
-                Assert(locally_owned_dofs_.is_element(face.a_hat_dof),
-                       ExcInternalError());
-                F(face.a_hat_dof) +=
+                double pressure =
                   external_pressure({t, point, vid, cell->id()}, provider);
+                if (!rcr_pc_dof.count(bid))
+                  {
+                    double conductance = 0., weighted_pressure = 0.;
+                    for (const auto &[other, resistance] :
+                         terminal_links.at(bid))
+                      {
+                        conductance += 1. / resistance;
+                        if (!rcr_pc_dof.count(other))
+                          weighted_pressure +=
+                            terminal_pressures.at(other) / resistance;
+                      }
+                    pressure -= weighted_pressure / conductance;
+                  }
+                F(face.a_hat_dof) += pressure;
               }
+            else if (outlet_type == "RCR" && rcr_map.count(bid) &&
+                     (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
+              F(face.a_hat_dof) +=
+                external_pressure({t, point, vid, cell->id()}, provider);
             continue;
           }
 
@@ -4094,7 +4151,8 @@ namespace MetricFlowX
                   {
                     conductance += 1. / resistance;
                     weighted_pressure +=
-                      terminal_pressure(other, y, t) / resistance;
+                      terminal_pressure(other, y, terminal_pressures) /
+                      resistance;
                   }
                 res_A = pressure - (Q + weighted_pressure) / conductance;
               }
@@ -4165,6 +4223,8 @@ namespace MetricFlowX
     if (rcr_pc_dof.empty())
       return;
 
+    const auto terminal_pressures = terminal_external_pressures(t);
+
     for (const auto &face : boundary_faces)
       {
         const auto        &cell = face.cell;
@@ -4191,7 +4251,9 @@ namespace MetricFlowX
           {
             discharge = 0.;
             for (const auto &[other, resistance] : terminal_links.at(bid))
-              discharge += (Pc - terminal_pressure(other, y, t)) / resistance;
+              discharge +=
+                (Pc - terminal_pressure(other, y, terminal_pressures)) /
+                resistance;
           }
         F(pc_dof) += rcr.C * Pc_dot - Q + discharge;
       }
@@ -4559,8 +4621,9 @@ namespace MetricFlowX
 
     // The native residual is F = M*ydot - R.  The pressure-only routines
     // assemble their contribution to the raw R vector, so this is the exact
-    // additive pressure contribution to F.  Capacitor and trace-continuity
-    // rows have no prescribed-pressure term.
+    // additive pressure contribution to F. Trace-continuity rows have no
+    // prescribed-pressure term. Connected capacitor rows also see downstream
+    // external pressure when their neighbour has no capacitor unknown.
     const unsigned int n_dofs = fe_collection_.max_dofs_per_cell();
     std::vector<types::global_dof_index> ldofs(n_dofs);
     for (const auto &cell : dof_handler_.active_cell_iterators())
@@ -4571,6 +4634,22 @@ namespace MetricFlowX
         cell->get_dof_indices(ldofs);
         for (const auto dof : ldofs)
           destination(dof) -= residual_F(dof);
+      }
+    if (!rcr_pc_dof.empty() && !terminal_links.empty())
+      {
+        const auto terminal_pressures =
+          terminal_external_pressures(t, &provider);
+        for (const auto &face : boundary_faces)
+          {
+            const auto bid = face.cell->face(face.face_no)->boundary_id();
+            const auto pc  = rcr_pc_dof.find(bid);
+            if (pc == rcr_pc_dof.end() || !terminal_links.count(bid))
+              continue;
+            for (const auto &[other, resistance] : terminal_links.at(bid))
+              if (!rcr_pc_dof.count(other))
+                destination(pc->second) -=
+                  terminal_pressures.at(other) / resistance;
+          }
       }
     destination.compress(VectorOperation::add);
   }
@@ -5501,7 +5580,7 @@ namespace MetricFlowX
         const double A_hat = y(face.a_hat_dof);
         const double U_hat = y(face.u_hat_dof);
 
-        // R_pc = A_hat*U_hat - (Pc - P_out)/R2
+        // R_pc = Q_out - (Pc - P_out)/R2
         const auto   bid  = cell->face(f)->boundary_id();
         const double sign = f == 1 ? 1. : -1.;
         jacobian_matrix.add(pc_dof, face.a_hat_dof, sign * U_hat);
