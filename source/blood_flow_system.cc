@@ -4106,8 +4106,9 @@ namespace MetricFlowX
                  (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
 
           {
-            const auto  &rcr = rcr_map.at(bid);
-            const double Q   = A_hat_cur * U_hat_cur;
+            const auto  &rcr  = rcr_map.at(bid);
+            const double sign = f == 1 ? 1. : -1.;
+            const double Q    = sign * A_hat_cur * U_hat_cur;
             if (rcr.C > 0.0)
               {
                 // const double Pc =
@@ -4125,10 +4126,9 @@ namespace MetricFlowX
                           A_hat, vid, a_d_local, t, point, cell->id()) -
                         ((rcr.R1 + rcr.R2) * Q + rcr.P_out);
               }
-            const double W1_int =
-              U_int + compute_invariant(A_int, vid, a_d_local);
-            res_U =
-              (U_hat_cur + compute_invariant(A_hat, vid, a_d_local)) - W1_int;
+            res_U = U_hat_cur +
+                    sign * compute_invariant(A_hat, vid, a_d_local) - U_int -
+                    sign * compute_invariant(A_int, vid, a_d_local);
           }
         else // Reflection outlet
           {
@@ -4176,11 +4176,10 @@ namespace MetricFlowX
         const types::global_dof_index pc_dof = pit->second;
         const auto &rcr = rcr_map.at(cell->face(f)->boundary_id());
 
-        const double A_hat = y(face.a_hat_dof);
-        const double U_hat = y(face.u_hat_dof);
-        const auto   bid   = cell->face(f)->boundary_id();
-        const double sign =
-          terminal_links.count(bid) ? terminal_ports.at(bid).outward_sign : 1.;
+        const double A_hat  = y(face.a_hat_dof);
+        const double U_hat  = y(face.u_hat_dof);
+        const auto   bid    = cell->face(f)->boundary_id();
+        const double sign   = f == 1 ? 1. : -1.;
         const double Q      = sign * A_hat * U_hat;
         const double Pc     = y(pc_dof);
         const double Pc_dot = ydot(pc_dof);
@@ -5431,63 +5430,22 @@ namespace MetricFlowX
                  (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
 
           {
-            const auto &rcr = rcr_map.at(bid);
-
-            if (rcr.C > 0.0)
+            const auto  &rcr        = rcr_map.at(bid);
+            const double sign       = f == 1 ? 1. : -1.;
+            const double resistance = rcr.C > 0. ? rcr.R1 : rcr.R1 + rcr.R2;
+            jacobian_matrix.add(a_row,
+                                a_row,
+                                dPdA_hat - resistance * sign * U_hat_cur);
+            jacobian_matrix.add(a_row, u_row, -resistance * sign * A_hat);
+            jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
+            jacobian_matrix.add(u_row, u_row, 1.);
+            for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
               {
-                // ---- Full RCR
-                // -------------------------------------------------------
-                // res_A = P(A_hat) - R1*(A_hat*U_hat) - Pc
-                // res_U = U_hat + 4(c_hat - c0) - W1_int
-                // dres_A/dA_hat = dP/dA_hat - R1*U_hat
-                // dres_A/dU_hat = -R1*A_hat
-                jacobian_matrix.add(a_row,
-                                    a_row,
-                                    dPdA_hat - rcr.R1 * U_hat_cur);
-                jacobian_matrix.add(a_row, u_row, -rcr.R1 * A_hat);
-
-                // dres_U/dA_hat = 4*dc_hat
-                // dres_U/dU_hat = 1
-                jacobian_matrix.add(u_row, a_row, 4.0 * dc_hat);
-                jacobian_matrix.add(u_row, u_row, 1.0);
-
-                // dres_U/d(A_int, U_int)
-                for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell();
-                     ++j)
-                  {
-                    const double phi_A = fef[area_extractor].value(j, 0);
-                    const double phi_U = fef[velocity_extractor].value(j, 0);
-                    jacobian_matrix.add(u_row,
-                                        ldofs[j],
-                                        -(phi_U + 4.0 * dc_int * phi_A));
-                  }
-              }
-            else
-              {
-                // C=0: P = (R1 + R2)*Q + P_out; no capacitor unknown.
-                const double resistance = rcr.R1 + rcr.R2;
-                jacobian_matrix.add(a_row,
-                                    a_row,
-                                    dPdA_hat - resistance * U_hat_cur);
-                jacobian_matrix.add(a_row, u_row, -resistance * A_hat);
-
-                // dres_U/dA_hat = 4*dc_hat
-                // dres_U/dU_hat = 1
-                // (identical to RCR — res_U has no R
-                // dependence)
-                jacobian_matrix.add(u_row, a_row, 4.0 * dc_hat);
-                jacobian_matrix.add(u_row, u_row, 1.0);
-
-                // dres_U/d(A_int, U_int)
-                for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell();
-                     ++j)
-                  {
-                    const double phi_A = fef[area_extractor].value(j, 0);
-                    const double phi_U = fef[velocity_extractor].value(j, 0);
-                    jacobian_matrix.add(u_row,
-                                        ldofs[j],
-                                        -(phi_U + 4.0 * dc_int * phi_A));
-                  }
+                const double phi_A = fef[area_extractor].value(j, 0);
+                const double phi_U = fef[velocity_extractor].value(j, 0);
+                jacobian_matrix.add(u_row,
+                                    ldofs[j],
+                                    -(phi_U + sign * 4. * dc_int * phi_A));
               }
           }
         else // Reflection
@@ -5544,9 +5502,8 @@ namespace MetricFlowX
         const double U_hat = y(face.u_hat_dof);
 
         // R_pc = A_hat*U_hat - (Pc - P_out)/R2
-        const auto   bid = cell->face(f)->boundary_id();
-        const double sign =
-          terminal_links.count(bid) ? terminal_ports.at(bid).outward_sign : 1.;
+        const auto   bid  = cell->face(f)->boundary_id();
+        const double sign = f == 1 ? 1. : -1.;
         jacobian_matrix.add(pc_dof, face.a_hat_dof, sign * U_hat);
         jacobian_matrix.add(pc_dof, face.u_hat_dof, sign * A_hat);
         if (terminal_links.count(bid))

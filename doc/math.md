@@ -140,14 +140,17 @@ At a subcritical inlet, $\widehat A\widehat U=Q_{\mathrm{in}}(t)$ is
 paired with outgoing characteristic compatibility. Inflows can be analytic
 functions or tabulated waveforms; see [Configuration](configuration.md).
 
-At an RCR outlet, $Q=\widehat A\widehat U$ and
+At an RCR terminal, $Q=s\widehat A\widehat U$ is the outward flow, with
+$s=-1$ at the first endpoint and $s=1$ at the last endpoint. The circuit obeys
 
 $$
 p(\widehat A)=P_c+R_1Q,\qquad
 C\dot P_c-Q+\frac{P_c-P_{\mathrm{out}}}{R_2}=0.
 $$
 
-The pressure relation and outgoing characteristic fix the terminal trace;
+The pressure relation and outgoing characteristic fix the terminal trace.
+The outgoing characteristic uses the same endpoint sign, so a pressure source
+at the first endpoint retains the characteristic leaving the vessel there.
 $P_c$ is an additional differential unknown when $C>0$. For $C\leq0$,
 the resistive branch carries no capacitor unknown and imposes
 
