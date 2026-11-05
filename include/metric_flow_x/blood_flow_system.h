@@ -169,7 +169,7 @@ namespace MetricFlowX
       using SparseMatrix    = dealii::TrilinosWrappers::SparseMatrix;
       using PreconditionILU = dealii::TrilinosWrappers::PreconditionILU;
     } // namespace MPI
-    using SolverGMRES = dealii::SolverGMRES<MPI::Vector>;
+    using SolverGMRES             = dealii::SolverGMRES<MPI::Vector>;
 #else
 #  error DEAL_II_WITH_PETSC or DEAL_II_WITH_TRILINOS required
 #endif
@@ -375,8 +375,8 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive & a0 & r_d & a_d & E & h_wall & p_d & p0 & L & r_in & r_out &
-          dynamic_viscosity & wall;
+        archive &a0 &r_d &a_d &E &h_wall &p_d &p0 &L &r_in &r_out
+          &dynamic_viscosity &wall;
       }
     };
 
@@ -390,7 +390,7 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive & R1 & R2 & C & P_out & label;
+        archive &R1 &R2 &C &P_out &label;
       }
     };
 
@@ -403,7 +403,7 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive & boundary0 & boundary1 & resistance;
+        archive &boundary0 &boundary1 &resistance;
       }
     };
 
@@ -422,7 +422,7 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive & vessels & terminals & terminal_connections;
+        archive &vessels &terminals &terminal_connections;
       }
     };
 
@@ -1094,8 +1094,8 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive & area & velocity & vessel & reference_area & outward_sign &
-          point & cell_id;
+        archive &area &velocity &vessel &reference_area &outward_sign &point
+          &cell_id;
       }
     };
     std::map<types::boundary_id, TerminalPort> terminal_ports;
