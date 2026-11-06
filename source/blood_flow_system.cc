@@ -639,6 +639,11 @@ namespace MetricFlowX
             valid = valid && std::isfinite(value);
           }
       }
+    valid = valid && (physics.sealed_terminals.empty() || outlet_type == "RCR");
+    for (const auto id : physics.sealed_terminals)
+      valid = valid && id != 0 && id != 255 &&
+              id != numbers::invalid_boundary_id &&
+              !physics.terminals.count(id);
     std::set<std::pair<types::boundary_id, types::boundary_id>> connections;
     for (const auto &connection : physics.terminal_connections)
       {
@@ -689,7 +694,8 @@ namespace MetricFlowX
                 valid          = valid && bid != 255;
                 if (bid != 0)
                   {
-                    valid      = valid && physics.terminals.count(bid);
+                    valid      = valid && (physics.terminals.count(bid) ||
+                                      physics.sealed_terminals.count(bid));
                     auto &port = ports[bid];
                     port.first = cell->material_id();
                     ++port.second;
@@ -710,7 +716,8 @@ namespace MetricFlowX
           global.second += port.second;
         }
     AssertThrow(
-      global_ports.size() == physics.terminals.size() &&
+      global_ports.size() ==
+          physics.terminals.size() + physics.sealed_terminals.size() &&
         std::all_of(global_ports.begin(),
                     global_ports.end(),
                     [](const auto &entry) { return entry.second.second == 1; }),
@@ -731,10 +738,12 @@ namespace MetricFlowX
           }
         vessel_map.emplace(id, value);
       }
-    rcr_map = physics.terminals;
+    rcr_map             = physics.terminals;
+    sealed_terminal_ids = physics.sealed_terminals;
     vessel_terminals.clear();
     for (const auto &[bid, port] : global_ports)
-      vessel_terminals[port.first].insert(bid);
+      if (rcr_map.count(bid))
+        vessel_terminals[port.first].insert(bid);
     input_terminal_connections = physics.terminal_connections;
     in_memory_physics          = true;
     setup_system();
@@ -1504,6 +1513,7 @@ namespace MetricFlowX
         }
     }
 
+    sealed_terminal_ids.clear();
     // RCR map, keyed by boundary id: global data, identical on every rank
     // because every rank reads the same file.
     if (terminal_parameter_source == "Parameters")
@@ -1772,9 +1782,8 @@ namespace MetricFlowX
           vessel_s_bounds[vid] = std::make_pair(s_min[vid], s_max[vid]);
       }
 
-    // Terminal boundary ids: derived from rcr_map, which is replicated, so this
-    // set is identical on every rank and needs no reduction.
-    terminal_boundary_ids.clear();
+    // Both boundary tables are replicated, so their union needs no reduction.
+    terminal_boundary_ids = sealed_terminal_ids;
     for (const auto &[bid, rcr] : rcr_map)
       {
         (void)rcr;
@@ -2729,7 +2738,7 @@ namespace MetricFlowX
               continue;
 
             const types::boundary_id bid = cell->face(f)->boundary_id();
-            if (bid != 0 && is_terminal_boundary(bid))
+            if (bid != 0 && rcr_map.count(bid))
               terminal_Pc_storage.try_emplace(
                 bid,
                 vessel_map.at(vid).wall.type == WallLaw::Type::square_root ?
@@ -3148,6 +3157,8 @@ namespace MetricFlowX
                                 0.);
                       const auto        rcr = rcr_map.find(bid);
                       const std::string label =
+                        sealed_terminal_ids.count(bid) ?
+                          "sealed" :
                         rcr == rcr_map.end() ?
                           "boundary_" + std::to_string(bid) :
                           rcr->second.label;
@@ -4134,6 +4145,14 @@ namespace MetricFlowX
             res_A = A_hat_cur * U_hat_cur - Q_in;
             res_U =
               (U_hat_cur - compute_invariant(A_hat, vid, a_d_local)) - W2_int;
+          }
+        else if (sealed_terminal_ids.count(bid))
+          {
+            const double sign = f == 1 ? 1. : -1.;
+            res_A             = sign * A_hat_cur * U_hat_cur;
+            res_U             = U_hat_cur +
+                    sign * compute_invariant(A_hat, vid, a_d_local) - U_int -
+                    sign * compute_invariant(A_int, vid, a_d_local);
           }
         else if (terminal_links.count(bid))
           {
@@ -5473,6 +5492,20 @@ namespace MetricFlowX
                                     ldofs[j],
                                     -(phi_U - 4.0 * dc_int * phi_A));
               }
+          }
+        else if (sealed_terminal_ids.count(bid))
+          {
+            const double sign = f == 1 ? 1. : -1.;
+            jacobian_matrix.add(a_row, a_row, sign * U_hat_cur);
+            jacobian_matrix.add(a_row, u_row, sign * A_hat_cur);
+            jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
+            jacobian_matrix.add(u_row, u_row, 1.);
+            for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
+              jacobian_matrix.add(u_row,
+                                  ldofs[j],
+                                  -fef[velocity_extractor].value(j, 0) -
+                                    sign * 4. * dc_int *
+                                      fef[area_extractor].value(j, 0));
           }
         else if (terminal_links.count(bid))
           {
