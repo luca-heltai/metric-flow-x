@@ -340,7 +340,8 @@ namespace MetricFlowX
      * a stateful value object.  It may be replaced between nonlinear residual
      * or Jacobian evaluations, but must not be modified concurrently with an
      * assembly.  MPI ranks must provide equivalent deterministic functions;
-     * no pressure field communication is performed by this class.
+     * no pressure field communication is performed by this class. Connected
+     * terminal pressures are sampled by their owners and exchanged as scalars.
      *
      * The returned value is added to the tube-law pressure:
      *
@@ -1108,10 +1109,15 @@ namespace MetricFlowX
     double
     terminal_pressure_derivative(types::boundary_id bid,
                                  const VectorType  &y) const;
+    std::map<types::boundary_id, double>
+    terminal_external_pressures(
+      double                          t,
+      const ExternalPressureProvider *provider = nullptr) const;
     double
-    terminal_pressure(types::boundary_id bid,
-                      const VectorType  &y,
-                      double             t) const;
+    terminal_pressure(
+      types::boundary_id                          bid,
+      const VectorType                           &y,
+      const std::map<types::boundary_id, double> &external_pressures) const;
 
     void
     assemble_jacobian_rcr_capacitor_block(const VectorType &y);
