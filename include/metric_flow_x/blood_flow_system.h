@@ -59,6 +59,7 @@
 #include <deal.II/sundials/ida.h>
 
 #include <boost/serialization/map.hpp>
+#include <boost/serialization/set.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/vector.hpp>
 
@@ -417,12 +418,16 @@ namespace MetricFlowX
       std::map<unsigned int, VesselProperties> vessels;
       std::map<types::boundary_id, RCRPhysics> terminals;
       std::vector<TerminalConnection>          terminal_connections;
+      /** Degree-one endpoints with exactly zero outward flow. These must not
+       * appear in terminals or terminal_connections. They introduce no
+       * capacitor pressure or downstream reservoir. */
+      std::set<types::boundary_id> sealed_terminals;
 
       template <class Archive>
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive &vessels &terminals &terminal_connections;
+        archive &vessels &terminals &terminal_connections &sealed_terminals;
       }
     };
 
@@ -942,6 +947,7 @@ namespace MetricFlowX
     ExternalPressureProvider external_pressure_provider;
 
     std::map<unsigned int, RCRPhysics> rcr_map;
+    std::set<types::boundary_id>       sealed_terminal_ids;
     bool                               in_memory_physics = false;
     std::vector<TerminalConnection>    input_terminal_connections;
     // Coarse-mesh incidence, replicated before partitioning; output owners

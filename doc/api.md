@@ -66,6 +66,17 @@ entry must identify exactly one degree-one endpoint. Boundary zero is reserved
 for inflow and 255 for junctions. A connected venous endpoint can use face zero;
 its native outward sign is retained.
 
+Use `physics.sealed_terminals.insert(boundary_id)` for an imaging endpoint that
+must have exactly zero outward flow. Every non-inflow endpoint must belong to
+exactly one of `terminals` and `sealed_terminals`; boundary ids 0 and 255 remain
+reserved. A sealed endpoint cannot participate in `terminal_connections`. It
+preserves the outgoing characteristic for either endpoint orientation and adds
+no capacitor pressure, resistance, or downstream reservoir. For example, to
+replace terminal one in the example above with a closed end, erase it from
+`physics.terminals`, insert one into `physics.sealed_terminals`, then call
+`flow.setup(physics)`. A prescribed nonzero inflow into an otherwise sealed tube
+changes its stored volume, so its startup need not be steady.
+
 `terminal_connections` supplies `{boundary0, boundary1, resistance}` records for
 the same native terminal resistors used by `Terminal connections CSV file`.
 The resistance must be positive and both endpoints must be declared terminals.
