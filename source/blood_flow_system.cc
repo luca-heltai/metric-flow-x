@@ -5888,16 +5888,16 @@ namespace MetricFlowX
         for (unsigned int i = 0; i < cell->get_fe().n_dofs_per_cell(); ++i)
           if (cell->get_fe().system_to_component_index(i).first == 0)
             {
-              const double A             = y(ldofs[i]);
-              const double base_pressure = compute_pressure_value(
-                A,
-                cell->material_id(),
-                compute_a_d_at_point(cell, support_point(cell, i)));
+              const auto   point = support_point(cell, i);
+              const double A     = y(ldofs[i]);
+              const double base_pressure =
+                compute_pressure_value(A,
+                                       cell->material_id(),
+                                       compute_a_d_at_point(cell, point));
               p(ldofs[i]) =
                 base_pressure +
-                external_pressure(
-                  {t, cell->center(), cell->material_id(), cell->id()},
-                  provider);
+                external_pressure({t, point, cell->material_id(), cell->id()},
+                                  provider);
             }
       }
 
