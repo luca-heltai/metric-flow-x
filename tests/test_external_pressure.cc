@@ -196,9 +196,8 @@ test()
                        delta_p) < tolerance,
               ExcInternalError());
 
-  // Spatial evaluation uses the physical cell center, and the provider also
-  // receives the vessel id.  The pressure output is a convenient direct
-  // oracle for the location at which this data is sampled.
+  // Spatial pressure output samples the area support points and preserves
+  // the provider's physical coordinates and vessel id.
   problem.set_external_pressure_provider(
     [](const BloodFlowSystem<1, 3>::PressureEvaluationPoint &evaluation) {
       return 17.0 + 100.0 * evaluation.point[0] +
@@ -230,12 +229,15 @@ test()
           problem.fe_collection_.max_dofs_per_cell());
         ldofs.resize(cell->get_fe().n_dofs_per_cell());
         cell->get_dof_indices(ldofs);
-        const double expected_external =
-          17.0 + 100.0 * cell->center()[0] +
-          3.0 * static_cast<double>(cell->material_id());
         for (unsigned int i = 0; i < cell->get_fe().n_dofs_per_cell(); ++i)
           if (cell->get_fe().system_to_component_index(i).first == 0)
             {
+              const auto point =
+                cell->vertex(0) + cell->get_fe().unit_support_point(i)[0] *
+                                    (cell->vertex(1) - cell->vertex(0));
+              const double expected_external =
+                17.0 + 100.0 * point[0] +
+                3.0 * static_cast<double>(cell->material_id());
               const double base =
                 problem.pressure(y(ldofs[i]), cell->material_id());
               AssertThrow(std::abs(p_with_spatial(ldofs[i]) - base -
