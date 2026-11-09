@@ -262,6 +262,12 @@ namespace MetricFlowX
     , inflow_function("Functions", "0.0", "Inflow function", par, "x,t")
   {
     add_parameter("Finite element degree", fe_degree);
+    add_parameter(
+      "Minimum positive area",
+      minimum_positive_area_,
+      "Numerical area floor in m^2. Set before setup; finite and strictly positive.",
+      this->prm,
+      Patterns::Double(0.));
     add_parameter("Problem constants", constants);
     add_parameter("Output filename", output_filename);
     add_parameter(
@@ -554,6 +560,24 @@ namespace MetricFlowX
 
   template <int dim, int spacedim>
   void
+  BloodFlowSystem<dim, spacedim>::validate_minimum_positive_area() const
+  {
+    const bool valid =
+      std::isfinite(minimum_positive_area_) && minimum_positive_area_ > 0.;
+    AssertThrow(
+      Utilities::MPI::min(valid ? 1u : 0u, mpi_communicator_) == 1,
+      ExcMessage(
+        "Minimum positive area must be finite and strictly positive (m^2)."));
+    const double reference =
+      Utilities::MPI::broadcast(mpi_communicator_, minimum_positive_area_, 0);
+    AssertThrow(
+      Utilities::MPI::min(minimum_positive_area_ == reference ? 1u : 0u,
+                          mpi_communicator_) == 1,
+      ExcMessage("Minimum positive area must be identical on every rank."));
+  }
+
+  template <int dim, int spacedim>
+  void
   BloodFlowSystem<dim, spacedim>::setup()
   {
     setup(MeshInitializer{});
@@ -573,6 +597,7 @@ namespace MetricFlowX
   void
   BloodFlowSystem<dim, spacedim>::setup(const NetworkPhysics &physics)
   {
+    validate_minimum_positive_area();
     bool valid = triangulation_.n_global_active_cells() > 0 &&
                  dof_handler_.n_dofs() == 0 && !physics.vessels.empty() &&
                  physics.vessels.size() < std::numeric_limits<int>::max() &&
@@ -855,7 +880,7 @@ namespace MetricFlowX
                                              double       reference) {
       if (!std::isfinite(a) || a <= 0.)
         return false;
-      a                    = std::max(a, 1e-10);
+      a                    = std::max(a, minimum_positive_area_);
       const double modulus = a * compute_pressure_derivative(a, vid, reference);
       const bool   valid   = std::isfinite(modulus) && modulus > 0.;
       if (!valid && invalid == 0 && verbosity > 1)
@@ -1282,6 +1307,7 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::create_triangulation(
     const MeshInitializer &initialize_mesh)
   {
+    validate_minimum_positive_area();
     AssertThrow(triangulation_.n_global_active_cells() == 0,
                 ExcMessage(
                   "Cannot initialize an already populated flow mesh."));
@@ -2216,7 +2242,8 @@ namespace MetricFlowX
     if (rcr_pc_dof.count(bid))
       return 1.;
     const auto &port = terminal_ports.at(bid);
-    return compute_pressure_derivative(std::max(y(port.area), 1e-10),
+    return compute_pressure_derivative(std::max(y(port.area),
+                                                minimum_positive_area_),
                                        port.vessel,
                                        port.reference_area);
   }
@@ -2273,7 +2300,8 @@ namespace MetricFlowX
     if (it != rcr_pc_dof.end())
       return y(it->second);
     const auto &port = terminal_ports.at(bid);
-    return compute_pressure_value(std::max(y(port.area), 1e-10),
+    return compute_pressure_value(std::max(y(port.area),
+                                           minimum_positive_area_),
                                   port.vessel,
                                   port.reference_area) +
            (external_pressures.empty() ? 0. : external_pressures.at(bid));
@@ -3739,7 +3767,7 @@ namespace MetricFlowX
         // --------------------------------------------------
         for (unsigned int q = 0; q < quad_cell.size(); ++q)
           {
-            const double A = std::max(A_h[q], 1e-10);
+            const double A = std::max(A_h[q], minimum_positive_area_);
             const double U = U_h[q];
             const double P =
               pressure_only ?
@@ -3823,9 +3851,10 @@ namespace MetricFlowX
 
             for (unsigned int q = 0; q < quad_face.size(); ++q)
               {
-                const double A_in  = std::max(Ah_q[q], 1e-10);
-                const double U_in  = Uh_q[q];
-                const double A_hat = std::max(Ahat_q[q], 1e-10);
+                const double A_in = std::max(Ah_q[q], minimum_positive_area_);
+                const double U_in = Uh_q[q];
+                const double A_hat =
+                  std::max(Ahat_q[q], minimum_positive_area_);
                 const double U_hat = Uhat_q[q];
                 const double bn =
                   compute_tangent_normal_product(cell, normals[q]);
@@ -3949,9 +3978,9 @@ namespace MetricFlowX
         hp_fef.get_present_fe_values()[velocity_extractor].get_function_values(
           y_cell, U_R_v);
 
-        const double           A_L = std::max(A_L_v[0], 1e-10);
+        const double           A_L = std::max(A_L_v[0], minimum_positive_area_);
         const double           U_L = U_L_v[0];
-        const double           A_R = std::max(A_R_v[0], 1e-10);
+        const double           A_R = std::max(A_R_v[0], minimum_positive_area_);
         const double           U_R = U_R_v[0];
         const Point<spacedim> &point =
           hp_fef.get_present_fe_values().get_quadrature_points()[0];
@@ -3964,7 +3993,7 @@ namespace MetricFlowX
         double A_hat = 0.0, U_hat = 0.0;
         A_hat = y(face.trace.a_hat_dof);
         U_hat = y(face.trace.u_hat_dof);
-        A_hat = std::max(A_hat, 1e-10);
+        A_hat = std::max(A_hat, minimum_positive_area_);
 
         // Left HDG type flux residuals (face integrals with
         // interior state from left cell) numerical_flux is
@@ -4120,14 +4149,14 @@ namespace MetricFlowX
         fef[velocity_extractor].get_function_values_from_local_dof_values(
           local_values, U_int_v);
 
-        const double A_int     = std::max(A_int_v[0], 1e-10);
+        const double A_int     = std::max(A_int_v[0], minimum_positive_area_);
         const double U_int     = U_int_v[0];
         const double a_d_local = compute_a_d_at_face(cell, f);
 
         // Current face trace (from trace block of y)
         const double A_hat_cur = y(face.a_hat_dof);
         const double U_hat_cur = y(face.u_hat_dof);
-        const double A_hat     = std::max(A_hat_cur, 1e-10);
+        const double A_hat     = std::max(A_hat_cur, minimum_positive_area_);
 
         double res_A = 0.0, res_U = 0.0;
 
@@ -4303,7 +4332,7 @@ namespace MetricFlowX
                                            update_values);
 
     const double rho   = density;
-    const double A_min = 1e-10;
+    const double A_min = minimum_positive_area_;
 
     std::vector<types::global_dof_index> ldofs(
       fe_collection_.max_dofs_per_cell());
@@ -4697,7 +4726,7 @@ namespace MetricFlowX
           fe_collection_,
           hp::QCollection<dim - 1>(quadrature),
           update_values | update_normal_vectors | update_quadrature_points);
-        const double area_floor = 1.e-10;
+        const double area_floor = minimum_positive_area_;
         for (const auto &face : interior_faces)
           {
             const double raw_trace_area = y_relevant[face.trace.a_hat_dof];
@@ -5023,7 +5052,7 @@ namespace MetricFlowX
         // -------------------------------
         for (unsigned int q = 0; q < quad_cell.size(); ++q)
           {
-            const double A    = std::max(A_h[q], 1e-10);
+            const double A    = std::max(A_h[q], minimum_positive_area_);
             const double U    = U_h[q];
             const double dpdA = compute_pressure_derivative(
               A, vid, compute_a_d_at_point(cell, fev.quadrature_point(q)));
@@ -5086,7 +5115,7 @@ namespace MetricFlowX
               local_values, Ahat_q);
             fef[u_hat_extractor].get_function_values_from_local_dof_values(
               local_values, Uhat_q);
-            const double A_hat = std::max(Ahat_q[0], 1e-10);
+            const double A_hat = std::max(Ahat_q[0], minimum_positive_area_);
             const double U_hat = Uhat_q[0];
 
             const auto [loc_a_hat_dof, loc_u_hat_dof] =
@@ -5097,7 +5126,7 @@ namespace MetricFlowX
 
             for (unsigned int q = 0; q < quad_face.size(); ++q)
               {
-                const double A_in = std::max(Ah_q[q], 1e-10);
+                const double A_in = std::max(Ah_q[q], minimum_positive_area_);
                 const double U_in = Uh_q[q];
                 const double bn =
                   compute_tangent_normal_product(cell, normals[q]);
@@ -5240,7 +5269,7 @@ namespace MetricFlowX
           y_cell, A_Lv);
         hp_fef.get_present_fe_values()[velocity_extractor].get_function_values(
           y_cell, U_Lv);
-        const double A_L = std::max(A_Lv[0], 1e-10);
+        const double A_L = std::max(A_Lv[0], minimum_positive_area_);
         const double U_L = U_Lv[0];
 
         std::vector<types::global_dof_index> ldofs_L(
@@ -5259,7 +5288,7 @@ namespace MetricFlowX
           y_cell, A_Rv);
         hp_fef.get_present_fe_values()[velocity_extractor].get_function_values(
           y_cell, U_Rv);
-        const double A_R = std::max(A_Rv[0], 1e-10);
+        const double A_R = std::max(A_Rv[0], minimum_positive_area_);
         const double U_R = U_Rv[0];
 
         std::vector<types::global_dof_index> ldofs_R(
@@ -5272,7 +5301,7 @@ namespace MetricFlowX
         double A_hat_cur = 0.0, U_hat_cur = 0.0;
         A_hat_cur          = y(face.trace.a_hat_dof);
         U_hat_cur          = y(face.trace.u_hat_dof);
-        const double A_hat = std::max(A_hat_cur, 1e-10);
+        const double A_hat = std::max(A_hat_cur, minimum_positive_area_);
         const double U_hat = U_hat_cur;
 
         const FaceTraceDof           &td    = face.trace;
@@ -5444,14 +5473,14 @@ namespace MetricFlowX
         fef[area_extractor].get_function_values_from_local_dof_values(
           local_values, A_int_v);
 
-        const double A_int     = std::max(A_int_v[0], 1e-10);
+        const double A_int     = std::max(A_int_v[0], minimum_positive_area_);
         const double a_d_local = compute_a_d_at_face(cell, f);
         const double dc_int =
           0.25 * compute_invariant_derivative(A_int, vid, a_d_local);
 
         const double A_hat_cur = y(face.a_hat_dof);
         const double U_hat_cur = y(face.u_hat_dof);
-        const double A_hat     = std::max(A_hat_cur, 1e-10);
+        const double A_hat     = std::max(A_hat_cur, minimum_positive_area_);
         const double dc_hat =
           0.25 * compute_invariant_derivative(A_hat, vid, a_d_local);
         const double dPdA_hat =
@@ -5660,7 +5689,7 @@ namespace MetricFlowX
                                            update_values);
 
     const double rho   = density;
-    const double A_min = 1e-10;
+    const double A_min = minimum_positive_area_;
 
     std::vector<double> local_values(fe_collection_.max_dofs_per_cell());
     std::vector<double> Av(1);

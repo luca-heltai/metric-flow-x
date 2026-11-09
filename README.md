@@ -73,6 +73,21 @@ memory. Geometry and connectivity remain distributed; only coefficient tables
 are replicated, as in the file-based solver. See [the embedding API](doc/api.md)
 for ownership, identifiers and initialization requirements.
 
+Numerical parameters also apply to in-memory setup. For networks with small
+positive reference areas, choose `Minimum positive area` (in m²) below the areas
+the model must resolve:
+
+```text
+subsection MetricFlowSystem<1, 3>
+  set Minimum positive area = 1e-14
+end
+```
+
+The default remains `1e-10 m²`. Read the configured value with
+`flow.get_minimum_positive_area()`. Set it through `initialize_params()` before
+setup; every rank must use the same finite, strictly positive value. Network
+coefficient tables and vessel radii retain their input values.
+
 An optional prescribed surrounding pressure can be supplied with
 `set_external_pressure_provider()`. The provider receives time, physical
 point, vessel id, and the incident centerline `CellId`, and returns pressure

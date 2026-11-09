@@ -431,6 +431,14 @@ namespace MetricFlowX
       }
     };
 
+    /** Area regularization floor in m^2. Set through "Minimum positive area"
+     * before either file-based or in-memory setup. */
+    double
+    get_minimum_positive_area() const
+    {
+      return minimum_positive_area_;
+    }
+
     void
     initialize_params(const std::string &filename = "");
 
@@ -907,6 +915,11 @@ namespace MetricFlowX
     // face_key(const typename DoFHandler<dim, spacedim>::active_cell_iterator
     // &cell,
     //          const unsigned int face_no) const;
+
+    double minimum_positive_area_ = 1e-10;
+
+    void
+    validate_minimum_positive_area() const;
 
     std::string terminal_parameter_source = "VTK";
     std::string terminal_parameters_csv_file;
@@ -1602,7 +1615,7 @@ namespace MetricFlowX
                        const unsigned int vid,
                        const double       a_d_local) const
     {
-      const double A_safe = std::max(A, 1e-10);
+      const double A_safe = std::max(A, minimum_positive_area_);
       const auto  &vp     = vessel_map.at(vid);
       if (vp.wall.type != WallLaw::Type::square_root)
         return vp.wall.wave_speed(A_safe, a_d_local, vp.h_wall, density);
@@ -1615,7 +1628,7 @@ namespace MetricFlowX
                                   const unsigned int vid,
                                   const double       a_d_local) const
     {
-      const double A_safe = std::max(A, 1e-10);
+      const double A_safe = std::max(A, minimum_positive_area_);
       const auto  &vp     = vessel_map.at(vid);
       if (vp.wall.type != WallLaw::Type::square_root)
         {
