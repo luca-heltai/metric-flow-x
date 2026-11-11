@@ -3338,17 +3338,14 @@ namespace MetricFlowX
     const double       external_pressure_L,
     const double       external_pressure_R) const
   {
-    const double c_L   = compute_wave_speed(A_L, vid_L, ad_L);
-    const double c_R   = compute_wave_speed(A_R, vid_R, ad_R);
-    const double U_bar = 0.5 * (U_L + U_R);
+    const double c_L = compute_wave_speed(A_L, vid_L, ad_L);
+    const double c_R = compute_wave_speed(A_R, vid_R, ad_R);
+    // States retain their vessel-tangent velocity on either half-face.
+    const double U_bar = 0.5 * (bn_L * U_L + bn_R * U_R);
     const double c_bar = 0.5 * (c_L + c_R);
     const double s_L   = U_bar - c_bar;
     const double s_R   = U_bar + c_bar;
-    // const double s_L = std::min(U_L - c_L, U_R - c_R);
-
-    // const double s_R = std::max(U_L + c_L, U_R + c_R);
-
-    const double FAL = scalar_area_flux(bn_L, A_L, U_L);
+    const double FAL   = scalar_area_flux(bn_L, A_L, U_L);
     const double FUL =
       scalar_momentum_flux(bn_L,
                            U_L,
@@ -3394,16 +3391,12 @@ namespace MetricFlowX
                                                const double       ad_L,
                                                const double       ad_R) const
   {
-    const double c_L   = compute_wave_speed(A_L, vid_L, ad_L);
-    const double c_R   = compute_wave_speed(A_R, vid_R, ad_R);
-    const double U_bar = 0.5 * (U_L + U_R);
-    const double c_bar = 0.5 * (c_L + c_R);
-    const double s_L   = U_bar - c_bar;
-    const double s_R   = U_bar + c_bar;
-    // const double s_L = std::min(U_L - c_L, U_R - c_R);
-
-    // const double s_R = std::max(U_L + c_L, U_R + c_R);
-
+    const double c_L         = compute_wave_speed(A_L, vid_L, ad_L);
+    const double c_R         = compute_wave_speed(A_R, vid_R, ad_R);
+    const double U_bar       = 0.5 * (bn_L * U_L + bn_R * U_R);
+    const double c_bar       = 0.5 * (c_L + c_R);
+    const double s_L         = U_bar - c_bar;
+    const double s_R         = U_bar + c_bar;
     const double c2L_over_AL = c_L * c_L / A_L;
     const double c2R_over_AR = c_R * c_R / A_R;
 
@@ -3425,7 +3418,7 @@ namespace MetricFlowX
        (s_R * FUL_j - s_L * FUR_j + s_R * s_L * (dU_R - dU_L)) * inv}};
     // The HLL wave speeds depend on state for every wall law.
     {
-      const double du = .5 * (dU_L + dU_R);
+      const double du = .5 * (bn_L * dU_L + bn_R * dU_R);
       const double dc =
         .5 * (compute_wave_speed_derivative(A_L, vid_L, ad_L) * dA_L +
               compute_wave_speed_derivative(A_R, vid_R, ad_R) * dA_R);
@@ -3607,7 +3600,7 @@ namespace MetricFlowX
       {
         const double c_L   = compute_wave_speed(A_L, vid_L, a_d_L);
         const double c_R   = compute_wave_speed(A_R, vid_R, a_d_R);
-        const double U_bar = 0.5 * (U_L + U_R);
+        const double U_bar = 0.5 * (bn_L * U_L + bn_R * U_R);
         const double c_bar = 0.5 * (c_L + c_R);
         const double s_L   = U_bar - c_bar;
         const double s_R   = U_bar + c_bar;
@@ -3998,8 +3991,8 @@ namespace MetricFlowX
         // Left HDG type flux residuals (face integrals with
         // interior state from left cell) numerical_flux is
         // designed for left/right states. The trace acts as the
-        // exterior state, therefore use opposite orientation on
-        // the trace side.
+        // exterior state; both physical fluxes use this half-face's
+        // outward normal.
         const auto [FA_L, FU_L] =
           pressure_only ?
             numerical_external_pressure_flux(bn_L,
@@ -5032,7 +5025,7 @@ namespace MetricFlowX
                                                           other->material_id(),
                                                           reference_area);
                 const double c       = .5 * (c_cell + c_trace),
-                             mean_u  = .5 * (u[0] + trace_velocity);
+                             mean_u  = .5 * bn * (u[0] + trace_velocity);
                 // In a supersonic branch the fixed pressure flux comes from
                 // one side and its state derivative is zero.
                 if (mean_u - c >= 0. || mean_u + c <= 0.)
@@ -5054,7 +5047,7 @@ namespace MetricFlowX
                     const double dc = .5 * (cell_dc * da + trace_dc * dat);
                     // F=M*ydot-R: negate the derivative of the raw HLL flux.
                     return -.5 * bn * (p_cell - p_other) / density *
-                           (.5 * (du + dut) / c - mean_u * dc / (c * c));
+                           (.5 * bn * (du + dut) / c - mean_u * dc / (c * c));
                   };
                 std::vector<types::global_dof_index> indices(
                   cell->get_fe().n_dofs_per_cell());
