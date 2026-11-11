@@ -11,6 +11,7 @@
 #include <array>
 #include <set>
 
+#include "pressure_jacobian_checks.h"
 #include "tests.h"
 
 using namespace MetricFlowX;
@@ -122,6 +123,7 @@ test()
             }
         }
       y.compress(VectorOperation::insert);
+      check_sparse_pressure_jacobian(flow, y);
       const auto provider = [&](const auto &point) {
         AssertThrow(
           visible.count(point.cell_id),

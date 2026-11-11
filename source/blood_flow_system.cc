@@ -4702,6 +4702,277 @@ namespace MetricFlowX
     destination.compress(VectorOperation::add);
   }
 
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::visit_external_pressure_jacobian(
+    const double                                t,
+    const VectorType                           &y,
+    const ExternalPressureBasisProvider        &provider,
+    const ExternalPressureJacobianEntryVisitor &visitor) const
+  {
+    TimerOutput::Scope timer(computing_timer,
+                             "visit_external_pressure_jacobian");
+    AssertThrow(provider && visitor,
+                ExcMessage(
+                  "Pressure basis and entry callbacks cannot be empty."));
+    update_ghosted_vectors(y);
+
+    const auto basis = [&](const PressureEvaluationPoint &point) {
+      auto entries = provider(point);
+      for (const auto &[column, value] : entries)
+        AssertThrow(column != numbers::invalid_dof_index &&
+                      std::isfinite(value),
+                    ExcMessage("Invalid external-pressure basis entry."));
+      return entries;
+    };
+    const auto emit = [&](const types::global_dof_index row,
+                          const ExternalPressureBasis  &entries,
+                          const double                  coefficient) {
+      if (coefficient == 0. || !locally_owned_dofs_.is_element(row))
+        return;
+      AssertThrow(std::isfinite(coefficient),
+                  ExcMessage("Nonfinite external-pressure derivative."));
+      for (const auto &[column, value] : entries)
+        if (value != 0.)
+          visitor(row, column, coefficient * value);
+    };
+
+    // As with terminal_external_pressures(), sample distant endpoints on
+    // their native owners; field-backed providers need no global FE lookup.
+    std::map<types::boundary_id, ExternalPressureBasis> local_terminals,
+      terminal_basis;
+    std::string error;
+    try
+      {
+        for (const auto &[bid, port] : terminal_ports)
+          if (locally_owned_dofs_.is_element(port.area))
+            local_terminals.emplace(
+              bid, basis({t, port.point, port.vessel, port.cell_id}));
+      }
+    catch (const std::exception &exception)
+      {
+        error = exception.what();
+      }
+    for (const auto &message :
+         Utilities::MPI::all_gather(mpi_communicator_, error))
+      AssertThrow(message.empty(), ExcMessage(message));
+    for (const auto &part :
+         Utilities::MPI::all_gather(mpi_communicator_, local_terminals))
+      terminal_basis.insert(part.begin(), part.end());
+    AssertDimension(terminal_basis.size(), terminal_ports.size());
+
+    const FEValuesExtractors::Scalar area(0), velocity(1), trace_area(2),
+      trace_velocity(3);
+    const QGauss<dim>     cell_quadrature(std::max(fe_degree, 1u) + 1);
+    const QGauss<dim - 1> cell_face_quadrature(std::max(fe_degree, 1u) + 1);
+    hp::FEValues<dim, spacedim>     cell_values(fe_collection_,
+                                            hp::QCollection<dim>(
+                                              cell_quadrature),
+                                            update_values | update_gradients |
+                                              update_quadrature_points |
+                                              update_JxW_values);
+    hp::FEFaceValues<dim, spacedim> cell_face_values(
+      fe_collection_,
+      hp::QCollection<dim - 1>(cell_face_quadrature),
+      update_values | update_normal_vectors | update_quadrature_points |
+        update_JxW_values);
+    std::vector<types::global_dof_index> indices;
+
+    // F = M*ydot - R: negate the volume term and reverse the sign of
+    // the numerical flux subtracted by the cell's raw R assembly.
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          indices.resize(cell->get_fe().n_dofs_per_cell());
+          cell->get_dof_indices(indices);
+          cell_values.reinit(cell);
+          const auto &fev       = cell_values.get_present_fe_values();
+          const auto  direction = compute_directional_vector(cell);
+          for (unsigned int q = 0; q < cell_quadrature.size(); ++q)
+            {
+              const auto weights = basis(
+                {t, fev.quadrature_point(q), cell->material_id(), cell->id()});
+              for (unsigned int i = 0; i < indices.size(); ++i)
+                if (cell->get_fe().system_to_component_index(i).first == 1)
+                  emit(indices[i],
+                       weights,
+                       -(direction * fev[velocity].gradient(i, q)) *
+                         fev.JxW(q) / density);
+            }
+          for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
+            {
+              cell_face_values.reinit(cell, f);
+              const auto &fef = cell_face_values.get_present_fe_values();
+              std::vector<double> a(cell_face_quadrature.size()),
+                u(cell_face_quadrature.size()), at(cell_face_quadrature.size()),
+                ut(cell_face_quadrature.size());
+              fef[area].get_function_values(y_relevant, a);
+              fef[velocity].get_function_values(y_relevant, u);
+              fef[trace_area].get_function_values(y_relevant, at);
+              fef[trace_velocity].get_function_values(y_relevant, ut);
+              const double ad = compute_a_d_at_face(cell, f);
+              for (unsigned int q = 0; q < cell_face_quadrature.size(); ++q)
+                {
+                  const double bn =
+                    compute_tangent_normal_product(cell, fef.normal_vector(q));
+                  const auto flux = numerical_external_pressure_flux(
+                    bn,
+                    bn,
+                    std::max(a[q], minimum_positive_area_),
+                    u[q],
+                    std::max(at[q], minimum_positive_area_),
+                    ut[q],
+                    cell->material_id(),
+                    cell->material_id(),
+                    ad,
+                    ad,
+                    1.,
+                    1.);
+                  const auto weights = basis({t,
+                                              fef.quadrature_point(q),
+                                              cell->material_id(),
+                                              cell->id()});
+                  for (unsigned int i = 0; i < indices.size(); ++i)
+                    {
+                      const auto component =
+                        cell->get_fe().system_to_component_index(i).first;
+                      if (component < 2)
+                        emit(indices[i],
+                             weights,
+                             (component == 0 ? flux[0] : flux[1]) *
+                               fef.shape_value(i, q) * fef.JxW(q));
+                    }
+                }
+            }
+        }
+
+    const QGauss<dim - 1>           face_quadrature(1);
+    hp::FEFaceValues<dim, spacedim> face_values(
+      fe_collection_,
+      hp::QCollection<dim - 1>(face_quadrature),
+      update_values | update_normal_vectors | update_quadrature_points);
+    for (const auto &face : interior_faces)
+      {
+        const double ad = compute_a_d_at_face(face.cell, face.face_no);
+        const double at =
+          std::max(static_cast<double>(y_relevant[face.trace.a_hat_dof]),
+                   minimum_positive_area_);
+        const double ut = y_relevant[face.trace.u_hat_dof];
+        for (unsigned int side = 0; side < 2; ++side)
+          {
+            const auto        &cell  = side == 0 ? face.cell : face.neighbor;
+            const auto        &other = side == 0 ? face.neighbor : face.cell;
+            const unsigned int f =
+              side == 0 ? face.face_no : face.neighbor_face_no;
+            face_values.reinit(cell, f);
+            const auto         &fef = face_values.get_present_fe_values();
+            std::vector<double> a(1), u(1);
+            fef[area].get_function_values(y_relevant, a);
+            fef[velocity].get_function_values(y_relevant, u);
+            const double bn =
+              compute_interior_tangent_normal_product(cell,
+                                                      fef.normal_vector(0));
+            const auto left =
+              numerical_external_pressure_flux(bn,
+                                               bn,
+                                               std::max(a[0],
+                                                        minimum_positive_area_),
+                                               u[0],
+                                               at,
+                                               ut,
+                                               cell->material_id(),
+                                               other->material_id(),
+                                               ad,
+                                               ad,
+                                               1.,
+                                               0.);
+            const auto right =
+              numerical_external_pressure_flux(bn,
+                                               bn,
+                                               std::max(a[0],
+                                                        minimum_positive_area_),
+                                               u[0],
+                                               at,
+                                               ut,
+                                               cell->material_id(),
+                                               other->material_id(),
+                                               ad,
+                                               ad,
+                                               0.,
+                                               1.);
+            const auto point = fef.quadrature_point(0);
+            const auto own_basis =
+              basis({t, point, cell->material_id(), cell->id()});
+            const auto other_basis =
+              basis({t, point, other->material_id(), other->id()});
+            emit(face.trace.a_hat_dof, own_basis, -left[0]);
+            emit(face.trace.u_hat_dof, own_basis, -left[1]);
+            emit(face.trace.a_hat_dof, other_basis, -right[0]);
+            emit(face.trace.u_hat_dof, other_basis, -right[1]);
+          }
+      }
+
+    for (const auto &face : boundary_faces)
+      {
+        const auto &cell = face.cell;
+        const auto  bid  = cell->face(face.face_no)->boundary_id();
+        face_values.reinit(cell, face.face_no);
+        const auto point =
+          face_values.get_present_fe_values().quadrature_point(0);
+        if (terminal_links.count(bid))
+          {
+            emit(face.a_hat_dof,
+                 basis({t, point, cell->material_id(), cell->id()}),
+                 -1.);
+            if (!rcr_pc_dof.count(bid))
+              {
+                double conductance = 0.;
+                for (const auto &[other, resistance] : terminal_links.at(bid))
+                  conductance += 1. / resistance;
+                for (const auto &[other, resistance] : terminal_links.at(bid))
+                  if (!rcr_pc_dof.count(other))
+                    emit(face.a_hat_dof,
+                         terminal_basis.at(other),
+                         1. / (resistance * conductance));
+              }
+          }
+        else if (outlet_type == "RCR" && rcr_map.count(bid) &&
+                 (rcr_map.at(bid).R1 > 0. || rcr_map.at(bid).R2 > 0.))
+          emit(face.a_hat_dof,
+               basis({t, point, cell->material_id(), cell->id()}),
+               -1.);
+
+        const auto pc = rcr_pc_dof.find(bid);
+        if (pc != rcr_pc_dof.end() && terminal_links.count(bid))
+          for (const auto &[other, resistance] : terminal_links.at(bid))
+            if (!rcr_pc_dof.count(other))
+              emit(pc->second, terminal_basis.at(other), -1. / resistance);
+      }
+
+    for (const auto &junction : junctions)
+      {
+        const auto &first       = junction.half_faces[0];
+        const auto  first_basis = basis(
+          {t, junction.location, first.cell->material_id(), first.cell->id()});
+        for (unsigned int i = 1; i < junction.n_vessels(); ++i)
+          {
+            const auto &previous = junction.half_faces[i - 1];
+            indices.resize(previous.cell->get_fe().n_dofs_per_cell());
+            previous.cell->get_dof_indices(indices);
+            const auto  row = face_trace_dofs(indices, previous.face_no).second;
+            const auto &current = junction.half_faces[i];
+            emit(row, first_basis, -1. / density);
+            emit(row,
+                 basis({t,
+                        junction.location,
+                        current.cell->material_id(),
+                        current.cell->id()}),
+                 1. / density);
+          }
+      }
+  }
+
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::add_external_pressure_state_jacobian(

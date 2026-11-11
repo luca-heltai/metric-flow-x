@@ -91,3 +91,49 @@ graph and is rejected for in-memory setup. Supplying a distributed mesh does not
 implicitly collect that graph to enable the optional warm start. The external
 application can initialize the native pair and advance its existing IDA adapter
 after all flow and coupling DoFs have been prepared.
+
+## A sparse external-pressure derivative
+
+For a pressure field owned by a coupled application, use
+`visit_external_pressure_jacobian(t, y, basis, visitor)` to assemble its
+cross-Jacobian. The native flow state `y` is held fixed. The basis callback
+returns the nonzero derivatives of pressure at a `PressureEvaluationPoint`
+with respect to the application's global pressure coefficients. The visitor
+receives additive `(native_row, pressure_column, value)` entries.
+
+For example, one pressure coefficient per compact native vessel id has the
+following basis:
+
+```cpp
+using Flow = MetricFlowX::BloodFlowSystem<1, 3>;
+using Index = dealii::types::global_dof_index;
+Flow::ExternalPressureBasisProvider basis =
+  [](const Flow::PressureEvaluationPoint &point) {
+    return Flow::ExternalPressureBasis{{point.vessel_id, 1.}};
+  };
+std::vector<std::tuple<Index, Index, double>> entries;
+flow.visit_external_pressure_jacobian(
+  t, y, basis, [&](Index row, Index column, double value) {
+    entries.emplace_back(row, column, value);
+  });
+```
+
+Each row belongs to the calling rank's native flow partition. Columns belong
+to the caller's coefficient space; repeated entries must be summed. The
+collected entries can supply a rectangular sparsity pattern and matrix without
+probing every global coefficient. A finite element provider can instead return
+the nonzero shape values and global coefficient indices on the requested cell,
+including any cell-local projection.
+
+This is a collective operation. The provider only needs locally visible cells.
+For distant connected terminals, MetricFlowX evaluates the stencil on the
+native endpoint owner and exchanges it through the existing terminal layout.
+Cell, ordinary-face, boundary, junction and connected-capacitor contributions
+use the same signs and numerical pressure flux as
+`add_external_pressure_residual`.
+
+HLL pressure weights depend on the candidate native state. Reassemble this
+matrix when that state changes. It is separate from
+`add_external_pressure_state_jacobian`, which differentiates with respect to
+native flow variables while holding prescribed pressures fixed. Neither
+operation installs a pressure provider or adds a time-derivative term.

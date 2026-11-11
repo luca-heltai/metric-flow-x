@@ -357,6 +357,17 @@ namespace MetricFlowX
     using ExternalPressureProvider =
       std::function<double(const PressureEvaluationPoint &)>;
 
+    /** Nonzero derivatives of external pressure with respect to caller-owned
+     * global coefficients. Repeated columns have additive semantics. */
+    using ExternalPressureBasis =
+      std::vector<std::pair<types::global_dof_index, double>>;
+
+    using ExternalPressureBasisProvider =
+      std::function<ExternalPressureBasis(const PressureEvaluationPoint &)>;
+
+    using ExternalPressureJacobianEntryVisitor = std::function<
+      void(types::global_dof_index, types::global_dof_index, double)>;
+
     struct VesselProperties
     {
       double  a0                = 0.0;
@@ -622,6 +633,22 @@ namespace MetricFlowX
                                    const VectorType               &y,
                                    const ExternalPressureProvider &provider,
                                    VectorType &destination) const;
+
+    /** Visit dF/dp entries for a sparse, caller-owned pressure basis.
+     *
+     * The candidate flow state is held fixed. Each invocation supplies an
+     * owned native residual row, a caller's global coefficient column and
+     * an additive matrix entry. Entries may repeat. The provider need only
+     * evaluate locally visible cells: connected-terminal stencils are sampled
+     * by endpoint owners and exchanged using the native terminal layout.
+     * This operation is collective and does not install either callback.
+     */
+    void
+    visit_external_pressure_jacobian(
+      const double                                t,
+      const VectorType                           &y,
+      const ExternalPressureBasisProvider        &provider,
+      const ExternalPressureJacobianEntryVisitor &visitor) const;
 
     /** Add d(pressure-only F)/dy with provider values held fixed.
      * Destination must have the native state-Jacobian layout and sparsity.
