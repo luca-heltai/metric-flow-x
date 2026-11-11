@@ -24,6 +24,7 @@ The following entries are registered by `BloodFlowSystem` in `include/metric_flo
 | `Verbosity (console depth)` | deal.II log depth; rank zero controls the visible log. |
 | `Print current statistics` | Print an aligned IDA progress row at every accepted output callback (default `true`), independently of file-output cadence. |
 | `Numerical flux type` | Exactly `HLL`, `HLL_HDG`, or `LAX_FRIEDRICHS`. Other strings are rejected. |
+| `Interior transmission` | `state` (default) preserves the legacy shared area/velocity trace. `flux` matches physical flow and momentum flux across ordinary interior faces, allowing different side states at a prescribed-pressure jump. |
 | `Use Riemann Invariants` | Select the configured boundary treatment using Riemann invariants. |
 | `Outlet boundary condition type` | `RCR` or `Reflection` for characteristic boundaries; `Dirichlet` prescribes area and velocity from the first two `Exact solution` components at every physical endpoint, including the inlet, and allocates no capacitor unknowns. |
 | `Mesh partitioning` | `graph` uses a weighted vessel graph and requires METIS; it is the default when available. `zorder` selects the legacy scheme and is the default without METIS. See [partitioning](partitioning.md). |

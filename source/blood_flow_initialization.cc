@@ -445,7 +445,7 @@ namespace MetricFlowX
       assemble_trace_interior_equations(t, y_relevant, residual);
       assemble_trace_boundary_equations(t, y_relevant, residual);
       assemble_trace_junction_equations(t, y_relevant, residual);
-      assemble_trace_continuity_equations(y_relevant, residual);
+      assemble_trace_continuity_equations(t, y_relevant, residual);
       residual.compress(VectorOperation::add);
     };
     initial_state_diagnostics_.largest_trace_block = 0;

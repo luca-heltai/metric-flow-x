@@ -319,6 +319,12 @@ namespace MetricFlowX
       "Positive value sets the interval between written outputs; zero writes "
       "at every IDA callback.");
     add_parameter("Numerical flux type", numerical_flux_type_str);
+    add_parameter(
+      "Interior transmission",
+      interior_transmission_str,
+      "Match state values (legacy) or physical area and momentum fluxes.",
+      this->prm,
+      Patterns::Selection("state|flux"));
     add_parameter("Use Riemann Invariants", use_riemann_invariants);
     add_parameter("Use junction mesh", use_junction_mesh);
     add_parameter("Mesh partitioning",
@@ -536,6 +542,15 @@ namespace MetricFlowX
         inflow_series.value(ida_parameters.initial_time);
         inflow_series.value(ida_parameters.final_time);
       }
+
+    if (interior_transmission_str == "state")
+      interior_transmission = InteriorTransmission::state;
+    else if (interior_transmission_str == "flux")
+      interior_transmission = InteriorTransmission::flux;
+    else
+      AssertThrow(false,
+                  ExcMessage("Unknown interior transmission: " +
+                             interior_transmission_str));
 
     if (numerical_flux_type_str == "HLL")
       numerical_flux_type = NumericalFluxType::HLL;
@@ -2048,8 +2063,8 @@ namespace MetricFlowX
                 // canonical owner, so they never reach this branch.
                 if (!cell->face(f)->at_boundary() &&
                     !is_junction_face(cell->id(), f))
-                  trace_continuity_pairs.push_back(
-                    TraceContinuityPair{a_here, u_here, a_canon, u_canon});
+                  trace_continuity_pairs.push_back(TraceContinuityPair{
+                    a_here, u_here, a_canon, u_canon, cell, nb, f, nb_f});
               }
             if (cell->face(f)->at_boundary() &&
                 !is_junction_face(cell->id(), f))
@@ -2074,11 +2089,21 @@ namespace MetricFlowX
             const auto &trace = face_dof_map.at(key);
             if (!dof_handler_.locally_owned_dofs().is_element(trace.a_hat_dof))
               continue;
+            ldofs.resize(cell->get_fe().n_dofs_per_cell());
+            cell->get_dof_indices(ldofs);
+            const auto nb   = cell->neighbor(f);
+            const auto nb_f = cell->neighbor_of_neighbor(f);
+            nb_dofs.resize(nb->get_fe().n_dofs_per_cell());
+            nb->get_dof_indices(nb_dofs);
+            const auto here  = face_trace_dofs(ldofs, f);
+            const auto there = face_trace_dofs(nb_dofs, nb_f);
             interior_faces.push_back({cell,
-                                      cell->neighbor(f),
+                                      nb,
                                       f,
-                                      cell->neighbor_of_neighbor(f),
-                                      trace});
+                                      nb_f,
+                                      trace,
+                                      {here.first, here.second},
+                                      {there.first, there.second}});
           }
 
     const types::global_dof_index n_pairs =
@@ -2567,10 +2592,9 @@ namespace MetricFlowX
     // rows are owned by construction.
     for (const auto &p : trace_continuity_pairs)
       {
-        dsp.add(p.a_dup, p.a_dup);
-        dsp.add(p.a_dup, p.a_canon);
-        dsp.add(p.u_dup, p.u_dup);
-        dsp.add(p.u_dup, p.u_canon);
+        for (const auto row : {p.a_dup, p.u_dup})
+          for (const auto column : {p.a_dup, p.u_dup, p.a_canon, p.u_canon})
+            dsp.add(row, column);
       }
   }
 
@@ -3655,7 +3679,10 @@ namespace MetricFlowX
     std::array<double, 2> result = {
       {0.5 * (FAL_j + FAR_j) - 0.5 * alpha * (dA_R - dA_L),
        0.5 * (FUL_j + FUR_j) - 0.5 * alpha * (dU_R - dU_L)}};
-    if (wall_model != "Square root")
+    // State transmission retains the legacy frozen square-root penalty.
+    // Flux transmission differentiates its active stabilization speed.
+    if (wall_model != "Square root" ||
+        interior_transmission == InteriorTransmission::flux)
       {
         const double dcL =
           compute_wave_speed_derivative(A_L, vid_L, ad_L) * dA_L;
@@ -3918,6 +3945,71 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer,
                              "assemble_trace_interior_equations");
+
+
+    if (interior_transmission == InteriorTransmission::flux)
+      {
+        const FEValuesExtractors::Scalar area(0), velocity(1);
+        const QGauss<dim - 1>            quadrature(1);
+        hp::FEFaceValues<dim, spacedim>  values(
+          fe_collection_,
+          hp::QCollection<dim - 1>(quadrature),
+          update_values | update_normal_vectors | update_quadrature_points);
+        for (const auto &face : interior_faces)
+          for (unsigned int side = 0; side < 2; ++side)
+            {
+              const auto &cell = side == 0 ? face.cell : face.neighbor;
+              const auto  f = side == 0 ? face.face_no : face.neighbor_face_no;
+              const auto &trace =
+                side == 0 ? face.cell_trace : face.neighbor_trace;
+              values.reinit(cell, f);
+              const auto         &fev = values.get_present_fe_values();
+              std::vector<double> a(1), u(1);
+              fev[area].get_function_values(y, a);
+              fev[velocity].get_function_values(y, u);
+              const double bn =
+                compute_tangent_normal_product(cell, fev.normal_vector(0));
+              const double ad       = compute_a_d_at_face(cell, f);
+              const double pressure = external_pressure(
+                {t, fev.quadrature_point(0), cell->material_id(), cell->id()},
+                provider);
+              // These are the same side traces and pressure arguments used by
+              // the cell's face term, including at a pressure discontinuity.
+              const auto flux =
+                pressure_only ?
+                  numerical_external_pressure_flux(
+                    bn,
+                    bn,
+                    std::max(a[0], minimum_positive_area_),
+                    u[0],
+                    std::max(static_cast<double>(y[trace.a_hat_dof]),
+                             minimum_positive_area_),
+                    y[trace.u_hat_dof],
+                    cell->material_id(),
+                    cell->material_id(),
+                    ad,
+                    ad,
+                    pressure,
+                    pressure) :
+                  numerical_flux(bn,
+                                 bn,
+                                 std::max(a[0], minimum_positive_area_),
+                                 u[0],
+                                 std::max(static_cast<double>(
+                                            y[trace.a_hat_dof]),
+                                          minimum_positive_area_),
+                                 y[trace.u_hat_dof],
+                                 cell->material_id(),
+                                 cell->material_id(),
+                                 ad,
+                                 ad,
+                                 pressure,
+                                 pressure);
+              F(face.trace.a_hat_dof) += flux[0];
+              F(face.trace.u_hat_dof) += flux[1];
+            }
+        return;
+      }
 
     // FEValues and FEFaceValues read through the ghosted state vector. It
     // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
@@ -4517,22 +4609,73 @@ namespace MetricFlowX
       }
   }
 
+
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::assemble_trace_continuity_equations(
-    const VectorType &y,
-    VectorType       &F)
+    const double                    t,
+    const VectorType               &y,
+    VectorType                     &F,
+    const ExternalPressureProvider *provider,
+    const bool                      pressure_only)
   {
     TimerOutput::Scope timer(computing_timer,
                              "assemble_trace_continuity_equations");
     for (const auto &p : trace_continuity_pairs)
       {
-        // The duplicate side is always a locally owned cell's own pair, so
-        // these rows are owned by construction; the canonical values are read
-        // from the ghosted vector and may live on another rank.
         Assert(locally_owned_dofs_.is_element(p.a_dup), ExcInternalError());
-        F(p.a_dup) += y(p.a_dup) - y(p.a_canon);
-        F(p.u_dup) += y(p.u_dup) - y(p.u_canon);
+        if (interior_transmission == InteriorTransmission::state)
+          {
+            if (!pressure_only)
+              {
+                F(p.a_dup) += y(p.a_dup) - y(p.a_canon);
+                F(p.u_dup) += y(p.u_dup) - y(p.u_canon);
+              }
+          }
+        else if (interior_transmission == InteriorTransmission::flux)
+          {
+            const auto  &duplicate = p.duplicate_cell;
+            const auto  &canonical = p.canonical_cell;
+            const double ad_d =
+              compute_a_d_at_face(duplicate, p.duplicate_face_no);
+            const double ad_c =
+              compute_a_d_at_face(canonical, p.canonical_face_no);
+            const double reference_speed =
+              compute_wave_speed(ad_c, canonical->material_id(), ad_c);
+            AssertThrow(std::isfinite(reference_speed) && reference_speed > 0.,
+                        ExcMessage("Interior transmission requires a finite "
+                                   "positive reference wave speed."));
+            const double pressure_d =
+              external_pressure({t,
+                                 duplicate->vertex(p.duplicate_face_no),
+                                 duplicate->material_id(),
+                                 duplicate->id()},
+                                provider);
+            const double pressure_c =
+              external_pressure({t,
+                                 canonical->vertex(p.canonical_face_no),
+                                 canonical->material_id(),
+                                 canonical->id()},
+                                provider);
+            double head_difference = (pressure_d - pressure_c) / density;
+            if (!pressure_only)
+              {
+                const double a_d = std::max(static_cast<double>(y[p.a_dup]),
+                                            minimum_positive_area_);
+                const double a_c = std::max(static_cast<double>(y[p.a_canon]),
+                                            minimum_positive_area_);
+                const double u_d = y[p.u_dup], u_c = y[p.u_canon];
+                F(p.a_dup) += (a_d * u_d - a_c * u_c) / reference_speed;
+                head_difference +=
+                  .5 * (u_d * u_d - u_c * u_c) +
+                  (compute_pressure_value(a_d, duplicate->material_id(), ad_d) -
+                   compute_pressure_value(a_c,
+                                          canonical->material_id(),
+                                          ad_c)) /
+                    density;
+              }
+            F(p.u_dup) += head_difference / reference_speed;
+          }
       }
   }
 
@@ -4540,15 +4683,53 @@ namespace MetricFlowX
   void
   BloodFlowSystem<dim, spacedim>::assemble_jacobian_trace_continuity_block()
   {
-    // Owned by construction: the duplicate side is a locally owned cell's own
-    // pair.  The canonical column may belong to another rank, which is fine --
-    // only rows are partitioned.
+    TimerOutput::Scope timer(computing_timer,
+                             "assemble_jacobian_trace_continuity_block");
     for (const auto &p : trace_continuity_pairs)
       {
-        jacobian_matrix.add(p.a_dup, p.a_dup, 1.0);
-        jacobian_matrix.add(p.a_dup, p.a_canon, -1.0);
-        jacobian_matrix.add(p.u_dup, p.u_dup, 1.0);
-        jacobian_matrix.add(p.u_dup, p.u_canon, -1.0);
+        if (interior_transmission == InteriorTransmission::state)
+          {
+            jacobian_matrix.add(p.a_dup, p.a_dup, 1.0);
+            jacobian_matrix.add(p.a_dup, p.a_canon, -1.0);
+            jacobian_matrix.add(p.u_dup, p.u_dup, 1.0);
+            jacobian_matrix.add(p.u_dup, p.u_canon, -1.0);
+          }
+        else if (interior_transmission == InteriorTransmission::flux)
+          {
+            const double ad_c =
+              compute_a_d_at_face(p.canonical_cell, p.canonical_face_no);
+            const double reference_speed =
+              compute_wave_speed(ad_c, p.canonical_cell->material_id(), ad_c);
+            AssertThrow(std::isfinite(reference_speed) && reference_speed > 0.,
+                        ExcMessage("Interior transmission requires a finite "
+                                   "positive reference wave speed."));
+            for (unsigned int side = 0; side < 2; ++side)
+              {
+                const auto &cell =
+                  side == 0 ? p.duplicate_cell : p.canonical_cell;
+                const auto face =
+                  side == 0 ? p.duplicate_face_no : p.canonical_face_no;
+                const auto   a_column = side == 0 ? p.a_dup : p.a_canon;
+                const auto   u_column = side == 0 ? p.u_dup : p.u_canon;
+                const double sign     = side == 0 ? 1. : -1.;
+                const double raw_area = y_relevant[a_column];
+                const double area = std::max(raw_area, minimum_positive_area_);
+                const double u    = y_relevant[u_column];
+                const double active =
+                  raw_area > minimum_positive_area_ ? 1. : 0.;
+                const double factor = sign / reference_speed;
+                const double ad     = compute_a_d_at_face(cell, face);
+                jacobian_matrix.add(p.a_dup, a_column, factor * u * active);
+                jacobian_matrix.add(p.a_dup, u_column, factor * area);
+                jacobian_matrix.add(
+                  p.u_dup,
+                  a_column,
+                  factor * active *
+                    compute_pressure_derivative(area, cell->material_id(), ad) /
+                    density);
+                jacobian_matrix.add(p.u_dup, u_column, factor * u);
+              }
+          }
       }
   }
 
@@ -4582,7 +4763,7 @@ namespace MetricFlowX
     assemble_trace_interior_equations(t, y_relevant, residual_F);
     assemble_trace_boundary_equations(t, y_relevant, residual_F);
     assemble_trace_junction_equations(t, y_relevant, residual_F);
-    assemble_trace_continuity_equations(y_relevant, residual_F);
+    assemble_trace_continuity_equations(t, y_relevant, residual_F);
     residual_F.compress(VectorOperation::add);
 
     // ---- residual = M_K * ydot - R, uniformly over the FE range -------------
@@ -4657,6 +4838,8 @@ namespace MetricFlowX
     self->assemble_trace_boundary_equations(
       t, y_relevant, residual_F, &provider, true);
     self->assemble_trace_junction_equations(
+      t, y_relevant, residual_F, &provider, true);
+    self->assemble_trace_continuity_equations(
       t, y_relevant, residual_F, &provider, true);
     residual_F.compress(VectorOperation::add);
 
@@ -4845,64 +5028,111 @@ namespace MetricFlowX
       fe_collection_,
       hp::QCollection<dim - 1>(face_quadrature),
       update_values | update_normal_vectors | update_quadrature_points);
-    for (const auto &face : interior_faces)
+    if (interior_transmission == InteriorTransmission::state)
       {
-        const double ad = compute_a_d_at_face(face.cell, face.face_no);
-        const double at =
-          std::max(static_cast<double>(y_relevant[face.trace.a_hat_dof]),
-                   minimum_positive_area_);
-        const double ut = y_relevant[face.trace.u_hat_dof];
-        for (unsigned int side = 0; side < 2; ++side)
+        for (const auto &face : interior_faces)
           {
-            const auto        &cell  = side == 0 ? face.cell : face.neighbor;
-            const auto        &other = side == 0 ? face.neighbor : face.cell;
-            const unsigned int f =
-              side == 0 ? face.face_no : face.neighbor_face_no;
-            face_values.reinit(cell, f);
-            const auto         &fef = face_values.get_present_fe_values();
-            std::vector<double> a(1), u(1);
-            fef[area].get_function_values(y_relevant, a);
-            fef[velocity].get_function_values(y_relevant, u);
-            const double bn =
-              compute_interior_tangent_normal_product(cell,
-                                                      fef.normal_vector(0));
-            const auto left =
-              numerical_external_pressure_flux(bn,
-                                               bn,
-                                               std::max(a[0],
-                                                        minimum_positive_area_),
-                                               u[0],
-                                               at,
-                                               ut,
-                                               cell->material_id(),
-                                               other->material_id(),
-                                               ad,
-                                               ad,
-                                               1.,
-                                               0.);
-            const auto right =
-              numerical_external_pressure_flux(bn,
-                                               bn,
-                                               std::max(a[0],
-                                                        minimum_positive_area_),
-                                               u[0],
-                                               at,
-                                               ut,
-                                               cell->material_id(),
-                                               other->material_id(),
-                                               ad,
-                                               ad,
-                                               0.,
-                                               1.);
-            const auto point = fef.quadrature_point(0);
-            const auto own_basis =
-              basis({t, point, cell->material_id(), cell->id()});
-            const auto other_basis =
-              basis({t, point, other->material_id(), other->id()});
-            emit(face.trace.a_hat_dof, own_basis, -left[0]);
-            emit(face.trace.u_hat_dof, own_basis, -left[1]);
-            emit(face.trace.a_hat_dof, other_basis, -right[0]);
-            emit(face.trace.u_hat_dof, other_basis, -right[1]);
+            const double ad = compute_a_d_at_face(face.cell, face.face_no);
+            const double at =
+              std::max(static_cast<double>(y_relevant[face.trace.a_hat_dof]),
+                       minimum_positive_area_);
+            const double ut = y_relevant[face.trace.u_hat_dof];
+            for (unsigned int side = 0; side < 2; ++side)
+              {
+                const auto &cell  = side == 0 ? face.cell : face.neighbor;
+                const auto &other = side == 0 ? face.neighbor : face.cell;
+                const unsigned int f =
+                  side == 0 ? face.face_no : face.neighbor_face_no;
+                face_values.reinit(cell, f);
+                const auto         &fef = face_values.get_present_fe_values();
+                std::vector<double> a(1), u(1);
+                fef[area].get_function_values(y_relevant, a);
+                fef[velocity].get_function_values(y_relevant, u);
+                const double bn =
+                  compute_interior_tangent_normal_product(cell,
+                                                          fef.normal_vector(0));
+                const auto left = numerical_external_pressure_flux(
+                  bn,
+                  bn,
+                  std::max(a[0], minimum_positive_area_),
+                  u[0],
+                  at,
+                  ut,
+                  cell->material_id(),
+                  other->material_id(),
+                  ad,
+                  ad,
+                  1.,
+                  0.);
+                const auto right = numerical_external_pressure_flux(
+                  bn,
+                  bn,
+                  std::max(a[0], minimum_positive_area_),
+                  u[0],
+                  at,
+                  ut,
+                  cell->material_id(),
+                  other->material_id(),
+                  ad,
+                  ad,
+                  0.,
+                  1.);
+                const auto point = fef.quadrature_point(0);
+                const auto own_basis =
+                  basis({t, point, cell->material_id(), cell->id()});
+                const auto other_basis =
+                  basis({t, point, other->material_id(), other->id()});
+                emit(face.trace.a_hat_dof, own_basis, -left[0]);
+                emit(face.trace.u_hat_dof, own_basis, -left[1]);
+                emit(face.trace.a_hat_dof, other_basis, -right[0]);
+                emit(face.trace.u_hat_dof, other_basis, -right[1]);
+              }
+          }
+      }
+
+    else if (interior_transmission == InteriorTransmission::flux)
+      {
+        for (const auto &face : interior_faces)
+          for (unsigned int side = 0; side < 2; ++side)
+            {
+              const auto &cell = side == 0 ? face.cell : face.neighbor;
+              const auto  f = side == 0 ? face.face_no : face.neighbor_face_no;
+              face_values.reinit(cell, f);
+              const auto  &fev = face_values.get_present_fe_values();
+              const double bn =
+                compute_tangent_normal_product(cell, fev.normal_vector(0));
+              // With equal own-side pressure arguments every flux family has
+              // the same state-independent momentum offset n*p/rho.
+              emit(face.trace.u_hat_dof,
+                   basis({t,
+                          fev.quadrature_point(0),
+                          cell->material_id(),
+                          cell->id()}),
+                   -bn / density);
+            }
+        for (const auto &p : trace_continuity_pairs)
+          {
+            const auto  &duplicate = p.duplicate_cell;
+            const auto  &canonical = p.canonical_cell;
+            const double ad =
+              compute_a_d_at_face(canonical, p.canonical_face_no);
+            const double reference_speed =
+              compute_wave_speed(ad, canonical->material_id(), ad);
+            AssertThrow(std::isfinite(reference_speed) && reference_speed > 0.,
+                        ExcMessage("Interior transmission requires a finite "
+                                   "positive reference wave speed."));
+            emit(p.u_dup,
+                 basis({t,
+                        duplicate->vertex(p.duplicate_face_no),
+                        duplicate->material_id(),
+                        duplicate->id()}),
+                 -1. / (density * reference_speed));
+            emit(p.u_dup,
+                 basis({t,
+                        canonical->vertex(p.canonical_face_no),
+                        canonical->material_id(),
+                        canonical->id()}),
+                 1. / (density * reference_speed));
           }
       }
 
@@ -4980,6 +5210,14 @@ namespace MetricFlowX
                 ExcMessage("An external-pressure provider cannot be empty."));
     AssertDimension(destination.m(), n_total_dofs);
     AssertDimension(destination.n(), n_total_dofs);
+    if (interior_transmission == InteriorTransmission::flux)
+      {
+        // Cell and canonical half-fluxes use equal own-side pressure
+        // arguments, so their prescribed-pressure offsets are n*p/rho.
+        // The duplicate head equation is also linear in fixed pressure.
+        destination.compress(VectorOperation::add);
+        return;
+      }
     if (numerical_flux_type == NumericalFluxType::HLL)
       {
         auto *self = const_cast<BloodFlowSystem *>(this);
@@ -5493,6 +5731,63 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer,
                              "assemble_jacobian_trace_interior_block");
+
+
+    if (interior_transmission == InteriorTransmission::flux)
+      {
+        const FEValuesExtractors::Scalar area(0), velocity(1), trace_area(2),
+          trace_velocity(3);
+        const QGauss<dim - 1>           quadrature(1);
+        hp::FEFaceValues<dim, spacedim> values(
+          fe_collection_,
+          hp::QCollection<dim - 1>(quadrature),
+          update_values | update_normal_vectors);
+        std::vector<types::global_dof_index> indices;
+        for (const auto &face : interior_faces)
+          for (unsigned int side = 0; side < 2; ++side)
+            {
+              const auto &cell = side == 0 ? face.cell : face.neighbor;
+              const auto  f = side == 0 ? face.face_no : face.neighbor_face_no;
+              const auto &trace =
+                side == 0 ? face.cell_trace : face.neighbor_trace;
+              values.reinit(cell, f);
+              const auto         &fev = values.get_present_fe_values();
+              std::vector<double> a(1), u(1);
+              fev[area].get_function_values(y, a);
+              fev[velocity].get_function_values(y, u);
+              const double bn =
+                compute_tangent_normal_product(cell, fev.normal_vector(0));
+              const double ad = compute_a_d_at_face(cell, f);
+              indices.resize(cell->get_fe().n_dofs_per_cell());
+              cell->get_dof_indices(indices);
+              for (unsigned int j = 0; j < indices.size(); ++j)
+                {
+                  const auto flux = numerical_flux_jac(
+                    bn,
+                    bn,
+                    std::max(a[0], minimum_positive_area_),
+                    u[0],
+                    std::max(static_cast<double>(y[trace.a_hat_dof]),
+                             minimum_positive_area_),
+                    y[trace.u_hat_dof],
+                    fev[area].value(j, 0),
+                    fev[velocity].value(j, 0),
+                    fev[trace_area].value(j, 0),
+                    fev[trace_velocity].value(j, 0),
+                    cell->material_id(),
+                    cell->material_id(),
+                    ad,
+                    ad);
+                  jacobian_matrix.add(face.trace.a_hat_dof,
+                                      indices[j],
+                                      flux[0]);
+                  jacobian_matrix.add(face.trace.u_hat_dof,
+                                      indices[j],
+                                      flux[1]);
+                }
+            }
+        return;
+      }
 
     // FEValues and FEFaceValues read through the ghosted state vector. It
     // is sized dof_handler_.n_dofs(), which get_function_values() asserts, and
