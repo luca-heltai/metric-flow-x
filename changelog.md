@@ -9,4 +9,6 @@
 
 ### Fixed
 
+- [PR #92](https://github.com/luca-heltai/metric-flow-x/pull/92) Orient HLL characteristic speeds and their state and external-pressure derivatives with each outward face normal.
+
 - [PR #89](https://github.com/luca-heltai/metric-flow-x/pull/89) Evaluate spatial external pressure at each area support point in nodal pressure output, preserving providers that are constant on each cell.
