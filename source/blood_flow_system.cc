@@ -4623,6 +4623,7 @@ namespace MetricFlowX
                              "assemble_trace_continuity_equations");
     for (const auto &p : trace_continuity_pairs)
       {
+        Assert(locally_owned_dofs_.is_element(p.a_dup), ExcInternalError());
         if (interior_transmission == InteriorTransmission::state)
           {
             if (!pressure_only)
