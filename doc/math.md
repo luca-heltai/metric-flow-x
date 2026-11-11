@@ -69,8 +69,8 @@ select a different constitutive law.
 ## Cell fields and face traces
 
 On each cell $K$, both components of $\boldsymbol w_h$ are discontinuous
-polynomials of the selected degree. An ordinary interface carries one
-trace pair $\widehat{\boldsymbol w}_h=(\widehat A,\widehat U)$.
+polynomials of the selected degree. By default, an ordinary interface carries one
+shared trace pair $\widehat{\boldsymbol w}_h=(\widehat A,\widehat U)$.
 For a polynomial test function $\boldsymbol v$, the cell residual is
 
 $$
@@ -89,10 +89,10 @@ equations for the shared trace. The code provides `HLL`, `HLL_HDG` and
 
 For `HLL`, $\boldsymbol f_L$ and $\boldsymbol f_R$ are the physical fluxes
 projected with the orientation arguments supplied to the flux routine. The
-current routine computes its two speed estimates from the axial states:
+routine computes its two speed estimates using the outward conormals:
 
 $$
-\overline U=(U_L+U_R)/2,\qquad \overline c=(c_L+c_R)/2,\qquad
+\overline U=(n_L U_L+n_R U_R)/2,\qquad \overline c=(c_L+c_R)/2,\qquad
 s_L=\overline U-\overline c,\quad s_R=\overline U+\overline c.
 $$
 
@@ -107,6 +107,39 @@ $$
 +s_Ls_R(\boldsymbol w_R-\boldsymbol w_L)}{s_R-s_L},&s_L<0<s_R.
 \end{cases}
 $$
+
+### Interior transmission with discontinuous pressure
+
+The default `Interior transmission = state` retains the shared area and velocity
+trace. Set `Interior transmission = flux` to retain each side's existing
+trace and impose continuity of the physical fluxes
+
+$$
+Q = A U, \qquad H = \frac{U^2}{2} +
+  \frac{p_{\mathrm{tube}}(A) + p_{\mathrm{ext}}}{\rho}.
+$$
+
+This permits a stationary pressure step with continuous nonzero flow and head
+but different areas and velocities. Each canonical transmission equation sums
+the same outward numerical half-fluxes as the two cell residuals, using that
+side's trace, wall law and prescribed pressure. Boundary and junction equations
+are unchanged.
+
+The duplicate rows impose `(Q_duplicate - Q_canonical)/c_ref = 0` and
+`(H_duplicate - H_canonical)/c_ref = 0`. Here `c_ref` is the wave speed at
+the canonical face's fixed reference area. It does not depend on the candidate
+state; the row units remain area and velocity. No unknowns are added.
+
+For continuous prescribed pressure and the same wall law, the change of
+interface coordinates from `(A,U)` to `(Q,H)` has determinant `U^2-c^2`.
+It is locally invertible for positive subsonic states. The two choices have the
+same continuous-pressure interface states there, with different constraint
+coordinates. Flux transmission does not switch modes at a pressure crossing
+and does not establish nonlinear or time-integrator convergence.
+
+In flux mode, the square-root Lax--Friedrichs Jacobian differentiates the
+active stabilization speed. State mode retains its legacy frozen-speed
+Jacobian for that wall law.
 
 ## Junctions
 

@@ -886,6 +886,31 @@ namespace MetricFlowX
       LAX_FRIEDRICHS
     };
 
+    /** Ordinary interior faces may transmit states or physical fluxes.
+     * State transmission is the legacy default. Flux transmission permits
+     * distinct side traces when prescribed external pressure is discontinuous.
+     */
+    enum class InteriorTransmission
+    {
+      state,
+      flux
+    };
+
+    void
+    set_interior_transmission(const InteriorTransmission transmission)
+    {
+      AssertThrow(transmission == InteriorTransmission::state ||
+                    transmission == InteriorTransmission::flux,
+                  dealii::ExcMessage("Unknown interior transmission."));
+      interior_transmission = transmission;
+    }
+
+    InteriorTransmission
+    get_interior_transmission() const
+    {
+      return interior_transmission;
+    }
+
     void
     set_numerical_flux(const NumericalFluxType flux_type)
     {
@@ -932,6 +957,7 @@ namespace MetricFlowX
       typename DoFHandler<dim, spacedim>::active_cell_iterator cell, neighbor;
       unsigned int face_no, neighbor_face_no;
       FaceTraceDof trace;
+      FaceTraceDof cell_trace, neighbor_trace;
     };
 
     // Rebuilt with face_dof_map after DoF distribution. Keep the first-owned-
@@ -1068,6 +1094,8 @@ namespace MetricFlowX
     // registered in face_dof_map and carries the Riemann equation, while the
     // opposite side is slaved by the algebraic rows
     //     A_hat_dup - A_hat_canon = 0 ,   U_hat_dup - U_hat_canon = 0 .
+    // Flux transmission instead matches AU and U^2/2 + P/rho, divided by
+    // a fixed reference wave speed. Each half-face then retains its own trace.
     // Junction and boundary half-faces are each their own canonical owner and
     // are untouched by this mechanism.
     //
@@ -1079,6 +1107,9 @@ namespace MetricFlowX
     {
       types::global_dof_index a_dup, u_dup;     // slaved (duplicate) side
       types::global_dof_index a_canon, u_canon; // master (canonical) side
+      typename DoFHandler<dim, spacedim>::active_cell_iterator duplicate_cell,
+        canonical_cell;
+      unsigned int duplicate_face_no, canonical_face_no;
     };
     std::vector<TraceContinuityPair> trace_continuity_pairs;
 
@@ -1395,8 +1426,10 @@ namespace MetricFlowX
     // Positive values throttle file output; zero writes every IDA callback.
     double time_interval = 0.0;
 
-    NumericalFluxType numerical_flux_type     = NumericalFluxType::HLL;
-    std::string       numerical_flux_type_str = "HLL";
+    NumericalFluxType    numerical_flux_type     = NumericalFluxType::HLL;
+    std::string          numerical_flux_type_str = "HLL";
+    InteriorTransmission interior_transmission   = InteriorTransmission::state;
+    std::string          interior_transmission_str = "state";
 
     SUNDIALS::IDA<VectorType>::AdditionalData ida_parameters;
 
@@ -2145,10 +2178,20 @@ namespace MetricFlowX
       assemble_trace_junction_equations(time, y, F);
     }
 
-    // Continuity rows for the duplicate side of each ordinary interior face:
-    // F[a_dup] = A_hat_dup - A_hat_canon, likewise for U.
+    // Duplicate rows match A/U in state mode, or (Q,H)/c_ref in flux mode.
     void
-    assemble_trace_continuity_equations(const VectorType &y, VectorType &F);
+    assemble_trace_continuity_equations(
+      const double                    t,
+      const VectorType               &y,
+      VectorType                     &F,
+      const ExternalPressureProvider *provider      = nullptr,
+      const bool                      pressure_only = false);
+
+    void
+    assemble_trace_continuity_equations(const VectorType &y, VectorType &F)
+    {
+      assemble_trace_continuity_equations(time, y, F);
+    }
 
     // Jacobian blocks
     void
