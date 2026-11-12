@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 #include <metric_flow_x/blood_flow_system.h>
 
-#if __has_include(<deal.II/distributed/solution_transfer.h>)
-#  include <deal.II/distributed/solution_transfer.h>
-#else
+#if DEAL_II_VERSION_GTE(9, 7, 0)
 #  include <deal.II/numerics/solution_transfer.h>
+#else
+#  include <deal.II/distributed/solution_transfer.h>
 #endif
 
 #include <boost/archive/binary_iarchive.hpp>
@@ -80,13 +80,13 @@ namespace MetricFlowX
       return result;
     }
 
-#if __has_include(<deal.II/distributed/solution_transfer.h>)
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+    template <int dim, int spacedim>
+    using NativeTransfer = dealii::SolutionTransfer<dim, VectorType, spacedim>;
+#else
     template <int dim, int spacedim>
     using NativeTransfer = dealii::parallel::distributed::
       SolutionTransfer<dim, VectorType, spacedim>;
-#else
-    template <int dim, int spacedim>
-    using NativeTransfer = dealii::SolutionTransfer<dim, VectorType, spacedim>;
 #endif
     /// @endcond
   } // namespace
