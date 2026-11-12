@@ -26,6 +26,25 @@ def read_rows(path):
         return list(csv.DictReader(stream))
 
 
+def check_residuals(history):
+    rows = read_rows(history / "checkpoint_residuals.csv")
+    # These are fixture-specific raw equation bounds, not universal error
+    # weights: components have different units. Observable continuation below
+    # is the numerical accuracy check against an uninterrupted integration.
+    bounds = {"area_residual_linfty": 1e-9,
+              "velocity_residual_linfty": 1e-5,
+              "area_trace_residual_linfty": 1e-6,
+              "velocity_trace_residual_linfty": 1e-8,
+              "capacitor_residual_linfty": 1e-9}
+    assert rows
+    for row in rows:
+        assert abs(float(row["time_s"]) - float(row["ida_internal_time_s"])) < 1e-15
+        for field, bound in bounds.items():
+            value = float(row[field])
+            assert math.isfinite(value) and value <= bound, (field, value, bound)
+    return rows, {field: max(float(row[field]) for row in rows) for field in bounds}
+
+
 def parameters(mesh, inflow, output, checkpoints):
     return f"""subsection Metric Flow Parameters
   set Viscosity coefficient (mu) = 0.004
@@ -87,6 +106,18 @@ def validate(executable, source, destination, ranks, mpiexec):
     prefix = [mpiexec, "-np", str(ranks)] if ranks > 1 else []
     environment = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
     run(prefix + [str(executable), str(prm)], folder, environment, "reference")
+    reference_residuals, maximum_residuals = check_residuals(checkpoints)
+    assert len(reference_residuals) == 5
+
+    quiet_output, quiet_history = folder / "without-vtk-output", folder / "without-vtk-history"
+    quiet_prm = original / "without_vtk.prm"
+    quiet_prm.write_text(parameters(mesh, inflow, quiet_output, quiet_history).replace(
+        "  set Finite element degree = 1", "  set Write solution output = false\n  set Finite element degree = 1"))
+    run(prefix + [str(executable), str(quiet_prm)], folder, environment, "without-vtk")
+    assert len([path for path in quiet_history.iterdir() if path.is_dir()]) == 5
+    assert not list(quiet_output.rglob("*.vtu"))
+    check_residuals(quiet_history)
+
     history = {float.fromhex(path.name.removeprefix("checkpoint-")): path
                for path in checkpoints.iterdir() if path.is_dir()}
     assert len(history) == 5, history
@@ -108,6 +139,13 @@ def validate(executable, source, destination, ranks, mpiexec):
                   "--final-time", "0.008", "--output-directory", str(restored_output),
                   "--checkpoint-directory", str(folder / "continued-checkpoints")],
         folder, environment, "restart")
+
+    restored_residuals, _ = check_residuals(folder / "continued-checkpoints")
+    expected_residual = min(reference_residuals,
+                            key=lambda row: abs(float(row["time_s"]) - selected_time))
+    for field in maximum_residuals:
+        assert math.isclose(float(restored_residuals[0][field]), float(expected_residual[field]),
+                            rel_tol=1e-8, abs_tol=1e-12), field
 
     # Resetting IDA discards its BDF history, so this is a numerical continuation
     # comparison, not a bitwise comparison. Bounds allow accumulated error from
@@ -148,7 +186,7 @@ def validate(executable, source, destination, ranks, mpiexec):
                            environment, "incompatible-ranks", expect_success=False)
         assert "MPI size" in incompatible.stdout + incompatible.stderr
     print(f"Fresh-process checkpoint/restart ranks={ranks}: PASSED; "
-          f"maximum normalized probe errors={maximum}")
+          f"maximum normalized probe errors={maximum}; raw residual maxima={maximum_residuals}")
 
 
 def main():
