@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 // Adapted from deal.II 9.7.1 source/distributed/fully_distributed_tria.cc.
 // Copyright (C) 2019 - 2025 by the deal.II authors.
+#include <deal.II/base/mpi.h>
 #include <deal.II/base/mpi_large_count.h>
 
 #include <deal.II/grid/tria_description.h>
