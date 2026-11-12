@@ -1,6 +1,9 @@
 #ifndef METRIC_FLOW_X_INFLOW_SERIES_H
 #define METRIC_FLOW_X_INFLOW_SERIES_H
 
+#include <boost/serialization/utility.hpp>
+#include <boost/serialization/vector.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -52,6 +55,13 @@ namespace MetricFlowX
       const auto &b = *right;
       return a.second +
              (b.second - a.second) * ((time - a.first) / (b.first - a.first));
+    }
+
+    template <class Archive>
+    void
+    serialize(Archive &archive, const unsigned int)
+    {
+      archive &samples &periodicity;
     }
 
   private:

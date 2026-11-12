@@ -4,7 +4,9 @@ foreach(_fixture adan56 constant aortic multi_vessel wall_arterial wall_venous w
   configure_file("parameters/${_fixture}.prm.in"
     "parameters/${_fixture}.prm" @ONLY)
 endforeach()
-add_compile_definitions(PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/")
+add_compile_definitions(
+  PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/"
+  METRIC_FLOW_X_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/third_party/rapidcsv")
 deal_II_pickup_tests()

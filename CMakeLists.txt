@@ -70,6 +70,8 @@ foreach(_variant IN LISTS METRIC_FLOW_X_BUILD_TYPES)
 endforeach()
 
 set(METRIC_FLOW_X_SOURCES
+  source/compatibility/fully_distributed_tria.cc
+  source/checkpoint.cc
   source/blood_flow_system.cc
   source/vessel_partitioning.cc
   source/viscous_wall.cc
@@ -101,8 +103,6 @@ foreach(_variant IN LISTS METRIC_FLOW_X_BUILD_TYPES)
   set_target_properties(${_library} PROPERTIES EXPORT_NAME metric_flow_x_${_variant})
 
   add_executable(${_application} apps/blood_flow.cc)
-  target_compile_definitions(${_application} PRIVATE
-    PRM_DIR="${CMAKE_CURRENT_BINARY_DIR}/parameters/")
   deal_ii_setup_target(${_application} ${_variant_upper})
   target_link_libraries(${_application} ${_library})
   file(RELATIVE_PATH _library_relative_to_bin
@@ -150,9 +150,6 @@ endforeach()
 
 set(METRIC_FLOW_X_PARAMETER_DIR
   "${CMAKE_CURRENT_BINARY_DIR}/parameters/")
-add_compile_definitions(
-  METRIC_FLOW_X_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
-)
 
 add_executable(benchmark_assembly EXCLUDE_FROM_ALL tools/benchmark_assembly.cc)
 list(GET METRIC_FLOW_X_BUILD_TYPES 0 _benchmark_variant)
