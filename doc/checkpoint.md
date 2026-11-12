@@ -107,6 +107,27 @@ directory before retrying the same destination. The manifest checks file
 presence and sizes, but is not a cryptographic integrity check or a guarantee
 against storage-device power loss.
 
+## Native deal.II MPI serialization dependency
+
+The installed deal.II 9.9.0-pre revision `99dd5779c6bd882205f1a3110ded7d294dae7354`
+contains an offset error in `parallel::fullydistributed::Triangulation::save/load`:
+it converts the first-cell index to bytes although the attached-data serializer
+already performs the byte conversion. With multiple ranks, variable-size vector
+payloads overwrite their size table and loading can crash. The same two offset
+conversions are present in the inspected newer source used by the coupled build.
+
+The minimal [dependency patch](patches/dealii-fully-distributed-checkpoint-offsets.patch)
+removes those two conversions. Apply it to a separate compatible deal.II checkout
+and rebuild through that workspace's normal build entry point. No system or
+shared installation is modified by this project. Existing checkpoints written
+with the affected MPI serializer are corrupt and must be regenerated.
+
+The serial continuation test passes on the original installed library. MPI
+round-trip and continuation validation require the corrected native serializer;
+results with the isolated corrected dependency are being collected. This is a
+dependency defect, so the application continues to use the native API rather
+than introducing an alternate vector format.
+
 ## Verification
 
 The C++ `test_checkpoint` regression checks two distinct time-dependent native

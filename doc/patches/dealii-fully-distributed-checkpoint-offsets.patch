@@ -1,0 +1,20 @@
+--- a/source/distributed/fully_distributed_tria.cc
++++ b/source/distributed/fully_distributed_tria.cc
+@@ -492,8 +492,6 @@
+                             this->mpi_communicator);
+       AssertThrowMPI(ierr);
+ 
+-      global_first_cell *= sizeof(unsigned int);
+-
+ 
+       if (myrank == 0)
+         {
+@@ -719,8 +717,6 @@
+                             this->mpi_communicator);
+       AssertThrowMPI(ierr);
+ 
+-      global_first_cell *= sizeof(unsigned int);
+-
+       Assert(this->n_global_active_cells() == n_global_active_cells,
+              ExcMessage("Number of global active cells differ!"));
+ 
