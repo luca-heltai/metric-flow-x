@@ -138,7 +138,8 @@ test()
             for (unsigned int c = 0; c < 5; ++c)
               for (const auto i : flow.component_dofs_[c])
                 {
-                  state[i] += (c == 0 || c == 2) ? 1.e-7 : .125 * (c + 1);
+                  state[i] =
+                    state[i] + ((c == 0 || c == 2) ? 1.e-7 : .125 * (c + 1));
                   rate[i] = .25 * (c + 1) + .001 * i;
                 }
             state.compress(VectorOperation::insert);
