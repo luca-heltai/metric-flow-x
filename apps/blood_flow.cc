@@ -27,10 +27,12 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <stdexcept> // for std::invalid_argument
 
@@ -75,6 +77,11 @@ namespace MetricFlowX
         "Independent of the local time error tolerance.");
       problem.leave_subsection();
       problem.leave_subsection();
+      problem.add_parameter(
+        "Checkpoint directory",
+        checkpoint_directory_,
+        "Optional directory for native checkpoints at fixed output times; "
+        "empty disables checkpoint output.");
       tolerance_ramp_.add_parameters(problem);
       problem.add_parameter("Maximum IDA internal steps per output",
                             maximum_ida_steps_per_output_,
@@ -83,10 +90,71 @@ namespace MetricFlowX
 
 
     void
-    run(Problem &problem)
+    run(Problem                         &problem,
+        const bool                       restart              = false,
+        const std::optional<double>      final_time           = {},
+        const std::string               &output_directory     = "",
+        const std::optional<std::string> checkpoint_directory = {})
     {
+      const double output_origin = problem.ida_parameters.initial_time;
+      if (restart)
+        {
+          const double restored_time = problem.time;
+          // Continue the same geometric tolerance policy from the restored
+          // physical time, without restarting its initial hold interval.
+          if (tolerance_ramp_.enabled)
+            {
+              const auto scales =
+                tolerance_ramp_.scales(output_origin, restored_time);
+              if (restored_time >= tolerance_ramp_.end_time)
+                tolerance_ramp_.enabled = false;
+              else
+                {
+                  tolerance_ramp_.initial_relative_factor = scales.relative;
+                  tolerance_ramp_.initial_absolute_factor = scales.absolute;
+                  tolerance_ramp_.hold_duration =
+                    std::max(0.,
+                             output_origin + tolerance_ramp_.hold_duration -
+                               restored_time);
+                }
+            }
+          problem.ida_parameters.initial_time = restored_time;
+        }
+      if (final_time)
+        problem.ida_parameters.final_time = *final_time;
+      if (!output_directory.empty())
+        problem.output_directory = output_directory;
+      if (checkpoint_directory)
+        checkpoint_directory_ = *checkpoint_directory;
+      // Archive the effective CLI overrides. Keep the original initial time
+      // and tolerance-ramp parameters: subsequent restarts need that origin.
+      problem.enter_my_subsection(problem.prm);
+      problem.prm.set("Output directory", problem.output_directory);
+      problem.prm.set("Checkpoint directory", checkpoint_directory_);
+      problem.prm.enter_subsection("IDA parameters");
+      std::ostringstream final_time_text;
+      final_time_text << std::setprecision(17)
+                      << problem.ida_parameters.final_time;
+      problem.prm.set("Final time", final_time_text.str());
+      problem.prm.leave_subsection();
+      problem.leave_my_subsection(problem.prm);
+      AssertThrow(
+        (!restart && checkpoint_directory_.empty()) ||
+          problem.n_refinement_cycles == 1,
+        ExcMessage("Checkpoint output/restart requires one refinement cycle."));
       const bool steady_network_only = run_mode_ == "steady network";
       const bool steady_hdg          = run_mode_ == "steady HDG";
+      AssertThrow((!restart && checkpoint_directory_.empty()) ||
+                    (!steady_network_only && !steady_hdg),
+                  ExcMessage(
+                    "Checkpoint output/restart requires transient mode."));
+      if (restart)
+        AssertThrow(std::isfinite(problem.ida_parameters.final_time) &&
+                      problem.ida_parameters.final_time >
+                        problem.ida_parameters.initial_time,
+                    ExcMessage(
+                      "Restart final time must be after checkpoint time; "
+                      "use --final-time to extend the run."));
       AssertThrow(std::isfinite(problem.ida_parameters.initial_time),
                   ExcMessage("Initial time must be finite."));
       if (!steady_network_only && !steady_hdg)
@@ -122,9 +190,9 @@ namespace MetricFlowX
           if (problem.verbosity > 0)
             problem.pcout << "\n--- Refinement cycle " << cycle << " ---\n";
 
-          if (cycle == 0)
+          if (cycle == 0 && !restart)
             problem.setup();
-          else
+          else if (cycle > 0)
             problem.triangulation_.refine_global(1);
 
           if (cycle > 0)
@@ -156,15 +224,16 @@ namespace MetricFlowX
             problem.open_output_files();
           const auto preparation_start = std::chrono::steady_clock::now();
           const bool native_pair_verified =
-            !steady_hdg && (problem.initial_condition_policy == "native" ||
-                            problem.ida_parameters.ic_type ==
-                              SUNDIALS::IDA<VectorType>::AdditionalData::none);
+            !restart && !steady_hdg &&
+            (problem.initial_condition_policy == "native" ||
+             problem.ida_parameters.ic_type ==
+               SUNDIALS::IDA<VectorType>::AdditionalData::none);
           if (native_pair_verified)
             problem.initialize_consistent_state(
               problem.solution,
               problem.solution_dot,
               problem.ida_parameters.initial_time);
-          else
+          else if (!restart)
             {
               problem.initialize_state(problem.solution,
                                        problem.ida_parameters.initial_time);
@@ -177,8 +246,8 @@ namespace MetricFlowX
               .count();
           bool          initial_output_seen = false;
           unsigned long ic_residual_calls = 0, ic_jacobian_setups = 0,
-                        ic_linear_solves = 0;
-          double ida_initialization_wall = 0., first_interval_wall = -1.;
+                        ic_linear_solves        = 0;
+          double        ida_initialization_wall = 0., first_interval_wall = -1.;
           std::chrono::steady_clock::time_point solve_start, integration_start;
           problem.time = problem.ida_parameters.initial_time;
 
@@ -323,7 +392,7 @@ namespace MetricFlowX
                   ida_parameters.final_time > ida_parameters.initial_time,
                 ExcMessage("Steady HDG IC time scale is not representable."));
             }
-          else if (problem.initial_condition_policy == "native")
+          else if (restart || problem.initial_condition_policy == "native")
             ida_parameters.ic_type =
               SUNDIALS::IDA<VectorType>::AdditionalData::none;
           IDAErrorGuard::validate_setup(ida_parameters);
@@ -622,7 +691,7 @@ namespace MetricFlowX
                                                "." :
                                                problem.output_directory;
                   std::ofstream     statistics(folder +
-                                           "/stationary_statistics.json");
+                                               "/stationary_statistics.json");
                   statistics
                     << std::setprecision(17)
                     << "{\n  \"model\": \"steady HDG\",\n  \"time\": "
@@ -639,10 +708,12 @@ namespace MetricFlowX
           unsigned int output_number        = 0;
           bool         final_output_written = false;
 
-          ida.output_step = [&problem,
+          ida.output_step = [this,
+                             &problem,
                              &ida,
                              &ida_errors,
                              initial_output_time,
+                             output_origin,
                              final_output_time,
                              &next_output_time,
                              &output_number,
@@ -662,6 +733,51 @@ namespace MetricFlowX
             // including when integration starts at a nonzero time.
             const double t =
               step_number == 0 ? initial_output_time : callback_time;
+            double checkpoint_internal_time = t;
+            if (!checkpoint_directory_.empty())
+              {
+                void     *memory = internal::native_ida_memory(ida);
+                const int status =
+                  IDAGetCurrentTime(memory, &checkpoint_internal_time);
+                const double endpoint_tolerance =
+                  64. * std::numeric_limits<double>::epsilon() *
+                  std::max({std::abs(t),
+                            std::abs(initial_output_time),
+                            std::abs(problem.ida_parameters.output_period)});
+                AssertThrow(
+                  Utilities::MPI::min(
+                    status == 0 && std::isfinite(checkpoint_internal_time) &&
+                        std::abs(checkpoint_internal_time - t) <=
+                          endpoint_tolerance ?
+                      1u :
+                      0u,
+                    problem.mpi_communicator_) == 1,
+                  ExcMessage(
+                    "Checkpoint output must be an accepted IDA endpoint."));
+                if (t < final_output_time)
+                  {
+                    double next_stop =
+                      std::min(t + problem.ida_parameters.output_period,
+                               final_output_time);
+                    if (tolerance_ramp_.enabled && tolerance_ramp_.end_time > t)
+                      next_stop = std::min(next_stop, tolerance_ramp_.end_time);
+                    // reset() installs its own final stop after the
+                    // differential hook. Arm output stops here, after
+                    // RampSource's cutoff update, so checkpoint pairs are
+                    // accepted endpoints rather than dense-output interpolants.
+                    // The ramp cutoff is on this same output grid and remains a
+                    // stopping point.
+                    AssertThrow(
+                      std::isfinite(next_stop) && next_stop > t,
+                      ExcMessage(
+                        "Next checkpoint output time is not representable."));
+                    const int stop_status = IDASetStopTime(memory, next_stop);
+                    AssertThrow(
+                      Utilities::MPI::min(stop_status == 0 ? 1u : 0u,
+                                          problem.mpi_communicator_) == 1,
+                      ExcMessage("Cannot set IDA checkpoint output stop."));
+                  }
+              }
             if (step_number == 0)
               {
                 ida_initialization_wall =
@@ -692,7 +808,7 @@ namespace MetricFlowX
                                            /*resync_time=*/true,
                                            /*require_consecutive_steps=*/true);
             problem.print_current_statistics(ida, t);
-            if (!problem.write_solution_output)
+            if (!problem.write_solution_output && checkpoint_directory_.empty())
               {
                 if (step_number == 0)
                   integration_start = std::chrono::steady_clock::now();
@@ -719,25 +835,97 @@ namespace MetricFlowX
             // previous *written* output -> ida_step_history.csv.  Recorded
             // after the output_due check so each row spans one output
             // interval set by "Output time interval".
-            problem.record_ida_step(ida, t);
-
-            problem.compute_pressure(sol, ydot, problem.pressure_, t);
-            problem.output_results(sol, problem.pressure_, output_number++);
-            // HDG_IDA_Vessel_*.csv + mass_conservation.csv
-            problem.write_output_step(t, sol, &ydot);
-            problem.report_flow_regime(sol, t);
+            if (!checkpoint_directory_.empty())
+              {
+                // Each checkpoint is an immutable directory. The native writer
+                // rejects an existing destination, including after a restart.
+                std::ostringstream name;
+                name << "checkpoint-" << std::hexfloat << t;
+                problem.save_checkpoint(
+                  (std::filesystem::path(checkpoint_directory_) / name.str())
+                    .string(),
+                  t,
+                  sol,
+                  ydot);
+                auto residual = problem.make_state();
+                problem.assemble_residual(t, sol, ydot, residual);
+                std::vector<double> norms(5, 0.);
+                unsigned int        invalid = 0;
+                for (unsigned int component = 0; component < norms.size();
+                     ++component)
+                  for (const auto i : problem.component_dofs_[component])
+                    if (std::isfinite(residual[i]))
+                      norms[component] =
+                        std::max(norms[component], std::abs(residual[i]));
+                    else
+                      invalid = 1;
+                AssertThrow(Utilities::MPI::max(invalid,
+                                                problem.mpi_communicator_) == 0,
+                            ExcMessage("Nonfinite checkpoint DAE residual."));
+                for (auto &norm : norms)
+                  norm = Utilities::MPI::max(norm, problem.mpi_communicator_);
+                std::string diagnostic_error;
+                if (problem.this_mpi_process == 0)
+                  try
+                    {
+                      const auto path =
+                        std::filesystem::path(checkpoint_directory_) /
+                        "checkpoint_residuals.csv";
+                      const bool write_header =
+                        !std::filesystem::exists(path) ||
+                        std::filesystem::file_size(path) == 0;
+                      std::ofstream diagnostics(path, std::ios::app);
+                      if (write_header)
+                        diagnostics
+                          << "time_s,ida_internal_time_s,area_residual_linfty,"
+                             "velocity_residual_linfty,area_trace_residual_linfty,"
+                             "velocity_trace_residual_linfty,"
+                             "capacitor_residual_linfty\n";
+                      // Residual rows have different physical units. Record
+                      // raw component norms without claiming a universal bound.
+                      diagnostics << std::setprecision(17) << t << ','
+                                  << checkpoint_internal_time;
+                      for (const auto norm : norms)
+                        diagnostics << ',' << norm;
+                      diagnostics << '\n';
+                      diagnostics.close();
+                      AssertThrow(
+                        diagnostics.good(),
+                        ExcMessage(
+                          "Cannot write checkpoint residual diagnostics."));
+                    }
+                  catch (const std::exception &error)
+                    {
+                      diagnostic_error = error.what();
+                    }
+                diagnostic_error =
+                  Utilities::MPI::broadcast(problem.mpi_communicator_,
+                                            diagnostic_error,
+                                            0);
+                AssertThrow(diagnostic_error.empty(),
+                            ExcMessage(diagnostic_error));
+              }
+            if (problem.write_solution_output)
+              {
+                problem.record_ida_step(ida, t);
+                problem.compute_pressure(sol, ydot, problem.pressure_, t);
+                problem.output_results(sol, problem.pressure_, output_number++);
+                // HDG_IDA_Vessel_*.csv + mass_conservation.csv
+                problem.write_output_step(t, sol, &ydot);
+                problem.report_flow_regime(sol, t);
+              }
             final_output_written = at_final_time;
 
             if (problem.time_interval > 0.0)
               {
                 const long double elapsed =
                   (static_cast<long double>(schedule_time + tolerance) -
-                   initial_output_time) /
+                   output_origin) /
                   problem.time_interval;
                 const long double intervals = std::floor(elapsed) + 1.0L;
-                next_output_time            = static_cast<double>(
-                  static_cast<long double>(initial_output_time) +
-                  intervals * problem.time_interval);
+                next_output_time =
+                  static_cast<double>(static_cast<long double>(output_origin) +
+                                      intervals * problem.time_interval);
                 if (next_output_time <= schedule_time)
                   next_output_time =
                     std::nextafter(schedule_time,
@@ -762,7 +950,7 @@ namespace MetricFlowX
                                             "." :
                                             problem.output_directory;
               std::ofstream      statistics(folder +
-                                       "/initialization_statistics.json");
+                                            "/initialization_statistics.json");
               const auto        &d = problem.initial_state_diagnostics();
               std::ostringstream differential_defect;
               if (native_pair_verified)
@@ -842,6 +1030,7 @@ namespace MetricFlowX
     }
 
     std::string   run_mode_ = "transient";
+    std::string   checkpoint_directory_;
     ToleranceRamp tolerance_ramp_;
     long int      maximum_ida_steps_per_output_      = 500;
     double        maximum_step_size_                 = 0.;
@@ -855,24 +1044,72 @@ main(int argc, char **argv)
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-      /* --------------------------- 1. Locate parameter file -----------------
-       */
-      std::string par_name;
-      if (argc > 1)
-        par_name = argv[1]; // first CLI argument
-      else
-        par_name = "parameters.prm"; // fallback default
-
-      /* ---------------------- 2. Initialise deal.II logging -----------------
-       */
+      std::string                par_name = "parameters.prm", restart_directory;
+      std::string                output_directory;
+      std::optional<std::string> checkpoint_directory;
+      std::optional<double>      final_time;
+      bool                       parameter_given = false;
+      for (int i = 1; i < argc; ++i)
+        {
+          const std::string argument = argv[i];
+          auto              value    = [&]() {
+            AssertThrow(i + 1 < argc,
+                        ExcMessage("Missing value for " + argument));
+            return std::string(argv[++i]);
+          };
+          if (argument == "--restart")
+            restart_directory = value();
+          else if (argument == "--final-time")
+            {
+              const auto  text = value();
+              std::size_t end  = 0;
+              final_time       = std::stod(text, &end);
+              AssertThrow(end == text.size() && std::isfinite(*final_time),
+                          ExcMessage("Invalid --final-time value."));
+            }
+          else if (argument == "--output-directory")
+            output_directory = value();
+          else if (argument == "--checkpoint-directory")
+            checkpoint_directory = value();
+          else if (argument == "--help")
+            {
+              if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
+                std::cout << "Usage: blood_flow [parameters.prm] "
+                             "[--restart CHECKPOINT] [--final-time T] "
+                             "[--output-directory DIR] "
+                             "[--checkpoint-directory DIR]\n";
+              return 0;
+            }
+          else
+            {
+              AssertThrow(argument.rfind("--", 0) != 0 && !parameter_given,
+                          ExcMessage("Unexpected argument: " + argument));
+              par_name        = argument;
+              parameter_given = true;
+            }
+        }
+      AssertThrow(restart_directory.empty() || !parameter_given,
+                  ExcMessage("Use either a parameter file or --restart."));
       dealii::deallog.depth_console(1);
-
-      /* ------------------------- 3. Set up the problem ----------------------
-       */
-      BloodFlowSystem<1, 3> problem; // 1-dim geometry embedded in \mathbb{R}^3
+      BloodFlowSystem<1, 3>    problem;
       BloodFlowIDARunner<1, 3> runner(problem);
-      problem.initialize_params(par_name);
-      runner.run(problem);
+      if (restart_directory.empty())
+        problem.initialize_params(par_name);
+      else
+        {
+          problem.load_checkpoint(restart_directory);
+          // Start a separate output history by default, without depending on
+          // or truncating paths stored by the original invocation.
+          if (output_directory.empty())
+            output_directory = restart_directory + "-output";
+          if (!checkpoint_directory)
+            checkpoint_directory = restart_directory + "-continued";
+        }
+      runner.run(problem,
+                 !restart_directory.empty(),
+                 final_time,
+                 output_directory,
+                 checkpoint_directory);
 
       /* ------------------------ 4. Normal program exit ----------------------
        */

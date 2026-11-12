@@ -4,6 +4,8 @@
 
 ### Added
 
+- Add self-contained native transient checkpoint/restart, fixed-output history, and composable mesh serialization hooks using deal.II save/load and SolutionTransfer.
+
 - [PR #93](https://github.com/luca-heltai/metric-flow-x/pull/93) Add optional physical-flux transmission across ordinary interior faces, preserving stationary pressure steps with distinct side traces.
 
 - [PR #90](https://github.com/luca-heltai/metric-flow-x/pull/90) Configure the native minimum positive area through numerical parameters, with the existing `1e-10 m^2` default and collective setup validation.

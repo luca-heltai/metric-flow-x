@@ -471,6 +471,13 @@ namespace MetricFlowX
                 ExcMessage("Could not write parameter snapshot: " +
                            parameter_output_error));
 
+    finalize_parameter_initialization();
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::finalize_parameter_initialization()
+  {
     AssertThrow(
       wall_model == "Square root" || wall_model == "ADAVN arterial" ||
         wall_model == "ADAVN venous" || wall_model == "ADAVN mixed",
@@ -536,7 +543,7 @@ namespace MetricFlowX
     AssertThrow(!inflow_csv_file.empty() || inflow_csv_period == 0.0,
                 ExcMessage("Inflow CSV period requires an Inflow CSV file."));
     inflow_series = InflowSeries{};
-    if (!inflow_csv_file.empty())
+    if (!loading_checkpoint_ && !inflow_csv_file.empty())
       {
         inflow_series.read(inflow_csv_file, inflow_csv_period);
         inflow_series.value(ida_parameters.initial_time);

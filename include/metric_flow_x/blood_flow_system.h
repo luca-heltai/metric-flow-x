@@ -442,6 +442,59 @@ namespace MetricFlowX
       }
     };
 
+    /** Collectively publish a self-contained checkpoint by atomic directory
+     * rename. The destination and its .incomplete staging directory must not
+     * exist. Uses native deal.II mesh serialization and Boost archives.
+     * The complete state and its derivative are recorded at exactly t.
+     * External std::function pressure providers must be archived by their
+     * owning application, detached for this call, and reattached after load.
+     * Optional prepare_additional_data receives the staging directory after
+     * native state transfer registration and before mesh.save(). It can write
+     * application metadata and register more SolutionTransfer objects. Keep
+     * those objects alive through this call, and restore them in the same
+     * order with load_checkpoint's hook. All ranks call both hooks.
+     */
+    void
+    save_checkpoint(const std::string &directory,
+                    double             t,
+                    const VectorType  &state,
+                    const VectorType  &derivative,
+                    const std::function<void(const std::string &)>
+                      &prepare_additional_data = {}) const;
+
+    /** Restore into a fresh object after registering application parameters.
+     * No original input files are read. Requires the same MPI size, backend,
+     * deal.II version and compatible MetricFlowX executable. Restores time,
+     * solution and solution_dot; leaves the configured initial time intact
+     * so a runner can recover the original output/tolerance schedule.
+     * Reinitialize IDA at time using the restored pair, without CalcIC.
+     * restore_additional_data receives the committed checkpoint directory
+     * after native setup and state deserialization.
+     */
+    void
+    load_checkpoint(const std::string &directory,
+                    const std::function<void(const std::string &)>
+                      &restore_additional_data = {});
+
+    /** Native pair and physical time restored by load_checkpoint(). */
+    const VectorType &
+    state() const
+    {
+      return solution;
+    }
+
+    const VectorType &
+    state_derivative() const
+    {
+      return solution_dot;
+    }
+
+    double
+    get_time() const
+    {
+      return time;
+    }
+
     /** Area regularization floor in m^2. Set through "Minimum positive area"
      * before either file-based or in-memory setup. */
     double
@@ -924,6 +977,9 @@ namespace MetricFlowX
     }
 
   private:
+    void
+    finalize_parameter_initialization();
+
     using VertexKey = unsigned int;
     using FaceKey   = std::pair<CellId, unsigned int>;
 
@@ -1015,6 +1071,7 @@ namespace MetricFlowX
     std::map<unsigned int, RCRPhysics> rcr_map;
     std::set<types::boundary_id>       sealed_terminal_ids;
     bool                               in_memory_physics = false;
+    bool                               loading_checkpoint_ = false;
     std::vector<TerminalConnection>    input_terminal_connections;
     // Coarse-mesh incidence, replicated before partitioning; output owners
     // need labels even when the terminal itself belongs to another rank.

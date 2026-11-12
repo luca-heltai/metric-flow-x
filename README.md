@@ -54,6 +54,8 @@ by an external multiphysics application. Constitutive access is provided by
 
 See [initialization and startup tolerances](doc/initialization.md) for the static
 0D seed, verified initial derivatives and an optional tolerance ramp.
+See [native checkpoint and restart](doc/checkpoint.md) for self-contained
+transient snapshots and restarting without the original parameter/input files.
 See [stationary calculations](doc/stationary.md) for graph-only and complete
 HDG equilibrium output with the same `blood_flow` executable.
 
