@@ -70,6 +70,7 @@ foreach(_variant IN LISTS METRIC_FLOW_X_BUILD_TYPES)
 endforeach()
 
 set(METRIC_FLOW_X_SOURCES
+  source/compatibility/fully_distributed_tria.cc
   source/checkpoint.cc
   source/blood_flow_system.cc
   source/vessel_partitioning.cc

@@ -13,8 +13,6 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/timer.h>
 
-#include <deal.II/distributed/fully_distributed_tria.h>
-
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_tools.h>
 
@@ -34,6 +32,7 @@
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 
+#include <metric_flow_x/compatibility/fully_distributed_tria.h>
 #include <metric_flow_x/config.h>
 #include <metric_flow_x/wall_law.h>
 // Include only the backend selected when the library was built.
@@ -1121,9 +1120,9 @@ namespace MetricFlowX
     // Component 4: DG0 capacitor pressure on RCR terminal cells, FE_Nothing
     // elsewhere. All state and matrix indices are native DoFHandler indices.
     // -----------------------------------------------------------------------
-    parallel::fullydistributed::Triangulation<dim, spacedim> triangulation_;
-    DoFHandler<dim, spacedim>                                dof_handler_;
-    dealii::hp::FECollection<dim, spacedim>                  fe_collection_;
+    Compatibility::FullyDistributedTriangulation<dim, spacedim> triangulation_;
+    DoFHandler<dim, spacedim>                                  dof_handler_;
+    dealii::hp::FECollection<dim, spacedim>                    fe_collection_;
 
     types::global_dof_index n_total_dofs = 0;
 

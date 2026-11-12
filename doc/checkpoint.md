@@ -107,29 +107,20 @@ directory before retrying the same destination. The manifest checks file
 presence and sizes, but is not a cryptographic integrity check or a guarantee
 against storage-device power loss.
 
-## Native deal.II MPI serialization dependency
+## Local deal.II compatibility
 
-The installed deal.II 9.9.0-pre revision `99dd5779c6bd882205f1a3110ded7d294dae7354`
-contains an offset error in `parallel::fullydistributed::Triangulation::save/load`:
-it converts the first-cell index to bytes although the attached-data serializer
-already performs the byte conversion. With multiple ranks, variable-size vector
-payloads overwrite their size table and loading can crash. The same two offset
-conversions are present in the inspected newer source used by the coupled build.
+Checkpoint I/O uses `Compatibility::FullyDistributedTriangulation` from
+`metric_flow_x/compatibility/fully_distributed_tria.h`. Its save/load methods
+are adapted from deal.II 9.7.1 and keep the native archive format and
+`SolutionTransfer` callbacks. The remaining mesh operations are inherited
+from deal.II.
 
-The minimal [dependency patch](patches/dealii_fully_distributed_checkpoint_offsets.patch)
-removes those two conversions. Apply it to a separate compatible deal.II checkout
-and rebuild through that workspace's normal build entry point. No system or
-shared installation is modified by this project. Existing checkpoints written
-with the affected MPI serializer are corrupt and must be regenerated.
-
-The serial continuation test passes on the original installed library. MPI
-round-trip and fresh-process continuation pass at two and four ranks with the
-isolated corrected native serializer. The same checks also pass serially,
-including output without VTK, deleted original inputs, relocation and residual
-checks. Maximum normalized observable continuation error is 0.077 of the
-explicit comparison bounds. This is a
-dependency defect, so the application continues to use the native API rather
-than introducing an alternate vector format.
+The local implementation corrects the duplicated conversion from first-cell
+index to byte offset present in deal.II 9.7.1 and affected newer versions.
+With multiple ranks that defect corrupts variable-size attached data. No
+patched deal.II installation or version newer than 9.7.1 is required for
+checkpoint I/O. Existing checkpoints written with the defective MPI serializer
+must be regenerated; the local implementation does not repair them.
 
 ## Verification
 
