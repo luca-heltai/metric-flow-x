@@ -19,6 +19,7 @@ namespace MetricFlowX
   using dealii::ExcMessage;
   namespace
   {
+    /// @cond INTERNAL
     // File errors must reach every rank before the next collective operation.
     template <class Operation>
     void
@@ -63,8 +64,8 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive & magic & dealii_version & backend & ranks & time &
-          additional_data & physics & vessel_terminals & inflow & parameters;
+        archive &magic &dealii_version &backend &ranks &time &additional_data
+          &physics &vessel_terminals &inflow &parameters;
       }
     };
 
@@ -87,6 +88,7 @@ namespace MetricFlowX
     template <int dim, int spacedim>
     using NativeTransfer = dealii::SolutionTransfer<dim, VectorType, spacedim>;
 #endif
+    /// @endcond
   } // namespace
 
   template <int dim, int spacedim>
@@ -328,10 +330,10 @@ namespace MetricFlowX
     build_per_cell_mass_inv();
     collective_file_operation(mpi_communicator_, [&] {
       std::map<std::string, unsigned int> expected;
-      std::ifstream file(root / ("elements-" +
+      std::ifstream                       file(root / ("elements-" +
                                  std::to_string(this_mpi_process) + ".bin"),
                          std::ios::binary);
-      boost::archive::binary_iarchive archive(file);
+      boost::archive::binary_iarchive     archive(file);
       archive >> expected;
       AssertThrow(expected == cell_elements(dof_handler_),
                   ExcMessage(

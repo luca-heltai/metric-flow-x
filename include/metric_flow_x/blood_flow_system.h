@@ -1070,7 +1070,7 @@ namespace MetricFlowX
 
     std::map<unsigned int, RCRPhysics> rcr_map;
     std::set<types::boundary_id>       sealed_terminal_ids;
-    bool                               in_memory_physics = false;
+    bool                               in_memory_physics   = false;
     bool                               loading_checkpoint_ = false;
     std::vector<TerminalConnection>    input_terminal_connections;
     // Coarse-mesh incidence, replicated before partitioning; output owners

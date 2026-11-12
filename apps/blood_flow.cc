@@ -246,8 +246,8 @@ namespace MetricFlowX
               .count();
           bool          initial_output_seen = false;
           unsigned long ic_residual_calls = 0, ic_jacobian_setups = 0,
-                        ic_linear_solves        = 0;
-          double        ida_initialization_wall = 0., first_interval_wall = -1.;
+                        ic_linear_solves = 0;
+          double ida_initialization_wall = 0., first_interval_wall = -1.;
           std::chrono::steady_clock::time_point solve_start, integration_start;
           problem.time = problem.ida_parameters.initial_time;
 
@@ -691,7 +691,7 @@ namespace MetricFlowX
                                                "." :
                                                problem.output_directory;
                   std::ofstream     statistics(folder +
-                                               "/stationary_statistics.json");
+                                           "/stationary_statistics.json");
                   statistics
                     << std::setprecision(17)
                     << "{\n  \"model\": \"steady HDG\",\n  \"time\": "
@@ -950,7 +950,7 @@ namespace MetricFlowX
                                             "." :
                                             problem.output_directory;
               std::ofstream      statistics(folder +
-                                            "/initialization_statistics.json");
+                                       "/initialization_statistics.json");
               const auto        &d = problem.initial_state_diagnostics();
               std::ostringstream differential_defect;
               if (native_pair_verified)

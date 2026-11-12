@@ -61,7 +61,7 @@ namespace MetricFlowX
     void
     serialize(Archive &archive, const unsigned int)
     {
-      archive & samples & periodicity;
+      archive &samples &periodicity;
     }
 
   private:

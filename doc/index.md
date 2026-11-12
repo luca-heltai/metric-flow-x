@@ -73,6 +73,7 @@ math
 wall_models
 initialization
 transient_parameters
+checkpoint
 stationary
 partitioning
 results
