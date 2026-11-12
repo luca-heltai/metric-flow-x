@@ -116,7 +116,7 @@ already performs the byte conversion. With multiple ranks, variable-size vector
 payloads overwrite their size table and loading can crash. The same two offset
 conversions are present in the inspected newer source used by the coupled build.
 
-The minimal [dependency patch](patches/dealii-fully-distributed-checkpoint-offsets.patch)
+The minimal [dependency patch](patches/dealii_fully_distributed_checkpoint_offsets.patch)
 removes those two conversions. Apply it to a separate compatible deal.II checkout
 and rebuild through that workspace's normal build entry point. No system or
 shared installation is modified by this project. Existing checkpoints written
