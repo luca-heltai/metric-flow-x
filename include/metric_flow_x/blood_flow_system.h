@@ -1121,8 +1121,8 @@ namespace MetricFlowX
     // elsewhere. All state and matrix indices are native DoFHandler indices.
     // -----------------------------------------------------------------------
     Compatibility::FullyDistributedTriangulation<dim, spacedim> triangulation_;
-    DoFHandler<dim, spacedim>                                  dof_handler_;
-    dealii::hp::FECollection<dim, spacedim>                    fe_collection_;
+    DoFHandler<dim, spacedim>                                   dof_handler_;
+    dealii::hp::FECollection<dim, spacedim>                     fe_collection_;
 
     types::global_dof_index n_total_dofs = 0;
 
