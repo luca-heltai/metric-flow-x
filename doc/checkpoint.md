@@ -123,8 +123,11 @@ shared installation is modified by this project. Existing checkpoints written
 with the affected MPI serializer are corrupt and must be regenerated.
 
 The serial continuation test passes on the original installed library. MPI
-round-trip and continuation validation require the corrected native serializer;
-results with the isolated corrected dependency are being collected. This is a
+round-trip and fresh-process continuation pass at two and four ranks with the
+isolated corrected native serializer. The same checks also pass serially,
+including output without VTK, deleted original inputs, relocation and residual
+checks. Maximum normalized observable continuation error is 0.077 of the
+explicit comparison bounds. This is a
 dependency defect, so the application continues to use the native API rather
 than introducing an alternate vector format.
 
