@@ -44,6 +44,40 @@ Application parameters already registered by the caller are restored. A native
 replay reader may omit unrelated standalone runner/output controls; undefined
 entries are skipped using `ParameterHandler::parse_input`'s native facility.
 
+## Replaying a history
+
+A one-way consumer, such as a solid solver driven by saved flow areas, needs
+the state at every time of one history. Load one checkpoint once, then read the
+others into the same object:
+
+```cpp
+flow.load_checkpoint(first_directory);
+for (const auto &directory : later_checkpoints)
+  {
+    flow.load_checkpoint_state(directory);
+    // flow.state(), flow.state_derivative(), flow.get_time() now refer to
+    // directory.
+  }
+```
+
+`load_checkpoint_state()` is collective and requires an object that is already
+set up, either by `load_checkpoint()` or by the usual setup of the run that
+wrote the history. It validates the manifest and compatibility metadata as
+`load_checkpoint()` does, then loads the checkpoint mesh into a temporary
+triangulation. Every locally owned cell must match by CellId, vertices, material
+and boundary ids, and active finite element index; a checkpoint written on a
+different mesh or partition is rejected. The state pair is deserialized on the
+temporary mesh and copied cell by cell into `state()` and `state_derivative()`.
+`get_time()` returns the checkpoint time.
+
+No parameters are parsed, so no `ParameterAcceptor::clear()` is needed and other
+application acceptors keep their entries. The sparsity pattern, matrices,
+resolved physics, inflow samples and configured initial time are kept from the
+loaded object; the copies archived in the other checkpoint are not read.
+Application data appended through `prepare_additional_data` is ignored; use
+`load_checkpoint()` with a restore hook when that data is needed. If a check
+fails, the call throws on every rank and leaves time and state unchanged.
+
 The checkpoint contains:
 
 - The resolved parameter tree, including parsed function expressions, constants,
@@ -66,6 +100,56 @@ from the archives, and inflow samples are deserialized. The original configured
 initial time is retained in `ida_parameters.initial_time`; `get_time()` returns
 the saved physical time. The standalone runner uses the latter to reset IDA while
 preserving the original output-grid and tolerance-ramp origins.
+
+## Coupling field output
+
+A one-way coupling usually needs only a few fields at each output time, not a
+restart archive. The standalone application can write just those:
+
+```sh
+blood_flow input.prm --coupling-output-directory /path/to/coupling
+```
+
+or, in the parameter file, `Coupling output directory = /path/to/coupling`,
+with `Coupling output fields` chosen from `area`, `velocity` and `pressure`
+(default `area`). The directory receives:
+
+- `layout`: one native checkpoint at the first output time. It holds the mesh,
+  resolved physics, parameters and DoF layout, and is written once per history.
+- `fields-<time>`: at every output time, only the selected fields. Each rank
+  stores the values on its locally owned cells in CellId order, with a
+  fingerprint of their ids, vertices and finite elements. No mesh, physics or
+  parameters are repeated. Each directory is committed atomically with its own
+  `COMPLETE` manifest, like a checkpoint.
+- `coupling_fields.csv`: one row per output with the time and directory name.
+
+The fields follow the output schedule like checkpoints, but do not arm extra
+IDA stop times, so they do not change the integration. The output is
+independent of `Checkpoint directory` and `Write solution output`. On restart,
+an archived coupling output continues in `<checkpoint>-coupling` unless
+`--coupling-output-directory` is given.
+
+A reader loads the layout once and then reads one field per time:
+
+```cpp
+flow.load_checkpoint(coupling / "layout");
+auto area = flow.make_state();
+for (const auto &directory : field_directories)
+  {
+    const double t = flow.load_coupling_field(directory, "area", area);
+    // area holds A on the cell area DoFs and zero elsewhere.
+  }
+```
+
+`load_coupling_field()` parses no parameters and repeats no setup. It needs
+the same MPI size and partition as the writer, which `load_checkpoint()` of the
+layout provides, and rejects fields written on a different mesh, a field that
+was not saved, and damaged or uncommitted directories. `area` and `velocity`
+fill the cell area and cell velocity DoFs; `pressure` is the nodal physical
+pressure of `compute_pressure()` on the cell area DoFs. Traces, capacitor
+pressures and the derivative are not stored, so field directories cannot be
+used for restart. `save_coupling_fields()` writes the same format from an
+application that owns its own time loop.
 
 ## Restart semantics and restrictions
 
@@ -128,11 +212,18 @@ The C++ `test_checkpoint` regression checks two distinct time-dependent native
 pairs (including nonzero serialization sentinels in the second), all components and derivatives, mesh/material/boundary/DoF association,
 embedded inflow and parsed functions, residual preservation, relocation after
 deleting original inputs, and collective rejection of duplicate, missing and
-incompatible checkpoints. It runs with one, two and four ranks.
+incompatible checkpoints. It also replays the history into one loaded object in
+both directions, and checks that replay rejects fresh objects, invalid
+checkpoints and checkpoints written on a different mesh without changing the
+loaded state. It runs with one, two and four ranks. The C++ `test_coupling_fields`
+regression writes a layout and field directories, reads every field exactly
+into an object loaded from the relocated layout, and checks the rejections
+above.
 
 The standalone integration regression runs a nonzero transient, removes the
 original parameter, mesh and inflow files, relocates its checkpoints, and
-starts a fresh process from an interior checkpoint. It compares continued
+starts a fresh process from an interior checkpoint. It also checks the
+coupling output layout of the reference run and of the restart. It compares continued
 vessel and terminal observables with an uninterrupted reference using explicit
 absolute/relative tolerances that allow IDA's restarted BDF adaptation:
 
