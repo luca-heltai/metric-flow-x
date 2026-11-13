@@ -4,7 +4,7 @@
 
 ### Added
 
-- Add `BloodFlowSystem::load_checkpoint_state()` to replay the time and state pair of another checkpoint of the same history into a loaded object, checking the mesh and finite element association without parameter parsing or system setup.
+- [PR #97](https://github.com/luca-heltai/metric-flow-x/pull/97) Add `BloodFlowSystem::load_checkpoint_state()` to replay the time and state pair of another checkpoint of the same history into a loaded object, checking the mesh and finite element association without parameter parsing or system setup.
 
 - Add self-contained native transient checkpoint/restart, fixed-output history, and composable mesh serialization hooks using deal.II save/load and SolutionTransfer.
 
