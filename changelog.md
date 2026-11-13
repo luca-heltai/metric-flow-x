@@ -4,6 +4,8 @@
 
 ### Added
 
+- Add public `BloodFlowSystem::reference_area()` and `interpolate_reference_area()` for the tapered wall reference area `a_d(x)`, also on restored checkpoints, and document that `a0` does not enter the flow equations.
+
 - Add self-contained native transient checkpoint/restart, fixed-output history, and composable mesh serialization hooks using deal.II save/load and SolutionTransfer.
 
 - [PR #93](https://github.com/luca-heltai/metric-flow-x/pull/93) Add optional physical-flux transmission across ordinary interior faces, preserving stationary pressure steps with distinct side traces.

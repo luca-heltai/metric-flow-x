@@ -639,6 +639,34 @@ namespace MetricFlowX
     FEValuesExtractors::Scalar
     velocity_extractor() const;
 
+    /** Reference area of the vessel wall at point x of cell, in m^2.
+     *
+     * This is the tapered diastolic area a_d(x) = pi r(x)^2, with the radius
+     * interpolated linearly in arc length between r_in and r_out of the
+     * cell's vessel (the vessel a_d when no taper is given). Every wall law
+     * is evaluated relative to this area: the square-root law gives the
+     * transmural pressure p0 + p_d at A = a_d(x), and the ADAVN laws use it as
+     * their reference area. VesselProperties::a0 does not enter the flow
+     * equations; couplings that need the wall reference configuration should
+     * use this function, not a0.
+     *
+     * cell is a locally owned or ghost cell of dof_handler(). Requires a set-up
+     * object, including one restored by load_checkpoint().
+     */
+    double
+    reference_area(
+      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+      const Point<spacedim>                                          &x) const;
+
+    /** Interpolate reference_area() into a native vector with the layout of
+     * make_state(): the cell area DoFs hold a_d at their support points, the
+     * area trace DoFs hold a_d at their face, and all other DoFs are zero.
+     * area must have the locally owned DoFs of make_state(); it is
+     * overwritten. Collective.
+     */
+    void
+    interpolate_reference_area(VectorType &area) const;
+
     // Read the VTK file on the group masters, distribute the resulting
     // description, and broadcast the per-vessel and per-terminal data, which is
     // small enough to be replicated on every rank.

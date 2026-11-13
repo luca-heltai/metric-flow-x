@@ -806,6 +806,47 @@ namespace MetricFlowX
   }
 
   template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::reference_area(
+    const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+    const Point<spacedim>                                          &x) const
+  {
+    AssertThrow(dof_handler_.n_dofs() > 0 &&
+                  &cell->get_dof_handler() == &dof_handler_ &&
+                  !cell->is_artificial(),
+                ExcMessage("Reference area needs a set-up system and a "
+                           "locally owned or ghost cell of its DoFHandler."));
+    return compute_a_d_at_point(cell, x);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::interpolate_reference_area(
+    VectorType &area) const
+  {
+    AssertThrow(dof_handler_.n_dofs() > 0 &&
+                  area.size() == dof_handler_.n_dofs() &&
+                  area.locally_owned_elements() == locally_owned_dofs_,
+                ExcMessage("Reference area needs a set-up system and a vector "
+                           "with the layout of make_state()."));
+    area = 0.;
+    std::vector<types::global_dof_index> dofs;
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          dofs.resize(cell->get_fe().n_dofs_per_cell());
+          cell->get_dof_indices(dofs);
+          for (unsigned int i = 0; i < dofs.size(); ++i)
+            if (cell->get_fe().system_to_component_index(i).first == 0)
+              area(dofs[i]) =
+                compute_a_d_at_point(cell, support_point(cell, i));
+          for (const auto f : cell->face_indices())
+            area(face_trace_dofs(dofs, f).first) = compute_a_d_at_face(cell, f);
+        }
+    area.compress(VectorOperation::insert);
+  }
+
+  template <int dim, int spacedim>
   VectorType
   BloodFlowSystem<dim, spacedim>::make_absolute_tolerances() const
   {
