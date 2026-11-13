@@ -28,10 +28,10 @@ using AdditionalTransfer = dealii::SolutionTransfer<1, VectorType, 3>;
 #endif
 
 void
-make_mesh(Flow &flow)
+make_mesh(Flow &flow, const double length = .1, const unsigned int levels = 3)
 {
   Triangulation<1, 3>      mesh;
-  std::vector<Point<3>>    vertices{{0., 0., 0.}, {.1, 0., 0.}};
+  std::vector<Point<3>>    vertices{{0., 0., 0.}, {length, 0., 0.}};
   std::vector<CellData<1>> cells(1);
   cells[0].vertices[0] = 0;
   cells[0].vertices[1] = 1;
@@ -39,12 +39,44 @@ make_mesh(Flow &flow)
   for (const auto &cell : mesh.active_cell_iterators())
     for (const auto face : cell->face_indices())
       cell->face(face)->set_boundary_id(face);
-  mesh.refine_global(3);
+  mesh.refine_global(levels);
   GridTools::partition_triangulation_zorder(
     Utilities::MPI::n_mpi_processes(MPI_COMM_WORLD), mesh, false);
   flow.triangulation().create_triangulation(
     TriangulationDescription::Utilities::create_description_from_triangulation(
       mesh, MPI_COMM_WORLD));
+}
+
+Flow::NetworkPhysics
+make_physics(const double length = .1)
+{
+  Flow::NetworkPhysics physics;
+  auto                &v = physics.vessels[0];
+  v.r_d = v.r_in = v.r_out = .003;
+  v.a0 = v.a_d         = numbers::PI * v.r_d * v.r_d;
+  v.E                  = 5.e5;
+  v.h_wall             = .0003;
+  v.L                  = length;
+  v.p_d                = 100.;
+  v.dynamic_viscosity  = .0035;
+  physics.terminals[1] = {1.e7, 1.e8, 1.e-9, 100., "capacitive outlet"};
+  return physics;
+}
+
+// A checkpoint whose mesh differs from the history used for replay.
+void
+save_other_mesh(const std::string &path,
+                const double       length,
+                const unsigned int levels)
+{
+  ParameterAcceptor::clear();
+  Flow flow(MPI_COMM_WORLD);
+  flow.initialize_params("checkpoint-input.prm", "");
+  make_mesh(flow, length, levels);
+  flow.setup(make_physics(length));
+  auto state = flow.make_state(), rate = flow.make_state();
+  flow.initialize_consistent_state(state, rate, .125);
+  flow.save_checkpoint(path, .125, state, rate);
 }
 
 void
@@ -59,8 +91,8 @@ test()
       std::filesystem::remove_all("relocated-history");
       std::filesystem::remove_all("truncated-checkpoint");
       std::filesystem::remove_all("checkpoint.incomplete");
-      std::filesystem::remove_all("truncated-checkpoint");
-      std::filesystem::remove_all("checkpoint.incomplete");
+      std::filesystem::remove_all("shifted-mesh-checkpoint");
+      std::filesystem::remove_all("coarse-mesh-checkpoint");
       std::filesystem::create_directory("checkpoint-history");
       std::ofstream csv("checkpoint-inflow.csv");
       csv << "time_s,flow_m3_s\n0,1e-8\n1,3e-8\n";
@@ -93,17 +125,7 @@ test()
     Flow flow(comm);
     flow.initialize_params("checkpoint-input.prm", "");
     make_mesh(flow);
-    Flow::NetworkPhysics physics;
-    auto                &v = physics.vessels[0];
-    v.r_d = v.r_in = v.r_out = .003;
-    v.a0 = v.a_d         = numbers::PI * v.r_d * v.r_d;
-    v.E                  = 5.e5;
-    v.h_wall             = .0003;
-    v.L                  = .1;
-    v.p_d                = 100.;
-    v.dynamic_viscosity  = .0035;
-    physics.terminals[1] = {1.e7, 1.e8, 1.e-9, 100., "capacitive outlet"};
-    flow.setup(physics);
+    flow.setup(make_physics());
     for (const auto i : flow.locally_owned_dofs_)
       owned.push_back(i);
     for (unsigned int c = 0; c < 5; ++c)
@@ -214,6 +236,11 @@ test()
             "Existing checkpoint overwrite was not rejected collectively."));
       }
   }
+
+  // Same CellIds and element association, different vertices.
+  save_other_mesh("shifted-mesh-checkpoint", .2, 3);
+  // Different cells.
+  save_other_mesh("coarse-mesh-checkpoint", .1, 2);
 
   double changed = 0.;
   for (unsigned int i = 0; i < owned.size(); ++i)
@@ -328,6 +355,53 @@ test()
         }
     }
 
+  // History replay: one loaded object reads the state pair of every other
+  // checkpoint, in any order, without parameter parsing or system setup.
+  const auto check_pair = [&](const Flow &flow, const unsigned int step) {
+    AssertThrow(flow.get_time() == times[step],
+                ExcMessage("Replayed checkpoint time changed."));
+    for (unsigned int j = 0; j < owned.size(); ++j)
+      AssertThrow(flow.state()[owned[j]] == states[step][j] &&
+                    flow.state_derivative()[owned[j]] == rates[step][j],
+                  ExcMessage("Replayed state/rate is not exact."));
+  };
+  {
+    ParameterAcceptor::clear();
+    Flow                                replay(comm);
+    VectorType                          extra;
+    std::unique_ptr<AdditionalTransfer> extra_transfer;
+    replay.load_checkpoint("relocated-history/step-0",
+                           [&](const std::string &) {
+                             extra = replay.make_state();
+                             extra_transfer =
+                               std::make_unique<AdditionalTransfer>(
+                                 replay.dof_handler());
+                             extra_transfer->deserialize(extra);
+                           });
+    const auto *const solution_address = &replay.state();
+    const auto        n_dofs           = replay.dof_handler().n_dofs();
+    for (const unsigned int step : {1u, 0u, 1u})
+      {
+        // Both checkpoints carry application data, which replay ignores.
+        replay.load_checkpoint_state("relocated-history/step-" +
+                                     std::to_string(step));
+        check_pair(replay, step);
+        AssertThrow(&replay.state() == solution_address &&
+                      replay.dof_handler().n_dofs() == n_dofs &&
+                      replay.ida_parameters.initial_time == 0.,
+                    ExcMessage("Replay changed the loaded system."));
+        auto residual = replay.make_state();
+        replay.assemble_residual(replay.get_time(),
+                                 replay.state(),
+                                 replay.state_derivative(),
+                                 residual);
+        for (unsigned int j = 0; j < owned.size(); ++j)
+          AssertThrow(std::abs(residual[owned[j]] - residuals[step][j]) <=
+                        1.e-12 * std::max(1., std::abs(residuals[step][j])),
+                      ExcMessage("Replayed native equations changed."));
+      }
+  }
+
   if (rank == 0)
     {
       // Preserve the valid manifest while damaging one listed payload. All
@@ -367,6 +441,56 @@ test()
         ExcMessage(
           "Invalid checkpoint or missing restore hook was not rejected collectively."));
     }
+  {
+    ParameterAcceptor::clear();
+    Flow fresh(comm);
+    bool rejected = false;
+    try
+      {
+        fresh.load_checkpoint_state("relocated-history/step-0");
+      }
+    catch (const std::exception &)
+      {
+        rejected = true;
+      }
+    AssertThrow(Utilities::MPI::sum(rejected ? 1u : 0u, comm) == ranks,
+                ExcMessage("Replay into a fresh object was not rejected."));
+  }
+  {
+    ParameterAcceptor::clear();
+    Flow                                replay(comm);
+    VectorType                          extra;
+    std::unique_ptr<AdditionalTransfer> extra_transfer;
+    replay.load_checkpoint("relocated-history/step-0",
+                           [&](const std::string &) {
+                             extra = replay.make_state();
+                             extra_transfer =
+                               std::make_unique<AdditionalTransfer>(
+                                 replay.dof_handler());
+                             extra_transfer->deserialize(extra);
+                           });
+    for (const std::string path : {"missing-checkpoint",
+                                   "relocated-history/step-1",
+                                   "checkpoint.incomplete",
+                                   "truncated-checkpoint",
+                                   "shifted-mesh-checkpoint",
+                                   "coarse-mesh-checkpoint"})
+      {
+        bool rejected = false;
+        try
+          {
+            replay.load_checkpoint_state(path);
+          }
+        catch (const std::exception &)
+          {
+            rejected = true;
+          }
+        AssertThrow(Utilities::MPI::sum(rejected ? 1u : 0u, comm) == ranks,
+                    ExcMessage("Invalid replay checkpoint was not rejected: " +
+                               path));
+        check_pair(replay, 0);
+      }
+  }
   deallog.depth_file(10);
   deallog << "MetricFlowX checkpoint history: PASSED" << std::endl;
 }

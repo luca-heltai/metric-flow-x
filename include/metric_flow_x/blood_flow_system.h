@@ -475,7 +475,23 @@ namespace MetricFlowX
                     const std::function<void(const std::string &)>
                       &restore_additional_data = {});
 
-    /** Native pair and physical time restored by load_checkpoint(). */
+    /** Replay another checkpoint of the same history into this set-up object.
+     * Collectively replaces time, solution and solution_dot by the pair stored
+     * in directory. The object must already be set up, for example by
+     * load_checkpoint() or setup(), on the mesh the history was written with.
+     * The checkpoint mesh is loaded into a temporary triangulation and must
+     * match this object's locally owned cells (CellId, vertices, material and
+     * boundary ids) and active finite element indices. Parameters, physics,
+     * inflow and the configured initial time are not read or changed, and no
+     * system setup is repeated. Application data appended through
+     * prepare_additional_data is not read. If any check fails, this object is
+     * left unchanged.
+     */
+    void
+    load_checkpoint_state(const std::string &directory);
+
+    /** Native pair and physical time restored by load_checkpoint() or
+     * load_checkpoint_state(). */
     const VectorType &
     state() const
     {

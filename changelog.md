@@ -4,6 +4,8 @@
 
 ### Added
 
+- Add `BloodFlowSystem::load_checkpoint_state()` to replay the time and state pair of another checkpoint of the same history into a loaded object, checking the mesh and finite element association without parameter parsing or system setup.
+
 - Add self-contained native transient checkpoint/restart, fixed-output history, and composable mesh serialization hooks using deal.II save/load and SolutionTransfer.
 
 - [PR #93](https://github.com/luca-heltai/metric-flow-x/pull/93) Add optional physical-flux transmission across ordinary interior faces, preserving stationary pressure steps with distinct side traces.

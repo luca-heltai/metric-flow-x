@@ -44,6 +44,40 @@ Application parameters already registered by the caller are restored. A native
 replay reader may omit unrelated standalone runner/output controls; undefined
 entries are skipped using `ParameterHandler::parse_input`'s native facility.
 
+## Replaying a history
+
+A one-way consumer, such as a solid solver driven by saved flow areas, needs
+the state at every time of one history. Load one checkpoint once, then read the
+others into the same object:
+
+```cpp
+flow.load_checkpoint(first_directory);
+for (const auto &directory : later_checkpoints)
+  {
+    flow.load_checkpoint_state(directory);
+    // flow.state(), flow.state_derivative(), flow.get_time() now refer to
+    // directory.
+  }
+```
+
+`load_checkpoint_state()` is collective and requires an object that is already
+set up, either by `load_checkpoint()` or by the usual setup of the run that
+wrote the history. It validates the manifest and compatibility metadata as
+`load_checkpoint()` does, then loads the checkpoint mesh into a temporary
+triangulation. Every locally owned cell must match by CellId, vertices, material
+and boundary ids, and active finite element index; a checkpoint written on a
+different mesh or partition is rejected. The state pair is deserialized on the
+temporary mesh and copied cell by cell into `state()` and `state_derivative()`.
+`get_time()` returns the checkpoint time.
+
+No parameters are parsed, so no `ParameterAcceptor::clear()` is needed and other
+application acceptors keep their entries. The sparsity pattern, matrices,
+resolved physics, inflow samples and configured initial time are kept from the
+loaded object; the copies archived in the other checkpoint are not read.
+Application data appended through `prepare_additional_data` is ignored; use
+`load_checkpoint()` with a restore hook when that data is needed. If a check
+fails, the call throws on every rank and leaves time and state unchanged.
+
 The checkpoint contains:
 
 - The resolved parameter tree, including parsed function expressions, constants,
@@ -128,7 +162,10 @@ The C++ `test_checkpoint` regression checks two distinct time-dependent native
 pairs (including nonzero serialization sentinels in the second), all components and derivatives, mesh/material/boundary/DoF association,
 embedded inflow and parsed functions, residual preservation, relocation after
 deleting original inputs, and collective rejection of duplicate, missing and
-incompatible checkpoints. It runs with one, two and four ranks.
+incompatible checkpoints. It also replays the history into one loaded object in
+both directions, and checks that replay rejects fresh objects, invalid
+checkpoints and checkpoints written on a different mesh without changing the
+loaded state. It runs with one, two and four ranks.
 
 The standalone integration regression runs a nonzero transient, removes the
 original parameter, mesh and inflow files, relocates its checkpoints, and

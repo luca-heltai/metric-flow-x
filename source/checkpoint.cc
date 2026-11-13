@@ -12,7 +12,10 @@
 
 #include <filesystem>
 #include <iomanip>
+#include <map>
 #include <sstream>
+#include <utility>
+#include <vector>
 
 namespace MetricFlowX
 {
@@ -80,6 +83,75 @@ namespace MetricFlowX
       return result;
     }
 
+    std::map<std::string, unsigned int>
+    read_cell_elements(const std::filesystem::path &root,
+                       const unsigned int           rank)
+    {
+      std::map<std::string, unsigned int> result;
+      std::ifstream file(root / ("elements-" + std::to_string(rank) + ".bin"),
+                         std::ios::binary);
+      boost::archive::binary_iarchive archive(file);
+      archive >> result;
+      return result;
+    }
+
+    void
+    check_same_directory(MPI_Comm comm, const std::string &directory)
+    {
+      const auto reference =
+        dealii::Utilities::MPI::broadcast(comm, directory, 0);
+      AssertThrow(dealii::Utilities::MPI::min(directory == reference ? 1u : 0u,
+                                              comm) == 1,
+                  ExcMessage(
+                    "Checkpoint directories differ between MPI ranks."));
+    }
+
+    // Validates the manifest and the application envelope of a committed
+    // checkpoint on this rank. Call it inside collective_file_operation().
+    template <int dim, int spacedim>
+    CheckpointData<dim, spacedim>
+    read_checkpoint_data(const std::filesystem::path &root,
+                         const unsigned int           ranks)
+    {
+      CheckpointData<dim, spacedim> data;
+      AssertThrow(root.extension() != ".incomplete",
+                  ExcMessage("Uncommitted checkpoint."));
+      std::ifstream manifest(root / "COMPLETE");
+      std::string   header;
+      std::getline(manifest, header);
+      AssertThrow(header == data.magic,
+                  ExcMessage("Missing or incompatible checkpoint manifest."));
+      std::string    name;
+      std::uintmax_t bytes;
+      unsigned int   entries = 0;
+      while (manifest >> std::quoted(name) >> bytes)
+        {
+          const std::filesystem::path relative(name);
+          bool safe = !relative.empty() && !relative.is_absolute();
+          for (const auto &part : relative)
+            safe = safe && part != "..";
+          AssertThrow(safe &&
+                        std::filesystem::is_regular_file(root / relative) &&
+                        std::filesystem::file_size(root / name) == bytes,
+                      ExcMessage("Missing or truncated checkpoint payload: " +
+                                 name));
+          ++entries;
+        }
+      AssertThrow(manifest.eof() && entries >= 4,
+                  ExcMessage("Invalid checkpoint manifest."));
+      std::ifstream file(root / "application.bin", std::ios::binary);
+      boost::archive::binary_iarchive archive(file);
+      archive >> data;
+      const CheckpointData<dim, spacedim> expected;
+      AssertThrow(data.magic == expected.magic &&
+                    data.dealii_version == expected.dealii_version &&
+                    data.backend == expected.backend && data.ranks == ranks &&
+                    std::isfinite(data.time),
+                  ExcMessage(
+                    "Incompatible checkpoint version, backend, or MPI size."));
+      return data;
+    }
+
 #if DEAL_II_VERSION_GTE(9, 7, 0)
     template <int dim, int spacedim>
     using NativeTransfer = dealii::SolutionTransfer<dim, VectorType, spacedim>;
@@ -101,11 +173,7 @@ namespace MetricFlowX
     const std::function<void(const std::string &)> &prepare_additional_data)
     const
   {
-    const auto reference_directory =
-      Utilities::MPI::broadcast(mpi_communicator_, directory, 0);
-    AssertThrow(Utilities::MPI::min(directory == reference_directory ? 1u : 0u,
-                                    mpi_communicator_) == 1,
-                ExcMessage("Checkpoint directories differ between MPI ranks."));
+    check_same_directory(mpi_communicator_, directory);
     AssertThrow(
       Utilities::MPI::min(
         std::isfinite(t) && !external_pressure_provider &&
@@ -237,11 +305,7 @@ namespace MetricFlowX
     const std::string                              &directory,
     const std::function<void(const std::string &)> &restore_additional_data)
   {
-    const auto reference_directory =
-      Utilities::MPI::broadcast(mpi_communicator_, directory, 0);
-    AssertThrow(Utilities::MPI::min(directory == reference_directory ? 1u : 0u,
-                                    mpi_communicator_) == 1,
-                ExcMessage("Checkpoint directories differ between MPI ranks."));
+    check_same_directory(mpi_communicator_, directory);
     AssertThrow(Utilities::MPI::min(triangulation_.n_global_active_cells() ==
                                           0 &&
                                         dof_handler_.n_dofs() == 0 ?
@@ -252,41 +316,7 @@ namespace MetricFlowX
     const std::filesystem::path   root(directory);
     CheckpointData<dim, spacedim> data;
     collective_file_operation(mpi_communicator_, [&] {
-      AssertThrow(root.extension() != ".incomplete",
-                  ExcMessage("Uncommitted checkpoint."));
-      std::ifstream manifest(root / "COMPLETE");
-      std::string   header;
-      std::getline(manifest, header);
-      AssertThrow(header == data.magic,
-                  ExcMessage("Missing or incompatible checkpoint manifest."));
-      std::string    name;
-      std::uintmax_t bytes;
-      unsigned int   entries = 0;
-      while (manifest >> std::quoted(name) >> bytes)
-        {
-          const std::filesystem::path relative(name);
-          bool safe = !relative.empty() && !relative.is_absolute();
-          for (const auto &part : relative)
-            safe = safe && part != "..";
-          AssertThrow(safe &&
-                        std::filesystem::is_regular_file(root / relative) &&
-                        std::filesystem::file_size(root / name) == bytes,
-                      ExcMessage("Missing or truncated checkpoint payload: " +
-                                 name));
-          ++entries;
-        }
-      AssertThrow(manifest.eof() && entries >= 4,
-                  ExcMessage("Invalid checkpoint manifest."));
-      std::ifstream file(root / "application.bin", std::ios::binary);
-      boost::archive::binary_iarchive archive(file);
-      archive >> data;
-      const CheckpointData<dim, spacedim> expected;
-      AssertThrow(data.magic == expected.magic &&
-                    data.dealii_version == expected.dealii_version &&
-                    data.backend == expected.backend &&
-                    data.ranks == n_mpi_processes && std::isfinite(data.time),
-                  ExcMessage(
-                    "Incompatible checkpoint version, backend, or MPI size."));
+      data = read_checkpoint_data<dim, spacedim>(root, n_mpi_processes);
       AssertThrow(
         !data.additional_data || static_cast<bool>(restore_additional_data),
         ExcMessage(
@@ -329,13 +359,8 @@ namespace MetricFlowX
     initialize_terminal_capacitors();
     build_per_cell_mass_inv();
     collective_file_operation(mpi_communicator_, [&] {
-      std::map<std::string, unsigned int> expected;
-      std::ifstream                       file(root / ("elements-" +
-                                 std::to_string(this_mpi_process) + ".bin"),
-                         std::ios::binary);
-      boost::archive::binary_iarchive     archive(file);
-      archive >> expected;
-      AssertThrow(expected == cell_elements(dof_handler_),
+      AssertThrow(read_cell_elements(root, this_mpi_process) ==
+                    cell_elements(dof_handler_),
                   ExcMessage(
                     "Checkpoint cell/finite-element association differs."));
     });
@@ -349,6 +374,100 @@ namespace MetricFlowX
     });
   }
 
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::load_checkpoint_state(
+    const std::string &directory)
+  {
+    check_same_directory(mpi_communicator_, directory);
+    AssertThrow(dof_handler_.n_dofs() > 0,
+                ExcMessage(
+                  "Load a checkpoint state into a set-up BloodFlowSystem."));
+    const std::filesystem::path   root(directory);
+    CheckpointData<dim, spacedim> data;
+    collective_file_operation(mpi_communicator_, [&] {
+      data = read_checkpoint_data<dim, spacedim>(root, n_mpi_processes);
+      AssertThrow(read_cell_elements(root, this_mpi_process) ==
+                    cell_elements(dof_handler_),
+                  ExcMessage(
+                    "Checkpoint cell/finite-element association differs."));
+    });
+
+    // Only the native state is needed. Load the archived mesh with its
+    // attached vectors into a temporary triangulation, and rebuild the same
+    // finite element association there without any system setup.
+    Compatibility::FullyDistributedTriangulation<dim, spacedim> mesh(
+      mpi_communicator_);
+    mesh.load((root / "mesh").string());
+    DoFHandler<dim, spacedim> dofs(mesh);
+
+    using CellIterator =
+      typename DoFHandler<dim, spacedim>::active_cell_iterator;
+    std::map<CellId, CellIterator> current;
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        current.emplace(cell->id(), cell);
+    std::vector<std::pair<CellIterator, CellIterator>> pairs;
+
+    bool same =
+      mesh.n_global_active_cells() == triangulation_.n_global_active_cells();
+    for (const auto &cell : dofs.active_cell_iterators())
+      if (same && cell->is_locally_owned())
+        {
+          const auto match = current.find(cell->id());
+          same             = match != current.end();
+          if (!same)
+            break;
+          const auto &other = match->second;
+          same              = cell->material_id() == other->material_id();
+          for (const auto v : cell->vertex_indices())
+            same = same && cell->vertex(v) == other->vertex(v);
+          for (const auto f : cell->face_indices())
+            same = same && cell->face(f)->boundary_id() ==
+                             other->face(f)->boundary_id();
+          cell->set_active_fe_index(other->active_fe_index());
+          pairs.emplace_back(cell, other);
+        }
+    same = same && pairs.size() == current.size();
+    AssertThrow(Utilities::MPI::min(same ? 1u : 0u, mpi_communicator_) == 1,
+                ExcMessage("Checkpoint mesh differs from the loaded mesh."));
+    dofs.distribute_dofs(fe_collection_);
+    AssertThrow(dofs.n_dofs() == dof_handler_.n_dofs(),
+                ExcMessage("Checkpoint degrees of freedom differ."));
+
+    VectorType stored_state(dofs.locally_owned_dofs(), mpi_communicator_);
+    VectorType stored_rate(dofs.locally_owned_dofs(), mpi_communicator_);
+    {
+      NativeTransfer<dim, spacedim> transfer(dofs);
+      std::vector<VectorType *>     vectors{&stored_state, &stored_rate};
+      transfer.deserialize(vectors);
+    }
+
+    // Every unknown belongs to one cell, so copy cell by cell through the
+    // matching CellId instead of assuming the two numberings coincide.
+    VectorType new_state(locally_owned_dofs_, mpi_communicator_);
+    VectorType new_rate(locally_owned_dofs_, mpi_communicator_);
+    std::vector<types::global_dof_index> from, to;
+    for (const auto &[stored, other] : pairs)
+      {
+        from.resize(stored->get_fe().n_dofs_per_cell());
+        to.resize(other->get_fe().n_dofs_per_cell());
+        stored->get_dof_indices(from);
+        other->get_dof_indices(to);
+        for (unsigned int i = 0; i < to.size(); ++i)
+          {
+            new_state[to[i]] = stored_state[from[i]];
+            new_rate[to[i]]  = stored_rate[from[i]];
+          }
+      }
+    new_state.compress(VectorOperation::insert);
+    new_rate.compress(VectorOperation::insert);
+
+    solution     = new_state;
+    solution_dot = new_rate;
+    time         = data.time;
+  }
+
   template void
   BloodFlowSystem<1, 3>::save_checkpoint(
     const std::string &,
@@ -360,4 +479,6 @@ namespace MetricFlowX
   BloodFlowSystem<1, 3>::load_checkpoint(
     const std::string &,
     const std::function<void(const std::string &)> &);
+  template void
+  BloodFlowSystem<1, 3>::load_checkpoint_state(const std::string &);
 } // namespace MetricFlowX
