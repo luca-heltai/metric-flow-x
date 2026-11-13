@@ -82,6 +82,18 @@ namespace MetricFlowX
         checkpoint_directory_,
         "Optional directory for native checkpoints at fixed output times; "
         "empty disables checkpoint output.");
+      problem.add_parameter(
+        "Coupling output directory",
+        coupling_directory_,
+        "Optional directory for one-way coupling fields at fixed output "
+        "times: one native checkpoint 'layout' at the first output, then only "
+        "the selected fields in 'fields-<time>'. Empty disables it.");
+      problem.add_parameter(
+        "Coupling output fields",
+        coupling_fields_,
+        "Fields written to the coupling output directory.",
+        problem.prm,
+        Patterns::List(Patterns::Selection("area|velocity|pressure"), 1));
       tolerance_ramp_.add_parameters(problem);
       problem.add_parameter("Maximum IDA internal steps per output",
                             maximum_ida_steps_per_output_,
@@ -89,12 +101,19 @@ namespace MetricFlowX
     }
 
 
+    bool
+    coupling_output_enabled() const
+    {
+      return !coupling_directory_.empty();
+    }
+
     void
     run(Problem                         &problem,
         const bool                       restart              = false,
         const std::optional<double>      final_time           = {},
         const std::string               &output_directory     = "",
-        const std::optional<std::string> checkpoint_directory = {})
+        const std::optional<std::string> checkpoint_directory = {},
+        const std::optional<std::string> coupling_directory   = {})
     {
       const double output_origin = problem.ida_parameters.initial_time;
       if (restart)
@@ -126,11 +145,14 @@ namespace MetricFlowX
         problem.output_directory = output_directory;
       if (checkpoint_directory)
         checkpoint_directory_ = *checkpoint_directory;
+      if (coupling_directory)
+        coupling_directory_ = *coupling_directory;
       // Archive the effective CLI overrides. Keep the original initial time
       // and tolerance-ramp parameters: subsequent restarts need that origin.
       problem.enter_my_subsection(problem.prm);
       problem.prm.set("Output directory", problem.output_directory);
       problem.prm.set("Checkpoint directory", checkpoint_directory_);
+      problem.prm.set("Coupling output directory", coupling_directory_);
       problem.prm.enter_subsection("IDA parameters");
       std::ostringstream final_time_text;
       final_time_text << std::setprecision(17)
@@ -138,16 +160,17 @@ namespace MetricFlowX
       problem.prm.set("Final time", final_time_text.str());
       problem.prm.leave_subsection();
       problem.leave_my_subsection(problem.prm);
+      const bool native_archives = restart || !checkpoint_directory_.empty() ||
+                                   !coupling_directory_.empty();
       AssertThrow(
-        (!restart && checkpoint_directory_.empty()) ||
-          problem.n_refinement_cycles == 1,
-        ExcMessage("Checkpoint output/restart requires one refinement cycle."));
+        !native_archives || problem.n_refinement_cycles == 1,
+        ExcMessage(
+          "Checkpoint/coupling output and restart require one refinement cycle."));
       const bool steady_network_only = run_mode_ == "steady network";
       const bool steady_hdg          = run_mode_ == "steady HDG";
-      AssertThrow((!restart && checkpoint_directory_.empty()) ||
-                    (!steady_network_only && !steady_hdg),
-                  ExcMessage(
-                    "Checkpoint output/restart requires transient mode."));
+      AssertThrow(!native_archives || (!steady_network_only && !steady_hdg),
+                  ExcMessage("Checkpoint/coupling output and restart require "
+                             "transient mode."));
       if (restart)
         AssertThrow(std::isfinite(problem.ida_parameters.final_time) &&
                       problem.ida_parameters.final_time >
@@ -808,7 +831,8 @@ namespace MetricFlowX
                                            /*resync_time=*/true,
                                            /*require_consecutive_steps=*/true);
             problem.print_current_statistics(ida, t);
-            if (!problem.write_solution_output && checkpoint_directory_.empty())
+            if (!problem.write_solution_output &&
+                checkpoint_directory_.empty() && coupling_directory_.empty())
               {
                 if (step_number == 0)
                   integration_start = std::chrono::steady_clock::now();
@@ -904,6 +928,52 @@ namespace MetricFlowX
                                             0);
                 AssertThrow(diagnostic_error.empty(),
                             ExcMessage(diagnostic_error));
+              }
+            if (!coupling_directory_.empty())
+              {
+                // Mesh, physics, parameters and DoF layout are written once,
+                // as a native checkpoint of the first output. Each output time
+                // then stores only the selected fields.
+                const std::filesystem::path root(coupling_directory_);
+                if (!coupling_layout_written_)
+                  {
+                    problem.save_checkpoint((root / "layout").string(),
+                                            t,
+                                            sol,
+                                            ydot);
+                    coupling_layout_written_ = true;
+                  }
+                std::ostringstream name;
+                name << "fields-" << std::hexfloat << t;
+                problem.save_coupling_fields(
+                  (root / name.str()).string(), t, sol, ydot, coupling_fields_);
+                std::string index_error;
+                if (problem.this_mpi_process == 0)
+                  try
+                    {
+                      const auto path = root / "coupling_fields.csv";
+                      const bool write_header =
+                        !std::filesystem::exists(path) ||
+                        std::filesystem::file_size(path) == 0;
+                      std::ofstream index(path, std::ios::app);
+                      if (write_header)
+                        index << "time_s,directory\n";
+                      index << std::setprecision(17) << t << ',' << name.str()
+                            << '\n';
+                      index.close();
+                      AssertThrow(index.good(),
+                                  ExcMessage(
+                                    "Cannot write coupling field index."));
+                    }
+                  catch (const std::exception &error)
+                    {
+                      index_error = error.what();
+                    }
+                index_error =
+                  Utilities::MPI::broadcast(problem.mpi_communicator_,
+                                            index_error,
+                                            0);
+                AssertThrow(index_error.empty(), ExcMessage(index_error));
               }
             if (problem.write_solution_output)
               {
@@ -1031,6 +1101,9 @@ namespace MetricFlowX
 
     std::string   run_mode_ = "transient";
     std::string   checkpoint_directory_;
+    std::string              coupling_directory_;
+    std::vector<std::string> coupling_fields_         = {"area"};
+    bool                     coupling_layout_written_ = false;
     ToleranceRamp tolerance_ramp_;
     long int      maximum_ida_steps_per_output_      = 500;
     double        maximum_step_size_                 = 0.;
@@ -1047,6 +1120,7 @@ main(int argc, char **argv)
       std::string                par_name = "parameters.prm", restart_directory;
       std::string                output_directory;
       std::optional<std::string> checkpoint_directory;
+      std::optional<std::string> coupling_directory;
       std::optional<double>      final_time;
       bool                       parameter_given = false;
       for (int i = 1; i < argc; ++i)
@@ -1071,13 +1145,16 @@ main(int argc, char **argv)
             output_directory = value();
           else if (argument == "--checkpoint-directory")
             checkpoint_directory = value();
+          else if (argument == "--coupling-output-directory")
+            coupling_directory = value();
           else if (argument == "--help")
             {
               if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
                 std::cout << "Usage: blood_flow [parameters.prm] "
                              "[--restart CHECKPOINT] [--final-time T] "
                              "[--output-directory DIR] "
-                             "[--checkpoint-directory DIR]\n";
+                             "[--checkpoint-directory DIR] "
+                             "[--coupling-output-directory DIR]\n";
               return 0;
             }
           else
@@ -1104,12 +1181,17 @@ main(int argc, char **argv)
             output_directory = restart_directory + "-output";
           if (!checkpoint_directory)
             checkpoint_directory = restart_directory + "-continued";
+          // A restored coupling output starts a new history next to the
+          // checkpoint, since its layout and times differ from the original.
+          if (!coupling_directory && runner.coupling_output_enabled())
+            coupling_directory = restart_directory + "-coupling";
         }
       runner.run(problem,
                  !restart_directory.empty(),
                  final_time,
                  output_directory,
-                 checkpoint_directory);
+                 checkpoint_directory,
+                 coupling_directory);
 
       /* ------------------------ 4. Normal program exit ----------------------
        */

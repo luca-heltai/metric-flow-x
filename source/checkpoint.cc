@@ -10,6 +10,8 @@
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 
+#include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <iomanip>
 #include <map>
@@ -83,18 +85,6 @@ namespace MetricFlowX
       return result;
     }
 
-    std::map<std::string, unsigned int>
-    read_cell_elements(const std::filesystem::path &root,
-                       const unsigned int           rank)
-    {
-      std::map<std::string, unsigned int> result;
-      std::ifstream file(root / ("elements-" + std::to_string(rank) + ".bin"),
-                         std::ios::binary);
-      boost::archive::binary_iarchive archive(file);
-      archive >> result;
-      return result;
-    }
-
     void
     check_same_directory(MPI_Comm comm, const std::string &directory)
     {
@@ -106,20 +96,18 @@ namespace MetricFlowX
                     "Checkpoint directories differ between MPI ranks."));
     }
 
-    // Validates the manifest and the application envelope of a committed
-    // checkpoint on this rank. Call it inside collective_file_operation().
-    template <int dim, int spacedim>
-    CheckpointData<dim, spacedim>
-    read_checkpoint_data(const std::filesystem::path &root,
-                         const unsigned int           ranks)
+    // Checks that a committed directory lists only safe, complete payloads.
+    void
+    check_manifest(const std::filesystem::path &root,
+                   const std::string           &magic,
+                   const unsigned int           minimum_entries)
     {
-      CheckpointData<dim, spacedim> data;
       AssertThrow(root.extension() != ".incomplete",
                   ExcMessage("Uncommitted checkpoint."));
       std::ifstream manifest(root / "COMPLETE");
       std::string   header;
       std::getline(manifest, header);
-      AssertThrow(header == data.magic,
+      AssertThrow(header == magic,
                   ExcMessage("Missing or incompatible checkpoint manifest."));
       std::string    name;
       std::uintmax_t bytes;
@@ -137,11 +125,207 @@ namespace MetricFlowX
                                  name));
           ++entries;
         }
-      AssertThrow(manifest.eof() && entries >= 4,
+      AssertThrow(manifest.eof() && entries >= minimum_entries,
                   ExcMessage("Invalid checkpoint manifest."));
-      std::ifstream file(root / "application.bin", std::ios::binary);
+    }
+
+    // Rank 0 creates the staging directory of a new destination.
+    std::filesystem::path
+    create_staging(MPI_Comm comm, const std::string &directory)
+    {
+      const std::filesystem::path destination(directory),
+        staging(directory + ".incomplete");
+      collective_file_operation(comm, [&] {
+        AssertThrow(!directory.empty(),
+                    ExcMessage("Empty checkpoint directory."));
+        if (dealii::Utilities::MPI::this_mpi_process(comm) == 0)
+          {
+            AssertThrow(!std::filesystem::exists(destination),
+                        ExcMessage("Checkpoint destination already exists."));
+            if (!destination.parent_path().empty())
+              std::filesystem::create_directories(destination.parent_path());
+            AssertThrow(std::filesystem::create_directory(staging),
+                        ExcMessage(
+                          "Checkpoint staging directory already exists."));
+          }
+      });
+      return staging;
+    }
+
+    // A committed directory is visible only after all payload files have
+    // closed on every rank. Interrupted writes remain .incomplete.
+    void
+    commit_staging(MPI_Comm                     comm,
+                   const std::filesystem::path &staging,
+                   const std::string           &directory,
+                   const std::string           &magic)
+    {
+      AssertThrowMPI(MPI_Barrier(comm));
+      const std::filesystem::path destination(directory);
+      collective_file_operation(comm, [&] {
+        if (dealii::Utilities::MPI::this_mpi_process(comm) == 0)
+          {
+            std::ofstream manifest(staging / "COMPLETE");
+            manifest << magic << '\n';
+            for (const auto &entry :
+                 std::filesystem::recursive_directory_iterator(staging))
+              if (entry.is_regular_file() &&
+                  entry.path() != staging / "COMPLETE")
+                manifest << std::quoted(
+                              std::filesystem::relative(entry.path(), staging)
+                                .string())
+                         << ' ' << std::filesystem::file_size(entry.path())
+                         << '\n';
+            manifest.close();
+            AssertThrow(manifest,
+                        ExcMessage("Cannot finish checkpoint manifest."));
+            AssertThrow(!std::filesystem::exists(destination),
+                        ExcMessage(
+                          "Checkpoint destination appeared during write."));
+            std::filesystem::rename(staging, destination);
+          }
+      });
+    }
+
+    template <class Data>
+    void
+    write_archive(const std::filesystem::path &path, const Data &data)
+    {
+      std::ofstream file(path, std::ios::binary);
+      AssertThrow(file, ExcMessage("Cannot create archive " + path.string()));
+      {
+        boost::archive::binary_oarchive archive(file);
+        archive << data;
+      }
+      file.close();
+      AssertThrow(file, ExcMessage("Cannot finish archive " + path.string()));
+    }
+
+    template <class Data>
+    Data
+    read_archive(const std::filesystem::path &path)
+    {
+      Data          data;
+      std::ifstream file(path, std::ios::binary);
+      AssertThrow(file, ExcMessage("Cannot open archive " + path.string()));
       boost::archive::binary_iarchive archive(file);
       archive >> data;
+      return data;
+    }
+
+    // Envelope of a coupling field directory. Field values are stored per rank.
+    struct CouplingFieldsData
+    {
+      std::string magic          = "MetricFlowX coupling fields 1";
+      std::string dealii_version = DEAL_II_PACKAGE_VERSION;
+#ifdef METRIC_FLOW_X_WITH_PETSC
+      std::string backend = "PETSc";
+#else
+      std::string backend = "Trilinos";
+#endif
+      unsigned int             ranks = 0;
+      double                   time  = 0.;
+      std::vector<std::string> fields;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive & magic & dealii_version & backend & ranks & time & fields;
+      }
+    };
+
+    // Values of one field on the locally owned cells of one rank, in CellId
+    // order. layout identifies the cells, their vertices and their elements.
+    struct CouplingFieldBlock
+    {
+      std::uint64_t       layout = 0;
+      std::vector<double> values;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive & layout & values;
+      }
+    };
+
+    // FNV-1a, stable across processes, unlike std::hash.
+    void
+    hash_bytes(std::uint64_t &hash, const void *data, const std::size_t size)
+    {
+      const auto *bytes = static_cast<const unsigned char *>(data);
+      for (std::size_t i = 0; i < size; ++i)
+        {
+          hash ^= bytes[i];
+          hash *= 1099511628211ull;
+        }
+    }
+
+    // Locally owned cells in CellId order, and a fingerprint of their ids,
+    // vertices and active finite elements.
+    template <int dim, int spacedim>
+    std::pair<
+      std::vector<
+        typename dealii::DoFHandler<dim, spacedim>::active_cell_iterator>,
+      std::uint64_t>
+    owned_cell_layout(const dealii::DoFHandler<dim, spacedim> &dofs)
+    {
+      std::vector<
+        typename dealii::DoFHandler<dim, spacedim>::active_cell_iterator>
+        cells;
+      for (const auto &cell : dofs.active_cell_iterators())
+        if (cell->is_locally_owned())
+          cells.push_back(cell);
+      std::sort(cells.begin(), cells.end(), [](const auto &a, const auto &b) {
+        return a->id() < b->id();
+      });
+      std::uint64_t hash = 14695981039346656037ull;
+      for (const auto &cell : cells)
+        {
+          const auto         id    = cell->id().to_string();
+          const unsigned int index = cell->active_fe_index();
+          hash_bytes(hash, id.data(), id.size());
+          hash_bytes(hash, &index, sizeof(index));
+          for (const auto v : cell->vertex_indices())
+            for (unsigned int d = 0; d < spacedim; ++d)
+              {
+                const double x = cell->vertex(v)[d];
+                hash_bytes(hash, &x, sizeof(x));
+              }
+        }
+      return {cells, hash};
+    }
+
+    // Native component that holds a coupling field.
+    unsigned int
+    coupling_field_component(const std::string &field)
+    {
+      AssertThrow(field == "area" || field == "velocity" || field == "pressure",
+                  ExcMessage("Unknown coupling field '" + field +
+                             "'; use area, velocity or pressure."));
+      return field == "velocity" ? 1 : 0;
+    }
+
+    std::map<std::string, unsigned int>
+    read_cell_elements(const std::filesystem::path &root,
+                       const unsigned int           rank)
+    {
+      return read_archive<std::map<std::string, unsigned int>>(
+        root / ("elements-" + std::to_string(rank) + ".bin"));
+    }
+
+    // Validates the manifest and the application envelope of a committed
+    // checkpoint on this rank. Call it inside collective_file_operation().
+    template <int dim, int spacedim>
+    CheckpointData<dim, spacedim>
+    read_checkpoint_data(const std::filesystem::path &root,
+                         const unsigned int           ranks)
+    {
+      CheckpointData<dim, spacedim> data;
+      check_manifest(root, data.magic, 4);
+      data =
+        read_archive<CheckpointData<dim, spacedim>>(root / "application.bin");
       const CheckpointData<dim, spacedim> expected;
       AssertThrow(data.magic == expected.magic &&
                     data.dealii_version == expected.dealii_version &&
@@ -194,22 +378,7 @@ namespace MetricFlowX
                 ExcMessage("Nonfinite checkpoint state."));
     AssertThrow(std::isfinite(derivative.l2_norm()),
                 ExcMessage("Nonfinite checkpoint derivative."));
-    const std::filesystem::path destination(directory),
-      staging(directory + ".incomplete");
-    collective_file_operation(mpi_communicator_, [&] {
-      AssertThrow(!directory.empty(),
-                  ExcMessage("Empty checkpoint directory."));
-      if (this_mpi_process == 0)
-        {
-          AssertThrow(!std::filesystem::exists(destination),
-                      ExcMessage("Checkpoint destination already exists."));
-          if (!destination.parent_path().empty())
-            std::filesystem::create_directories(destination.parent_path());
-          AssertThrow(std::filesystem::create_directory(staging),
-                      ExcMessage(
-                        "Checkpoint staging directory already exists."));
-        }
-    });
+    const auto staging = create_staging(mpi_communicator_, directory);
 
     CheckpointData<dim, spacedim> data;
     data.ranks           = n_mpi_processes;
@@ -232,28 +401,10 @@ namespace MetricFlowX
     data.parameters = parameters.str();
     collective_file_operation(mpi_communicator_, [&] {
       if (this_mpi_process == 0)
-        {
-          std::ofstream file(staging / "application.bin", std::ios::binary);
-          AssertThrow(file, ExcMessage("Cannot create application archive."));
-          {
-            boost::archive::binary_oarchive archive(file);
-            archive << data;
-          }
-          file.close();
-          AssertThrow(file, ExcMessage("Cannot finish application archive."));
-        }
-      std::ofstream file(staging / ("elements-" +
-                                    std::to_string(this_mpi_process) + ".bin"),
-                         std::ios::binary);
-      AssertThrow(file,
-                  ExcMessage("Cannot create element association archive."));
-      {
-        boost::archive::binary_oarchive archive(file);
-        archive << cell_elements(dof_handler_);
-      }
-      file.close();
-      AssertThrow(file,
-                  ExcMessage("Cannot finish element association archive."));
+        write_archive(staging / "application.bin", data);
+      write_archive(staging /
+                      ("elements-" + std::to_string(this_mpi_process) + ".bin"),
+                    cell_elements(dof_handler_));
     });
 
     VectorType relevant_state(locally_owned_dofs_,
@@ -272,31 +423,10 @@ namespace MetricFlowX
         prepare_additional_data(staging.string());
     });
     triangulation_.save((staging / "mesh").string());
-    AssertThrowMPI(MPI_Barrier(mpi_communicator_));
-
-    // A committed directory is visible only after all mesh/vector and envelope
-    // files have closed on every rank. Interrupted writes remain .incomplete.
-    collective_file_operation(mpi_communicator_, [&] {
-      if (this_mpi_process == 0)
-        {
-          std::ofstream manifest(staging / "COMPLETE");
-          manifest << "MetricFlowX checkpoint 1\n";
-          for (const auto &entry :
-               std::filesystem::recursive_directory_iterator(staging))
-            if (entry.is_regular_file() && entry.path() != staging / "COMPLETE")
-              manifest
-                << std::quoted(
-                     std::filesystem::relative(entry.path(), staging).string())
-                << ' ' << std::filesystem::file_size(entry.path()) << '\n';
-          manifest.close();
-          AssertThrow(manifest,
-                      ExcMessage("Cannot finish checkpoint manifest."));
-          AssertThrow(!std::filesystem::exists(destination),
-                      ExcMessage(
-                        "Checkpoint destination appeared during write."));
-          std::filesystem::rename(staging, destination);
-        }
-    });
+    commit_staging(mpi_communicator_,
+                   staging,
+                   directory,
+                   CheckpointData<dim, spacedim>().magic);
   }
 
   template <int dim, int spacedim>
@@ -468,6 +598,161 @@ namespace MetricFlowX
     time         = data.time;
   }
 
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::save_coupling_fields(
+    const std::string              &directory,
+    const double                    t,
+    const VectorType               &state,
+    const VectorType               &derivative,
+    const std::vector<std::string> &fields) const
+  {
+    check_same_directory(mpi_communicator_, directory);
+    AssertThrow(!fields.empty(), ExcMessage("No coupling fields selected."));
+    for (unsigned int i = 0; i < fields.size(); ++i)
+      {
+        coupling_field_component(fields[i]);
+        AssertThrow(std::find(fields.begin(), fields.begin() + i, fields[i]) ==
+                      fields.begin() + i,
+                    ExcMessage("Duplicate coupling field " + fields[i] + "."));
+      }
+    AssertThrow(
+      Utilities::MPI::min(
+        std::isfinite(t) && dof_handler_.n_dofs() > 0 &&
+            state.size() == dof_handler_.n_dofs() &&
+            derivative.size() == state.size() &&
+            state.locally_owned_elements() == locally_owned_dofs_ &&
+            derivative.locally_owned_elements() == locally_owned_dofs_ ?
+          1u :
+          0u,
+        mpi_communicator_) == 1,
+      ExcMessage("Coupling fields need a finite time and native state pair."));
+    AssertThrow(Utilities::MPI::min(t, mpi_communicator_) ==
+                  Utilities::MPI::max(t, mpi_communicator_),
+                ExcMessage("Coupling field times differ between MPI ranks."));
+
+    VectorType pressure;
+    if (std::find(fields.begin(), fields.end(), "pressure") != fields.end())
+      {
+        pressure.reinit(locally_owned_dofs_, mpi_communicator_);
+        compute_pressure(state, derivative, pressure, t);
+      }
+    const auto cell_layout = owned_cell_layout(dof_handler_);
+    std::vector<CouplingFieldBlock>      blocks(fields.size());
+    std::vector<types::global_dof_index> dofs;
+    for (unsigned int f = 0; f < fields.size(); ++f)
+      {
+        const unsigned int component = coupling_field_component(fields[f]);
+        const VectorType  &source = fields[f] == "pressure" ? pressure : state;
+        blocks[f].layout          = cell_layout.second;
+        for (const auto &cell : cell_layout.first)
+          {
+            dofs.resize(cell->get_fe().n_dofs_per_cell());
+            cell->get_dof_indices(dofs);
+            for (unsigned int i = 0; i < dofs.size(); ++i)
+              if (cell->get_fe().system_to_component_index(i).first ==
+                  component)
+                blocks[f].values.push_back(source[dofs[i]]);
+          }
+        AssertThrow(Utilities::MPI::min(std::all_of(blocks[f].values.begin(),
+                                                    blocks[f].values.end(),
+                                                    [](const double value) {
+                                                      return std::isfinite(
+                                                        value);
+                                                    }) ?
+                                          1u :
+                                          0u,
+                                        mpi_communicator_) == 1,
+                    ExcMessage("Nonfinite coupling field " + fields[f] + "."));
+      }
+
+    const auto staging = create_staging(mpi_communicator_, directory);
+    collective_file_operation(mpi_communicator_, [&] {
+      if (this_mpi_process == 0)
+        {
+          CouplingFieldsData data;
+          data.ranks  = n_mpi_processes;
+          data.time   = t;
+          data.fields = fields;
+          write_archive(staging / "fields.bin", data);
+        }
+      for (unsigned int f = 0; f < fields.size(); ++f)
+        write_archive(staging / (fields[f] + "-" +
+                                 std::to_string(this_mpi_process) + ".bin"),
+                      blocks[f]);
+    });
+    commit_staging(mpi_communicator_,
+                   staging,
+                   directory,
+                   CouplingFieldsData().magic);
+  }
+
+  template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::load_coupling_field(
+    const std::string &directory,
+    const std::string &field,
+    VectorType        &values) const
+  {
+    check_same_directory(mpi_communicator_, directory);
+    const unsigned int component = coupling_field_component(field);
+    AssertThrow(dof_handler_.n_dofs() > 0 &&
+                  values.size() == dof_handler_.n_dofs() &&
+                  values.locally_owned_elements() == locally_owned_dofs_,
+                ExcMessage("Load coupling fields into a set-up system and a "
+                           "vector with the layout of make_state()."));
+    const std::filesystem::path root(directory);
+    const auto                  cell_layout = owned_cell_layout(dof_handler_);
+    const auto                 &cells       = cell_layout.first;
+    const std::uint64_t         layout      = cell_layout.second;
+    CouplingFieldsData          data;
+    CouplingFieldBlock          block;
+    collective_file_operation(mpi_communicator_, [&] {
+      check_manifest(root, data.magic, 2);
+      data = read_archive<CouplingFieldsData>(root / "fields.bin");
+      const CouplingFieldsData expected;
+      AssertThrow(data.magic == expected.magic &&
+                    data.dealii_version == expected.dealii_version &&
+                    data.backend == expected.backend &&
+                    data.ranks == n_mpi_processes && std::isfinite(data.time),
+                  ExcMessage(
+                    "Incompatible coupling fields version, backend, or MPI "
+                    "size."));
+      AssertThrow(std::find(data.fields.begin(), data.fields.end(), field) !=
+                    data.fields.end(),
+                  ExcMessage("Coupling field " + field + " was not saved."));
+      block = read_archive<CouplingFieldBlock>(
+        root / (field + "-" + std::to_string(this_mpi_process) + ".bin"));
+      AssertThrow(block.layout == layout,
+                  ExcMessage("Coupling field mesh or partition differs from "
+                             "the loaded mesh."));
+    });
+
+    VectorType result(locally_owned_dofs_, mpi_communicator_);
+    std::vector<types::global_dof_index> dofs;
+    std::size_t                          next = 0;
+    bool                                 fits = true;
+    for (const auto &cell : cells)
+      {
+        dofs.resize(cell->get_fe().n_dofs_per_cell());
+        cell->get_dof_indices(dofs);
+        for (unsigned int i = 0; fits && i < dofs.size(); ++i)
+          if (cell->get_fe().system_to_component_index(i).first == component)
+            {
+              fits = next < block.values.size();
+              if (fits)
+                result[dofs[i]] = block.values[next++];
+            }
+      }
+    fits = fits && next == block.values.size();
+    AssertThrow(Utilities::MPI::min(fits ? 1u : 0u, mpi_communicator_) == 1,
+                ExcMessage("Coupling field size differs from the loaded "
+                           "degrees of freedom."));
+    result.compress(VectorOperation::insert);
+    values = result;
+    return data.time;
+  }
+
   template void
   BloodFlowSystem<1, 3>::save_checkpoint(
     const std::string &,
@@ -481,4 +766,15 @@ namespace MetricFlowX
     const std::function<void(const std::string &)> &);
   template void
   BloodFlowSystem<1, 3>::load_checkpoint_state(const std::string &);
+  template void
+  BloodFlowSystem<1, 3>::save_coupling_fields(
+    const std::string &,
+    double,
+    const VectorType &,
+    const VectorType &,
+    const std::vector<std::string> &) const;
+  template double
+  BloodFlowSystem<1, 3>::load_coupling_field(const std::string &,
+                                             const std::string &,
+                                             VectorType &) const;
 } // namespace MetricFlowX

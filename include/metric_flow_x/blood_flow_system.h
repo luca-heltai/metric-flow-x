@@ -490,6 +490,35 @@ namespace MetricFlowX
     void
     load_checkpoint_state(const std::string &directory);
 
+    /** Collectively publish selected fields of a native pair at time t, for
+     * one-way couplings that replay a run. fields is a subset of "area" (cell
+     * area A), "velocity" (cell velocity U) and "pressure" (nodal physical
+     * pressure at the cell area support points, as compute_pressure()). Each
+     * rank stores only the field values on its locally owned cells, in
+     * CellId order, with a fingerprint of their ids, vertices and finite
+     * elements; no mesh, physics or parameters are written. The directory is
+     * committed atomically like a checkpoint and must not exist.
+     */
+    void
+    save_coupling_fields(const std::string              &directory,
+                         double                          t,
+                         const VectorType               &state,
+                         const VectorType               &derivative,
+                         const std::vector<std::string> &fields) const;
+
+    /** Read one field written by save_coupling_fields() into values and
+     * return its time. values must have the layout of make_state(); the
+     * field's DoFs (cell area DoFs for area and pressure, cell velocity DoFs
+     * for velocity) are overwritten and all others set to zero. This object
+     * must hold the writer's mesh with the same partition and MPI size, for
+     * example after load_checkpoint() of a checkpoint of the same run. No
+     * parameters are parsed and no system setup is repeated. Collective.
+     */
+    double
+    load_coupling_field(const std::string &directory,
+                        const std::string &field,
+                        VectorType        &values) const;
+
     /** Native pair and physical time restored by load_checkpoint() or
      * load_checkpoint_state(). */
     const VectorType &

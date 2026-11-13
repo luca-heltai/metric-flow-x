@@ -45,7 +45,27 @@ def check_residuals(history):
     return rows, {field: max(float(row[field]) for row in rows) for field in bounds}
 
 
-def parameters(mesh, inflow, output, checkpoints):
+def check_coupling(history, count):
+    """Layout once, then only small field directories indexed by time."""
+    assert (history / "layout" / "COMPLETE").is_file()
+    layout = sum(path.stat().st_size for path in (history / "layout").rglob("*")
+                 if path.is_file())
+    fields = sorted(path for path in history.iterdir()
+                    if path.is_dir() and path.name.startswith("fields-"))
+    assert len(fields) == count, fields
+    rows = read_rows(history / "coupling_fields.csv")
+    assert sorted(row["directory"] for row in rows) == [path.name for path in fields]
+    for row in rows:
+        folder = history / row["directory"]
+        assert float.fromhex(row["directory"].removeprefix("fields-")) == float(row["time_s"])
+        assert (folder / "COMPLETE").is_file()
+        assert not (folder / "mesh").exists()
+        size = sum(path.stat().st_size for path in folder.iterdir())
+        assert 2 * size < layout, (folder, size, layout)
+    return rows
+
+
+def parameters(mesh, inflow, output, checkpoints, coupling=""):
     return f"""subsection Metric Flow Parameters
   set Viscosity coefficient (mu) = 0.004
 end
@@ -57,6 +77,8 @@ subsection MetricFlowSystem<1, 3>
   set Inflow CSV file = {inflow}
   set Output directory = {output}
   set Checkpoint directory = {checkpoints}
+  set Coupling output directory = {coupling}
+  set Coupling output fields = area, pressure
   set Output time interval = 0.002
   set Initial condition policy = native
   set Initial consistency tolerance = 1e-6
@@ -102,12 +124,16 @@ def validate(executable, source, destination, ranks, mpiexec):
     output = folder / "reference-output"
     checkpoints = folder / "checkpoints"
     prm = original / "input.prm"
-    prm.write_text(parameters(mesh, inflow, output, checkpoints))
+    coupling = folder / "coupling"
+    prm.write_text(parameters(mesh, inflow, output, checkpoints, coupling))
     prefix = [mpiexec, "-np", str(ranks)] if ranks > 1 else []
     environment = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
     run(prefix + [str(executable), str(prm)], folder, environment, "reference")
     reference_residuals, maximum_residuals = check_residuals(checkpoints)
     assert len(reference_residuals) == 5
+    coupling_rows = check_coupling(coupling, 5)
+    assert sorted(float(row["time_s"]) for row in coupling_rows) == sorted(
+        float(row["time_s"]) for row in reference_residuals)
 
     quiet_output, quiet_history = folder / "without-vtk-output", folder / "without-vtk-history"
     quiet_prm = original / "without_vtk.prm"
@@ -141,6 +167,8 @@ def validate(executable, source, destination, ranks, mpiexec):
         folder, environment, "restart")
 
     restored_residuals, _ = check_residuals(folder / "continued-checkpoints")
+    # The archived coupling output continues in a new history by default.
+    check_coupling(Path(str(selected) + "-coupling"), 3)
     expected_residual = min(reference_residuals,
                             key=lambda row: abs(float(row["time_s"]) - selected_time))
     for field in maximum_residuals:

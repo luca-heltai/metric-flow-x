@@ -101,6 +101,56 @@ initial time is retained in `ida_parameters.initial_time`; `get_time()` returns
 the saved physical time. The standalone runner uses the latter to reset IDA while
 preserving the original output-grid and tolerance-ramp origins.
 
+## Coupling field output
+
+A one-way coupling usually needs only a few fields at each output time, not a
+restart archive. The standalone application can write just those:
+
+```sh
+blood_flow input.prm --coupling-output-directory /path/to/coupling
+```
+
+or, in the parameter file, `Coupling output directory = /path/to/coupling`,
+with `Coupling output fields` chosen from `area`, `velocity` and `pressure`
+(default `area`). The directory receives:
+
+- `layout`: one native checkpoint at the first output time. It holds the mesh,
+  resolved physics, parameters and DoF layout, and is written once per history.
+- `fields-<time>`: at every output time, only the selected fields. Each rank
+  stores the values on its locally owned cells in CellId order, with a
+  fingerprint of their ids, vertices and finite elements. No mesh, physics or
+  parameters are repeated. Each directory is committed atomically with its own
+  `COMPLETE` manifest, like a checkpoint.
+- `coupling_fields.csv`: one row per output with the time and directory name.
+
+The fields follow the output schedule like checkpoints, but do not arm extra
+IDA stop times, so they do not change the integration. The output is
+independent of `Checkpoint directory` and `Write solution output`. On restart,
+an archived coupling output continues in `<checkpoint>-coupling` unless
+`--coupling-output-directory` is given.
+
+A reader loads the layout once and then reads one field per time:
+
+```cpp
+flow.load_checkpoint(coupling / "layout");
+auto area = flow.make_state();
+for (const auto &directory : field_directories)
+  {
+    const double t = flow.load_coupling_field(directory, "area", area);
+    // area holds A on the cell area DoFs and zero elsewhere.
+  }
+```
+
+`load_coupling_field()` parses no parameters and repeats no setup. It needs
+the same MPI size and partition as the writer, which `load_checkpoint()` of the
+layout provides, and rejects fields written on a different mesh, a field that
+was not saved, and damaged or uncommitted directories. `area` and `velocity`
+fill the cell area and cell velocity DoFs; `pressure` is the nodal physical
+pressure of `compute_pressure()` on the cell area DoFs. Traces, capacitor
+pressures and the derivative are not stored, so field directories cannot be
+used for restart. `save_coupling_fields()` writes the same format from an
+application that owns its own time loop.
+
 ## Restart semantics and restrictions
 
 The runner starts a new IDA integration from the restored pair. It does not
@@ -165,11 +215,15 @@ deleting original inputs, and collective rejection of duplicate, missing and
 incompatible checkpoints. It also replays the history into one loaded object in
 both directions, and checks that replay rejects fresh objects, invalid
 checkpoints and checkpoints written on a different mesh without changing the
-loaded state. It runs with one, two and four ranks.
+loaded state. It runs with one, two and four ranks. The C++ `test_coupling_fields`
+regression writes a layout and field directories, reads every field exactly
+into an object loaded from the relocated layout, and checks the rejections
+above.
 
 The standalone integration regression runs a nonzero transient, removes the
 original parameter, mesh and inflow files, relocates its checkpoints, and
-starts a fresh process from an interior checkpoint. It compares continued
+starts a fresh process from an interior checkpoint. It also checks the
+coupling output layout of the reference run and of the restart. It compares continued
 vessel and terminal observables with an uninterrupted reference using explicit
 absolute/relative tolerances that allow IDA's restarted BDF adaptation:
 
