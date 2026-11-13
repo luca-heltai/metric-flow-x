@@ -1099,15 +1099,15 @@ namespace MetricFlowX
       problem.close_csv_files();
     }
 
-    std::string   run_mode_ = "transient";
-    std::string   checkpoint_directory_;
+    std::string              run_mode_ = "transient";
+    std::string              checkpoint_directory_;
     std::string              coupling_directory_;
     std::vector<std::string> coupling_fields_         = {"area"};
     bool                     coupling_layout_written_ = false;
-    ToleranceRamp tolerance_ramp_;
-    long int      maximum_ida_steps_per_output_      = 500;
-    double        maximum_step_size_                 = 0.;
-    double        nonlinear_convergence_coefficient_ = 0.33;
+    ToleranceRamp            tolerance_ramp_;
+    long int                 maximum_ida_steps_per_output_      = 500;
+    double                   maximum_step_size_                 = 0.;
+    double                   nonlinear_convergence_coefficient_ = 0.33;
   };
 } // namespace MetricFlowX
 

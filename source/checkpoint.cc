@@ -231,7 +231,7 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive & magic & dealii_version & backend & ranks & time & fields;
+        archive &magic &dealii_version &backend &ranks &time &fields;
       }
     };
 
@@ -246,11 +246,20 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive & layout & values;
+        archive &layout &values;
       }
     };
 
-    // FNV-1a, stable across processes, unlike std::hash.
+    // 64-bit FNV-1a (Fowler-Noll-Vo) hash. Unlike std::hash, its values are
+    // fixed by the algorithm, so writer and reader processes agree. It detects
+    // accidental layout mismatches; it is not a cryptographic check.
+    //
+    // The offset basis is the initial hash value, so that leading zero bytes
+    // still change the hash. The prime, 2^40 + 2^8 + 0xb3, spreads every byte
+    // over the hash bits; the product wraps modulo 2^64 by unsigned overflow.
+    constexpr std::uint64_t fnv_offset_basis = 14695981039346656037ull;
+    constexpr std::uint64_t fnv_prime        = 1099511628211ull;
+
     void
     hash_bytes(std::uint64_t &hash, const void *data, const std::size_t size)
     {
@@ -258,7 +267,7 @@ namespace MetricFlowX
       for (std::size_t i = 0; i < size; ++i)
         {
           hash ^= bytes[i];
-          hash *= 1099511628211ull;
+          hash *= fnv_prime;
         }
     }
 
@@ -280,7 +289,7 @@ namespace MetricFlowX
       std::sort(cells.begin(), cells.end(), [](const auto &a, const auto &b) {
         return a->id() < b->id();
       });
-      std::uint64_t hash = 14695981039346656037ull;
+      std::uint64_t hash = fnv_offset_basis;
       for (const auto &cell : cells)
         {
           const auto         id    = cell->id().to_string();
