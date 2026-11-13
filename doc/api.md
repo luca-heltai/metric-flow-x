@@ -92,6 +92,41 @@ implicitly collect that graph to enable the optional warm start. The external
 application can initialize the native pair and advance its existing IDA adapter
 after all flow and coupling DoFs have been prepared.
 
+## Wall reference area
+
+Every wall law is evaluated relative to the tapered diastolic area
+
+$$
+a_d(x)=\pi r(x)^2,\qquad r(x)=r_{\rm in}+\xi(x)\,(r_{\rm out}-r_{\rm in}),
+$$
+
+where $\xi\in[0,1]$ is the arc-length coordinate along the vessel. Without taper
+data ($r_{\rm in}$ or $r_{\rm out}$ not positive) the vessel value `a_d` is used.
+The square-root law gives the transmural pressure $p_0+p_d$ at $A=a_d(x)$; the
+ADAVN laws take $a_d(x)$ as the area of zero wall strain. A coupled wall is
+therefore in the flow model's reference configuration at $A=a_d(x)$. This
+configuration is not stress free when the law's pressure there is nonzero, for
+example when $p_0+p_d\neq0$ in the square-root law.
+
+`a0` is read from the input, validated as positive and archived in checkpoints,
+but it does not enter the flow equations. Couplings should not use it as the
+wall reference.
+
+The reference area is available on any set-up object, including one restored by
+`load_checkpoint()`:
+
+```cpp
+const double a = flow.reference_area(cell, x); // cell of flow.dof_handler()
+
+auto area = flow.make_state();
+flow.interpolate_reference_area(area);
+// Cell area and area trace DoFs hold a_d; all other DoFs are zero.
+```
+
+The vector has the layout of `state()`, so the area components of the two can
+be compared entry by entry, for example to form
+$\sqrt{A/\pi}-\sqrt{a_d/\pi}$.
+
 ## A sparse external-pressure derivative
 
 For a pressure field owned by a coupled application, use
