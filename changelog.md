@@ -4,6 +4,8 @@
 
 ### Added
 
+- [PR #102](https://github.com/luca-heltai/metric-flow-x/pull/102) Check full state, time-derivative and external-pressure Jacobians on one native three-arm microvascular network with a sealed side branch, nonuniform states and nonzero external pressure.
+
 - [PR #97](https://github.com/luca-heltai/metric-flow-x/pull/97) Add `Coupling output directory`, `Coupling output fields` and `--coupling-output-directory` to write only selected flow fields at each output time after one layout checkpoint, and `BloodFlowSystem::save_coupling_fields()` and `load_coupling_field()` to write and read them on a loaded object.
 - [PR #97](https://github.com/luca-heltai/metric-flow-x/pull/97) Add `BloodFlowSystem::load_checkpoint_state()` to replay the time and state pair of another checkpoint of the same history into a loaded object, checking the mesh and finite element association without parameter parsing or system setup.
 - [PR #100](https://github.com/luca-heltai/metric-flow-x/pull/100) Add public `BloodFlowSystem::reference_area()` and `interpolate_reference_area()` for the tapered wall reference area `a_d(x)`, also on restored checkpoints, and document that `a0` does not enter the flow equations.

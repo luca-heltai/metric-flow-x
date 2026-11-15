@@ -1,2 +1,3 @@
 
 DEAL::Linked physical pressure, Kirchhoff balance and pressure derivative: PASSED
+DEAL::Native three-arm microbed, sealed branch and full Jacobians: PASSED
