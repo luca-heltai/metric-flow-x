@@ -125,14 +125,14 @@ namespace MetricFlowX
           reference_area > 0.,
         dealii::ExcMessage(
           "Wall invariant requires finite positive area and reference area."));
-      static constexpr std::array<double, 4> x = {.1834346424956498,
-                                                  .5255324099163290,
-                                                  .7966664774136267,
-                                                  .9602898564975363};
-      static constexpr std::array<double, 4> w = {.3626837833783620,
-                                                  .3137066458778873,
-                                                  .2223810344533745,
-                                                  .1012285362903763};
+      static constexpr std::array<double, 4> x = {{.1834346424956498,
+                                                   .5255324099163290,
+                                                   .7966664774136267,
+                                                   .9602898564975363}};
+      static constexpr std::array<double, 4> w = {{.3626837833783620,
+                                                   .3137066458778873,
+                                                   .2223810344533745,
+                                                   .1012285362903763}};
       const double       limit = std::log(area / reference_area);
       const unsigned int intervals =
         std::max(1u,
