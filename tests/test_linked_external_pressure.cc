@@ -313,6 +313,23 @@ test()
                         c == 4           ? 20. :
                                            .03;
             }
+      // Preserve the original FD sensitivity under the positive row scaling.
+      // Determine G from the independent pairwise-link fixture, not the
+      // assembled residual or Jacobian.
+      for (const auto &face : flow.boundary_faces)
+        {
+          const auto bid  = face.cell->face(face.face_no)->boundary_id();
+          const auto leaf = std::find(leaves.begin(), leaves.end(), bid);
+          if (leaf == leaves.end() || (capacitor && bid == leaves[0]))
+            continue;
+          const auto id              = std::distance(leaves.begin(), leaf);
+          double     row_conductance = 0.;
+          for (unsigned int other = 0; other < arms.size(); ++other)
+            if (other != id)
+              row_conductance += 1. / (conductance * arms[id] * arms[other]);
+          if (flow.locally_owned_dofs().is_element(face.a_hat_dof))
+            row_scales[face.a_hat_dof] *= row_conductance;
+        }
       for (auto *v : {&state, &rate, &column_scales, &row_scales})
         v->compress(VectorOperation::insert);
       bool valid_scales = true;
