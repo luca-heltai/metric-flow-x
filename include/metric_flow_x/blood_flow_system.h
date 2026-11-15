@@ -61,6 +61,7 @@
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/vector.hpp>
+#include <boost/serialization/version.hpp>
 
 #include <metric_flow_x/inflow_series.h>
 #include <metric_flow_x/parsed_tools/constants.h>
@@ -169,7 +170,7 @@ namespace MetricFlowX
       using SparseMatrix    = dealii::TrilinosWrappers::SparseMatrix;
       using PreconditionILU = dealii::TrilinosWrappers::PreconditionILU;
     } // namespace MPI
-    using SolverGMRES             = dealii::SolverGMRES<MPI::Vector>;
+    using SolverGMRES = dealii::SolverGMRES<MPI::Vector>;
 #else
 #  error DEAL_II_WITH_PETSC or DEAL_II_WITH_TRILINOS required
 #endif
@@ -386,8 +387,8 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive &a0 &r_d &a_d &E &h_wall &p_d &p0 &L &r_in &r_out
-          &dynamic_viscosity &wall;
+        archive & a0 & r_d & a_d & E & h_wall & p_d & p0 & L & r_in & r_out &
+          dynamic_viscosity & wall;
       }
     };
 
@@ -396,12 +397,27 @@ namespace MetricFlowX
     {
       double      R1 = 0., R2 = 0., C = 0., P_out = 0.;
       std::string label;
+      /** Optional reservoir pressure in Pa. Empty preserves constant P_out.
+       * This known time-dependent datum is distinct from wall pressure.
+       */
+      InflowSeries outlet_pressure_series = {};
+
+      double
+      outlet_pressure(const double t) const
+      {
+        return outlet_pressure_series.empty() ? P_out :
+                                                outlet_pressure_series.value(t);
+      }
 
       template <class Archive>
       void
-      serialize(Archive &archive, const unsigned int)
+      serialize(Archive &archive, const unsigned int version)
       {
-        archive &R1 &R2 &C &P_out &label;
+        archive & R1 & R2 & C & P_out & label;
+        if (version > 0)
+          archive & outlet_pressure_series;
+        else if constexpr (Archive::is_loading::value)
+          outlet_pressure_series = {};
       }
     };
 
@@ -414,7 +430,7 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive &boundary0 &boundary1 &resistance;
+        archive & boundary0 & boundary1 & resistance;
       }
     };
 
@@ -437,7 +453,7 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive &vessels &terminals &terminal_connections &sealed_terminals;
+        archive & vessels & terminals & terminal_connections & sealed_terminals;
       }
     };
 
@@ -1300,8 +1316,8 @@ namespace MetricFlowX
       void
       serialize(Archive &archive, const unsigned int)
       {
-        archive &area &velocity &vessel &reference_area &outward_sign &point
-          &cell_id;
+        archive & area & velocity & vessel & reference_area & outward_sign &
+          point & cell_id;
       }
     };
     std::map<types::boundary_id, TerminalPort> terminal_ports;
@@ -2403,5 +2419,13 @@ namespace MetricFlowX
   };
 
 } // namespace MetricFlowX
+
+// Native checkpoints currently support the explicitly instantiated 1D-in-3D
+// flow system. Version zero archives retain their constant reservoir pressure.
+namespace MetricFlowX::internal
+{
+  using RCRPhysicsCheckpoint = BloodFlowSystem<1, 3>::RCRPhysics;
+}
+BOOST_CLASS_VERSION(MetricFlowX::internal::RCRPhysicsCheckpoint, 1)
 
 #endif // METRIC_FLOW_X_BLOOD_FLOW_SYSTEM_H

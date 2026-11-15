@@ -122,6 +122,41 @@ test()
   for (const double t : {0., 0.0005, 0.001, 10.1235, 19.9995, 20.})
     AssertThrow(std::abs(data.value(t) - (1e-8 + 2e-9 * t)) < 1e-20,
                 ExcInternalError());
+  // The named-column overload shares the flow parser, including quoted
+  // headers, strict numeric validation and the no-extrapolation contract.
+  write("time_s,pressure_Pa,comment\n0,600,start\n1,800,end\n");
+  data.read("inflow.csv", "pressure_Pa");
+  AssertThrow(data.value(.25) == 650., ExcInternalError());
+  for (const double t : {-.1, 1.1})
+    {
+      bool rejected = false;
+      try
+        {
+          data.value(t);
+        }
+      catch (const std::out_of_range &)
+        {
+          rejected = true;
+        }
+      AssertThrow(rejected, ExcInternalError());
+    }
+  for (const auto &content : {"time_s,pressure_Pa\n0,600\n1,nan\n",
+                              "time_s,pressure_Pa\n0,600\n0,800\n",
+                              "time_s,pressure_Pa\n0,600\n1,800suffix\n",
+                              "time_s,flow_m3_s\n0,600\n1,800\n"})
+    {
+      write(content);
+      bool rejected = false;
+      try
+        {
+          data.read("inflow.csv", "pressure_Pa");
+        }
+      catch (const std::invalid_argument &)
+        {
+          rejected = true;
+        }
+      AssertThrow(rejected, ExcInternalError());
+    }
   deallog << "SI inflow interpolation and validation: PASSED" << std::endl;
 }
 

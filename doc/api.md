@@ -172,3 +172,38 @@ matrix when that state changes. It is separate from
 `add_external_pressure_state_jacobian`, which differentiates with respect to
 native flow variables while holding prescribed pressures fixed. Neither
 operation installs a pressure provider or adds a time-derivative term.
+
+## Time-dependent terminal reservoir pressure
+
+`BloodFlowSystem<1,3>::RCRPhysics::outlet_pressure_series` is optional.
+With an empty series, `outlet_pressure(t)` returns the unchanged scalar
+`P_out`. To prescribe a measured reservoir pressure in SI units:
+
+```cpp
+Flow::RCRPhysics outlet{R1, R2, C, constant_pressure, "venous-root"};
+outlet.outlet_pressure_series.read("ivc_pressure.csv", "pressure_Pa");
+// Require full integration coverage before setup; no extrapolation or wrapping.
+outlet.outlet_pressure(initial_time);
+outlet.outlet_pressure(final_time);
+```
+
+The existing CSV reader selects `time_s` and `pressure_Pa`; the original
+`read(filename, period)` overload still selects `flow_m3_s`. Columns must be
+unique, values finite, times strictly increasing, with at least two samples.
+The default period is zero. Linear interpolation never extrapolates.
+
+The reservoir pressure enters `p(Ahat) - (R1+R2) Q - P_out(t)` when `C=0`,
+and `C Pcdot - Q + (Pc-P_out(t))/R2` when `C>0`. It also enters hydraulic
+initialization at the requested initial time. It is known time-dependent data,
+so it adds no state or derivative Jacobian entries. The external wall-pressure
+provider has different physics and must not be used for this boundary datum.
+`network_terminals.csv` lists the scalar `P_out` fallback coefficient, not an
+instantaneous waveform sample. Its `P_out_is_time_dependent` flag identifies
+terminals using a series; terminal pressure/flow output remains the
+physical solution. Keep the sampled forcing with the run provenance.
+
+Native checkpoints serialize all samples, independent of the original CSV
+path. Version-zero constant RCR archives remain readable; new archives require
+a reader supporting the new terminal data version. Rebuild applications against
+the matching headers and library because `RCRPhysics` has an additional member.
+No portal waveform or wall reference-pressure change is implied.
