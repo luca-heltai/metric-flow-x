@@ -339,9 +339,10 @@ test()
                 auto unit = flow.make_state(), action = flow.make_state();
                 if (owned)
                   {
-                    plus[column] += epsilon * scale;
-                    minus[column] -= epsilon * scale;
-                    unit[column] = scale;
+                    const double value = plus[column];
+                    plus[column]       = value + epsilon * scale;
+                    minus[column]      = value - epsilon * scale;
+                    unit[column]       = scale;
                   }
                 for (auto *v : {&plus, &minus, &unit})
                   v->compress(VectorOperation::insert);
@@ -441,6 +442,7 @@ test()
         }
       flow.clear_external_pressure_provider();
     }
+  deallog.depth_file(10);
   deallog
     << "Native three-arm microbed, sealed branch and full Jacobians: PASSED"
     << std::endl;
