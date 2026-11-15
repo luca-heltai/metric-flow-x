@@ -50,7 +50,7 @@ test()
         // Constant nonzero pressure has no state derivative on this half-face.
         for (unsigned int j = 0; j < 4; ++j)
           {
-            std::array<double, 4> state     = {al, ul, ar, ur};
+            std::array<double, 4> state     = {{al, ul, ar, ur}};
             std::array<double, 4> direction = {};
             direction[j]                    = j % 2 == 0 ? area : c;
             constexpr double h              = 1.e-5;

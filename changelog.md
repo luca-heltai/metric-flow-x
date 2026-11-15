@@ -17,7 +17,7 @@
 
 ### Fixed
 
-- Fully brace wall-law quadrature and numerical-flux Jacobian arrays so GCC builds remain warning-free with `-Wmissing-braces`.
+- Fully brace wall-law quadrature and numerical-flux arrays and remove an unused test communicator so native GCC builds and regression checks pass with warnings treated as errors.
 
 - Select the unified SolutionTransfer API on deal.II 9.7 and newer to avoid checkpoint compilation deprecation warnings, retaining the distributed API for older versions.
 
