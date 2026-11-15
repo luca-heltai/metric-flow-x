@@ -17,6 +17,8 @@
 
 ### Fixed
 
+- Fully brace wall-law quadrature and numerical-flux arrays and remove an unused test communicator so native GCC builds and regression checks pass with warnings treated as errors.
+
 - Select the unified SolutionTransfer API on deal.II 9.7 and newer to avoid checkpoint compilation deprecation warnings, retaining the distributed API for older versions.
 
 - [PR #92](https://github.com/luca-heltai/metric-flow-x/pull/92) Orient HLL characteristic speeds and their state and external-pressure derivatives with each outward face normal.

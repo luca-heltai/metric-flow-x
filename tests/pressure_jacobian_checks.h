@@ -15,7 +15,6 @@ check_sparse_pressure_jacobian(MetricFlowX::BloodFlowSystem<1, 3> &flow,
   using Flow            = MetricFlowX::BloodFlowSystem<1, 3>;
   using Index           = types::global_dof_index;
   using Entry           = std::pair<Index, Index>;
-  const auto  comm      = flow.mpi_communicator();
   const Index n_columns = 2 * flow.triangulation().n_global_active_cells();
   std::map<CellId, std::tuple<Index, Point<3>, Point<3>>> visible;
   for (const auto &cell : flow.dof_handler().active_cell_iterators())

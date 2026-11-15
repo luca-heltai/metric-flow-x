@@ -3498,14 +3498,14 @@ namespace MetricFlowX
       const auto   flux = hll_flux(
         bn_L, bn_R, A_L, U_L, A_R, U_R, vid_L, vid_R, ad_L, ad_R, 0., 0.);
       const std::array<double, 2> left = {
-        scalar_area_flux(bn_L, A_L, U_L),
-        scalar_momentum_flux(
-          bn_L, U_L, compute_pressure_value(A_L, vid_L, ad_L), density)};
+        {scalar_area_flux(bn_L, A_L, U_L),
+         scalar_momentum_flux(
+           bn_L, U_L, compute_pressure_value(A_L, vid_L, ad_L), density)}};
       const std::array<double, 2> right = {
-        scalar_area_flux(bn_R, A_R, U_R),
-        scalar_momentum_flux(
-          bn_R, U_R, compute_pressure_value(A_R, vid_R, ad_R), density)};
-      const std::array<double, 2> jump = {A_R - A_L, U_R - U_L};
+        {scalar_area_flux(bn_R, A_R, U_R),
+         scalar_momentum_flux(
+           bn_R, U_R, compute_pressure_value(A_R, vid_R, ad_R), density)}};
+      const std::array<double, 2> jump = {{A_R - A_L, U_R - U_L}};
       for (unsigned int i = 0; i < 2; ++i)
         result[i] +=
           inv * (dsR * left[i] - dsL * right[i] +
@@ -3736,14 +3736,14 @@ namespace MetricFlowX
           compute_wave_speed_derivative(A_L, vid_L, ad_L) * dA_L;
         const double dcR =
           compute_wave_speed_derivative(A_R, vid_R, ad_R) * dA_R;
-        const std::array<double, 4> waves = {(U_L - c2L) * bn_L,
-                                             (U_L + c2L) * bn_L,
-                                             (U_R - c2R) * bn_R,
-                                             (U_R + c2R) * bn_R};
-        const std::array<double, 4> dw    = {(dU_L - dcL) * bn_L,
-                                             (dU_L + dcL) * bn_L,
-                                             (dU_R - dcR) * bn_R,
-                                             (dU_R + dcR) * bn_R};
+        const std::array<double, 4> waves = {{(U_L - c2L) * bn_L,
+                                              (U_L + c2L) * bn_L,
+                                              (U_R - c2R) * bn_R,
+                                              (U_R + c2R) * bn_R}};
+        const std::array<double, 4> dw    = {{(dU_L - dcL) * bn_L,
+                                              (dU_L + dcL) * bn_L,
+                                              (dU_R - dcR) * bn_R,
+                                              (dU_R + dcR) * bn_R}};
         unsigned int                k     = 0;
         for (unsigned int i = 1; i < 4; ++i)
           if (std::abs(waves[i]) > std::abs(waves[k]))
