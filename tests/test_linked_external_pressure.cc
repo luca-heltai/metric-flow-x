@@ -315,6 +315,14 @@ test()
             }
       for (auto *v : {&state, &rate, &column_scales, &row_scales})
         v->compress(VectorOperation::insert);
+      bool valid_scales = true;
+      for (const auto row : flow.locally_owned_dofs())
+        valid_scales = valid_scales && std::isfinite(column_scales[row]) &&
+                       column_scales[row] > 0. &&
+                       std::isfinite(row_scales[row]) && row_scales[row] > 0.;
+      AssertThrow(Utilities::MPI::min(valid_scales ? 1u : 0u, comm) == 1,
+                  ExcMessage(
+                    "Every native DoF needs finite positive FD scales."));
       const Flow::ExternalPressureProvider pressure = [](const auto &point) {
         return 43. + 7. * point.vessel_id + 19. * point.point[0] +
                11. * point.point[1];
@@ -356,15 +364,25 @@ test()
                                        derivative ? state : minus,
                                        derivative ? minus : rate,
                                        fm);
+                bool finite_comparison = true;
                 for (const auto row : flow.locally_owned_dofs())
                   {
                     const double fd =
                       (fp[row] - fm[row]) / (2. * epsilon) / row_scales[row];
                     const double exact = action[row] / row_scales[row];
-                    worst              = std::max(worst,
-                                     std::abs(fd - exact) /
-                                       (1. + std::abs(fd) + std::abs(exact)));
+                    const double error = std::abs(fd - exact) /
+                                         (1. + std::abs(fd) + std::abs(exact));
+                    const bool finite = std::isfinite(fd) &&
+                                        std::isfinite(exact) &&
+                                        std::isfinite(error);
+                    finite_comparison = finite_comparison && finite;
+                    if (finite)
+                      worst = std::max(worst, error);
                   }
+                AssertThrow(
+                  Utilities::MPI::min(finite_comparison ? 1u : 0u, comm) == 1,
+                  ExcMessage(
+                    "Nonfinite entry in the full native FD comparison."));
               }
             worst = Utilities::MPI::max(worst, comm);
             if (Utilities::MPI::this_mpi_process(comm) == 0)
@@ -420,16 +438,24 @@ test()
             return pressure(point) + epsilon * lambda(point);
           });
           flow.assemble_residual(.375, state, rate, fm);
-          double worst = 0.;
+          double worst             = 0.;
+          bool   finite_comparison = true;
           for (const auto row : flow.locally_owned_dofs())
             {
               const double fd =
                 (fp[row] - fm[row]) / (2. * epsilon) / row_scales[row];
               const double exact = action[row] / row_scales[row];
-              worst              = std::max(worst,
-                               std::abs(fd - exact) /
-                                 (1. + std::abs(fd) + std::abs(exact)));
+              const double error =
+                std::abs(fd - exact) / (1. + std::abs(fd) + std::abs(exact));
+              const bool finite = std::isfinite(fd) && std::isfinite(exact) &&
+                                  std::isfinite(error);
+              finite_comparison = finite_comparison && finite;
+              if (finite)
+                worst = std::max(worst, error);
             }
+          AssertThrow(
+            Utilities::MPI::min(finite_comparison ? 1u : 0u, comm) == 1,
+            ExcMessage("Nonfinite entry in the full native FD comparison."));
           worst = Utilities::MPI::max(worst, comm);
           if (Utilities::MPI::this_mpi_process(comm) == 0)
             std::cout << "Combined native FD lambda C=" << capacitor
