@@ -4429,7 +4429,7 @@ namespace MetricFlowX
 
         // C*Ṗc - Q + (Pc - P_out)/R2 = 0
         // Both the terminal cell and its capacitor row belong to this rank.
-        double discharge = (Pc - rcr.outlet_pressure(t)) / rcr.R2;
+        double discharge = 0.;
         if (terminal_links.count(bid))
           {
             discharge = 0.;
@@ -4438,6 +4438,8 @@ namespace MetricFlowX
                 (Pc - terminal_pressure(other, y, terminal_pressures)) /
                 resistance;
           }
+        else
+          discharge = (Pc - rcr.outlet_pressure(t)) / rcr.R2;
         F(pc_dof) += rcr.C * Pc_dot - Q + discharge;
       }
   }

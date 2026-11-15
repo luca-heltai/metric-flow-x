@@ -195,7 +195,9 @@ The default period is zero. Linear interpolation never extrapolates.
 The reservoir pressure enters `p(Ahat) - (R1+R2) Q - P_out(t)` when `C=0`,
 and `C Pcdot - Q + (Pc-P_out(t))/R2` when `C>0`. It also enters hydraulic
 initialization at the requested initial time. It is known time-dependent data,
-so it adds no state or derivative Jacobian entries. The external wall-pressure
+so it adds no state or derivative Jacobian entries. At a terminal connected to
+the resolved resistor graph, that graph determines the downstream pressure;
+the independent reservoir datum is ignored and is not evaluated. The external wall-pressure
 provider has different physics and must not be used for this boundary datum.
 `network_terminals.csv` lists the scalar `P_out` fallback coefficient, not an
 instantaneous waveform sample. Its `P_out_is_time_dependent` flag identifies
