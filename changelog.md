@@ -17,6 +17,10 @@
 - [PR #90](https://github.com/luca-heltai/metric-flow-x/pull/90) Configure the native minimum positive area through numerical parameters, with the existing `1e-10 m^2` default and collective setup validation.
 - [PR #88](https://github.com/luca-heltai/metric-flow-x/pull/88) Add explicit sealed endpoints to in-memory networks, with zero outward flow and the outgoing characteristic for either endpoint orientation.
 
+### Changed
+
+- [PR #103](https://github.com/luca-heltai/metric-flow-x/pull/103) Express linked zero-capacitance terminal rows as conductance-weighted flow balances, with consistent residual, state-Jacobian and external-pressure contributions. The constant positive row scaling preserves the physical solutions and pressure units.
+
 ### Fixed
 
 - Fully brace wall-law quadrature and numerical-flux arrays and remove an unused test communicator so native GCC builds and regression checks pass with warnings treated as errors.
