@@ -283,7 +283,7 @@ namespace MetricFlowX
             ExcMessage(
               "Steady network initialization needs a resistance for every terminal."));
           const auto &r = rcr_map.at(bid);
-          outlets.push_back({node, r.R1 + r.R2, r.P_out});
+          outlets.push_back({node, r.R1 + r.R2, r.outlet_pressure(t)});
         }
     SteadyNetworkSolution graph;
     std::string           error;
@@ -390,8 +390,8 @@ namespace MetricFlowX
             {
               const auto  &r = rcr_map.at(bid);
               const double q =
-                (graph.pressures[node] - r.P_out) / (r.R1 + r.R2);
-              state(rcr_pc_dof.at(bid)) = r.P_out + r.R2 * q;
+                (graph.pressures[node] - r.outlet_pressure(t)) / (r.R1 + r.R2);
+              state(rcr_pc_dof.at(bid)) = r.outlet_pressure(t) + r.R2 * q;
             }
         }
     state.compress(VectorOperation::insert);

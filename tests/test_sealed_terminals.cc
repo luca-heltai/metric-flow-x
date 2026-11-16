@@ -56,12 +56,17 @@ physics(const bool capacitor = false)
 void
 test()
 {
-  const auto check = [](const bool reverse, const bool capacitor) {
+  const auto check = [](const bool reverse,
+                        const bool capacitor,
+                        const bool time_dependent) {
     ParameterAcceptor::clear();
     Flow flow(MPI_COMM_WORLD);
     flow.initialize_params("sealed_terminals.prm", "");
     mesh(flow, reverse);
-    const auto input = physics(capacitor);
+    auto input = physics(capacitor);
+    if (time_dependent)
+      input.terminals.at(2).outlet_pressure_series.read("reservoir.csv",
+                                                        "pressure_Pa");
     const auto received =
       Utilities::unpack<Flow::NetworkPhysics>(Utilities::pack(input));
     AssertThrow(received.sealed_terminals == input.sealed_terminals,
@@ -110,6 +115,34 @@ test()
               "The sealed boundary used the wrong outgoing characteristic"));
         }
 
+    // Independent SI oracle at two times. Only the reservoir datum changes;
+    // the wall reference pressure and state remain fixed.
+    for (const double t : {.17, .73})
+      {
+        residual = 0.;
+        flow.assemble_trace_boundary_equations(t, flow.y_relevant, residual);
+        flow.assemble_rcr_capacitor_equations(flow.y_relevant,
+                                              rate,
+                                              residual,
+                                              t);
+        residual.compress(VectorOperation::add);
+        const double p_out = 1200. + (time_dependent ? 100. * t : 0.);
+        const double p_wall =
+          1000. + beta / area * (std::sqrt(1.1 * area) - std::sqrt(area));
+        for (const auto &face : flow.boundary_faces)
+          if (face.cell->face(face.face_no)->boundary_id() == 2)
+            {
+              const double q = (reverse ? -1. : 1.) * 1.1 * area * .03;
+              const double expected =
+                p_wall - (capacitor ? 1.e7 * q + 1100. : 1.e8 * q + p_out);
+              AssertThrow(std::abs(residual[face.a_hat_dof] - expected) < 1.e-9,
+                          ExcMessage("Reservoir pressure trace oracle failed"));
+              if (capacitor)
+                AssertThrow(std::abs(residual[flow.rcr_pc_dof.at(2)] -
+                                     (-q + (1100. - p_out) / 9.e7)) < 1.e-16,
+                            ExcMessage("Reservoir capacitor oracle failed"));
+            }
+      }
     auto direction = flow.make_state();
     for (const auto component :
          {Flow::Component::area, Flow::Component::area_trace})
@@ -234,7 +267,8 @@ test()
   };
   for (const bool reverse : {false, true})
     for (const bool capacitor : {false, true})
-      check(reverse, capacitor);
+      for (const bool series : {false, true})
+        check(reverse, capacitor, series);
   check_inflow_and_invalid_inputs();
 }
 
@@ -245,6 +279,8 @@ main(int argc, char **argv)
   mpi_initlog();
   if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
     {
+      std::ofstream reservoir("reservoir.csv");
+      reservoir << "time_s,pressure_Pa\n0,1200\n1,1300\n";
       std::ofstream prm("sealed_terminals.prm");
       prm << "subsection Functions\n set Inflow function = 2e-9*(1+t)\nend\n"
           << "subsection Metric Flow Parameters\n"

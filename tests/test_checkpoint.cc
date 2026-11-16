@@ -8,6 +8,8 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/tria_description.h>
 
+#include <boost/archive/text_iarchive.hpp>
+
 #include <metric_flow_x/blood_flow_system.h>
 
 #include <filesystem>
@@ -60,6 +62,8 @@ make_physics(const double length = .1)
   v.p_d                = 100.;
   v.dynamic_viscosity  = .0035;
   physics.terminals[1] = {1.e7, 1.e8, 1.e-9, 100., "capacitive outlet"};
+  physics.terminals[1].outlet_pressure_series.read("reservoir.csv",
+                                                   "pressure_Pa");
   return physics;
 }
 
@@ -82,6 +86,23 @@ save_other_mesh(const std::string &path,
 void
 test()
 {
+  // Written by the installed version-zero RCRPhysics serializer (878c5fa)
+  // with text_oarchive(no_header). Omitting the archive header makes this
+  // small fixture independent of the installed Boost archive library version.
+  std::istringstream legacy(
+    "0 0 1.00000000000000000e+07 9.00000000000000000e+07 "
+    "5.00000000000000010e-09 1.20000000000000000e+03 16 legacy reservoir\n");
+  Flow::RCRPhysics old;
+  {
+    boost::archive::text_iarchive archive(legacy, boost::archive::no_header);
+    archive >> old;
+  }
+  AssertThrow(old.R1 == 1.e7 && old.R2 == 9.e7 && old.C == 5.e-9 &&
+                old.label == "legacy reservoir" &&
+                old.outlet_pressure_series.empty() &&
+                old.outlet_pressure(-17.) == 1200. &&
+                old.outlet_pressure(121.) == 1200.,
+              ExcMessage("Version-zero constant reservoir archive changed"));
   const auto comm  = MPI_COMM_WORLD;
   const auto rank  = Utilities::MPI::this_mpi_process(comm);
   const auto ranks = Utilities::MPI::n_mpi_processes(comm);
@@ -94,6 +115,8 @@ test()
       std::filesystem::remove_all("shifted-mesh-checkpoint");
       std::filesystem::remove_all("coarse-mesh-checkpoint");
       std::filesystem::create_directory("checkpoint-history");
+      std::ofstream reservoir("reservoir.csv");
+      reservoir << "time_s,pressure_Pa\n0,100\n1,200\n";
       std::ofstream csv("checkpoint-inflow.csv");
       csv << "time_s,flow_m3_s\n0,1e-8\n1,3e-8\n";
       std::ofstream prm("checkpoint-input.prm");
@@ -251,6 +274,7 @@ test()
     {
       std::filesystem::remove("checkpoint-input.prm");
       std::filesystem::remove("checkpoint-inflow.csv");
+      std::filesystem::remove("reservoir.csv");
       std::filesystem::rename("checkpoint-history", "relocated-history");
     }
   MPI_Barrier(comm);
@@ -305,6 +329,8 @@ test()
                     restored.rcr_map.at(1).label == "capacitive outlet",
                   ExcMessage(
                     "Checkpoint material or terminal metadata changed."));
+      AssertThrow(restored.rcr_map.at(1).outlet_pressure(.75) == 175.,
+                  ExcMessage("Checkpoint lost embedded reservoir samples."));
       AssertThrow(std::abs(restored.prescribed_inflow(.75) - 2.5e-8) < 1.e-22,
                   ExcMessage("Checkpoint lost embedded inflow samples."));
       restored.inflow_function.set_time(.75);

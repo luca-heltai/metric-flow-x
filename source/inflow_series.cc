@@ -12,6 +12,16 @@ namespace MetricFlowX
   void
   InflowSeries::read(const std::string &filename, const double period)
   {
+    read(filename, "flow_m3_s", period);
+  }
+
+  void
+  InflowSeries::read(const std::string &filename,
+                     const std::string &value_column,
+                     const double       period)
+  {
+    if (value_column.empty() || value_column == "time_s")
+      throw std::invalid_argument("CSV value column must differ from time_s");
     samples.clear();
     periodicity = period;
     if (!std::isfinite(period) || period < 0.)
@@ -30,9 +40,9 @@ namespace MetricFlowX
       if (name.empty() || !names.insert(name).second)
         throw std::invalid_argument(
           "Inflow CSV column names must be nonempty and unique");
-    if (csv.GetColumnIdx("time_s") < 0 || csv.GetColumnIdx("flow_m3_s") < 0)
-      throw std::invalid_argument(
-        "Inflow CSV requires time_s and flow_m3_s columns");
+    if (csv.GetColumnIdx("time_s") < 0 || csv.GetColumnIdx(value_column) < 0)
+      throw std::invalid_argument("CSV requires time_s and " + value_column +
+                                  " columns");
 
     const auto parse_value = [](const std::string &text, double &value) {
       std::istringstream field(text);
@@ -49,7 +59,7 @@ namespace MetricFlowX
           throw std::invalid_argument("Malformed inflow CSV row " +
                                       std::to_string(row + 2));
         const double time = csv.GetCell<double>("time_s", row, parse_value);
-        const double flow = csv.GetCell<double>("flow_m3_s", row, parse_value);
+        const double flow = csv.GetCell<double>(value_column, row, parse_value);
         if (!samples.empty() && time <= samples.back().first)
           throw std::invalid_argument(
             "Inflow CSV times must be strictly increasing");

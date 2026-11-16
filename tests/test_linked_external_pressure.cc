@@ -90,6 +90,8 @@ test()
                                          "root"};
           input.terminals[leaves[id]] = {
             0., 1.e6, capacitor && id == 0 ? 1.e-9 : 0., -500., "connected"};
+          input.terminals[leaves[id]].outlet_pressure_series.read(
+            "ignored-reservoir.csv", "pressure_Pa");
           for (unsigned int other = 0; other < id; ++other)
             input.terminal_connections.push_back(
               {leaves[id],
@@ -272,6 +274,8 @@ test()
             0., 1.e7, 0., reference[id], "root"};
           input.terminals[leaves[id]] = {
             0., 1.e6, capacitor && id == 0 ? 1.e-9 : 0., 0., "bed"};
+          input.terminals[leaves[id]].outlet_pressure_series.read(
+            "ignored-reservoir.csv", "pressure_Pa");
           for (unsigned int other = 0; other < id; ++other)
             input.terminal_connections.push_back(
               {leaves[id],
@@ -481,6 +485,10 @@ main(int argc, char **argv)
   initlog();
   if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
     {
+      // Linked leaves use resolved network pressure, never this reservoir.
+      // Its deliberately short support exposes accidental evaluation.
+      std::ofstream csv("ignored-reservoir.csv");
+      csv << "time_s,pressure_Pa\n0,-500\n0.1,-400\n";
       std::ofstream prm("linked_external_pressure.prm");
       prm
         << "subsection Metric Flow Parameters\n set Density (rho) = 1060\n set Viscosity coefficient (mu) = 0\n set Profile constant for friction term (xi) = 0\nend\n"

@@ -13,12 +13,20 @@
 
 namespace MetricFlowX
 {
-  /** SI inflow data. Linear interpolation, with no implicit extrapolation. */
+  /** Sampled SI data. Linear interpolation, with no implicit extrapolation. */
   class InflowSeries
   {
   public:
     void
     read(const std::string &filename, const double period = 0.);
+
+    /** Read time_s and a named SI value column using the same CSV validation.
+     * The two-argument overload continues to select flow_m3_s.
+     */
+    void
+    read(const std::string &filename,
+         const std::string &value_column,
+         const double       period = 0.);
 
     bool
     empty() const
