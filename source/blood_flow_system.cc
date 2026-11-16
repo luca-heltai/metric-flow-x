@@ -24,6 +24,8 @@
 
 #include <deal.II/distributed/tria_base.h>
 
+#include <deal.II/fe/fe_q.h>
+
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_description.h>
@@ -868,11 +870,20 @@ namespace MetricFlowX
     for (unsigned int node = 0; node < degree.size(); ++node)
       valid = valid && degree[node] > 0 &&
               (degree[node] != 1 || graph.boundaries.count(node));
-    // Native ids follow vertex incidence and CellId communication, not point
-    // coordinates. Check a bijection so coincident disconnected junctions
-    // cannot be merged, or a true shared junction split into fake inlets.
-    const auto native_vertices =
-      GridTools::compute_local_to_global_vertex_index_map(triangulation_);
+    // Continuous Q1 vertex DoFs provide global native identities on this same
+    // mesh, including distributed junctions. No coordinates are deduplicated
+    // and no flow DoFs or execution grid are modified; no algebraic vector or
+    // matrix is built. Only temporary vertex-identity metadata is retained.
+    // Unlike GridTools' active-vertex map, native DoF communication does not
+    // interpret a peer index as a local vertex number on 1D junctions.
+    DoFHandler<dim, spacedim> vertex_dofs(triangulation_);
+    vertex_dofs.distribute_dofs(FE_Q<dim, spacedim>(1));
+    std::map<unsigned int, types::global_vertex_index> native_vertices;
+    for (const auto &cell : vertex_dofs.active_cell_iterators())
+      if (cell->is_locally_owned())
+        for (const auto vertex : cell->vertex_indices())
+          native_vertices.emplace(cell->vertex_index(vertex),
+                                  cell->vertex_dof_index(vertex, 0));
     std::vector<std::pair<types::global_vertex_index, unsigned int>> vertex_ids;
     std::set<types::coarse_cell_id>                                  owned_ids;
     for (const auto &cell : triangulation_.active_cell_iterators())
