@@ -619,11 +619,30 @@ namespace MetricFlowX
   void
   BloodFlowSystem<dim, spacedim>::setup(const NetworkPhysics &physics)
   {
+    setup_network_physics(physics, nullptr);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::setup(const NetworkPhysics &physics,
+                                        const InitialGraph   &initial_graph)
+  {
+    setup_network_physics(physics, &initial_graph);
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::setup_network_physics(
+    const NetworkPhysics &physics,
+    const InitialGraph   *initial_graph)
+  {
     validate_minimum_positive_area();
-    bool valid = triangulation_.n_global_active_cells() > 0 &&
-                 dof_handler_.n_dofs() == 0 && !physics.vessels.empty() &&
-                 physics.vessels.size() < std::numeric_limits<int>::max() &&
-                 initial_state_source == "rest";
+    bool valid =
+      triangulation_.n_global_active_cells() > 0 &&
+      dof_handler_.n_dofs() == 0 && !physics.vessels.empty() &&
+      physics.vessels.size() < std::numeric_limits<int>::max() &&
+      (initial_state_source == "rest" ||
+       (initial_graph != nullptr && requests_steady_network_initialization()));
     unsigned int expected = 0;
     for (const auto &[id, v] : physics.vessels)
       {
@@ -705,7 +724,8 @@ namespace MetricFlowX
       Utilities::MPI::min(valid ? 1u : 0u, mpi_communicator_) == 1,
       ExcMessage(
         "In-memory setup requires a prepared mesh, undistributed DoFs, "
-        "compact vessel ids, valid physics and the native rest seed."));
+        "compact vessel ids, valid physics and either the native rest seed "
+        "or an explicit initialization graph for steady network."));
     auto       coefficients = Utilities::pack(physics);
     const auto controls =
       Utilities::pack(std::vector<std::string>{wall_model, outlet_type});
@@ -770,6 +790,15 @@ namespace MetricFlowX
                     [](const auto &entry) { return entry.second.second == 1; }),
       ExcMessage("Each terminal must identify exactly one mesh endpoint."));
 
+    if (initial_graph != nullptr)
+      set_initial_graph(physics, *initial_graph);
+    else
+      {
+        initial_graph_points_.clear();
+        initial_graph_cells_.clear();
+        initial_graph_boundaries_.clear();
+      }
+
     vessel_map.clear();
     for (const auto &[id, v] : physics.vessels)
       {
@@ -796,6 +825,106 @@ namespace MetricFlowX
     setup_system();
     initialize_terminal_capacitors();
     build_per_cell_mass_inv();
+  }
+
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::set_initial_graph(
+    const NetworkPhysics &physics,
+    const InitialGraph   &graph)
+  {
+    bool valid = !graph.cells.empty() && !graph.points.empty() &&
+                 graph.points.size() < std::numeric_limits<unsigned int>::max();
+    std::vector<unsigned int> degree(graph.points.size(), 0);
+    for (const auto &point : graph.points)
+      for (unsigned int d = 0; d < spacedim; ++d)
+        valid = valid && std::isfinite(point[d]);
+    for (const auto &[id, edge] : graph.cells)
+      {
+        const bool indices = edge.node0 < graph.points.size() &&
+                             edge.node1 < graph.points.size() &&
+                             edge.node0 != edge.node1;
+        valid = valid && id != numbers::invalid_coarse_cell_id && indices &&
+                physics.vessels.count(edge.vessel_id);
+        if (indices)
+          {
+            ++degree[edge.node0];
+            ++degree[edge.node1];
+            valid = valid && graph.points[edge.node0].distance(
+                               graph.points[edge.node1]) > 0.;
+          }
+      }
+    std::set<types::boundary_id> terminal_ids;
+    for (const auto &[node, bid] : graph.boundaries)
+      {
+        valid = valid && node < degree.size() && bid != 255 &&
+                (bid == 0 || physics.terminals.count(bid) ||
+                 physics.sealed_terminals.count(bid));
+        if (node < degree.size())
+          valid = valid && degree[node] == 1;
+        if (bid != 0)
+          valid = valid && terminal_ids.insert(bid).second;
+      }
+    for (unsigned int node = 0; node < degree.size(); ++node)
+      valid = valid && degree[node] > 0 &&
+              (degree[node] != 1 || graph.boundaries.count(node));
+    std::set<types::coarse_cell_id> owned_ids;
+    for (const auto &cell : triangulation_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          const auto id = cell->id().get_coarse_cell_id();
+          owned_ids.insert(id);
+          const auto found = graph.cells.find(id);
+          valid            = valid && found != graph.cells.end();
+          if (found != graph.cells.end())
+            {
+              const auto &edge = found->second;
+              valid            = valid && edge.vessel_id == cell->material_id();
+              if (edge.node0 < graph.points.size() &&
+                  edge.node1 < graph.points.size())
+                {
+                  typename Triangulation<dim, spacedim>::cell_iterator coarse(
+                    cell);
+                  while (coarse->level() > 0)
+                    coarse = coarse->parent();
+                  valid = valid &&
+                          coarse->vertex(0) == graph.points[edge.node0] &&
+                          coarse->vertex(1) == graph.points[edge.node1];
+                  for (const auto face : cell->face_indices())
+                    if (cell->face(face)->at_boundary() &&
+                        cell->face(face)->boundary_id() != 255)
+                      {
+                        const auto node = face == 0 ? edge.node0 : edge.node1;
+                        const auto boundary = graph.boundaries.find(node);
+                        valid = valid && boundary != graph.boundaries.end();
+                        if (boundary != graph.boundaries.end())
+                          valid = valid && boundary->second ==
+                                             cell->face(face)->boundary_id();
+                      }
+                }
+            }
+        }
+    std::set<types::coarse_cell_id> all_ids;
+    for (const auto &ids :
+         Utilities::MPI::all_gather(mpi_communicator_, owned_ids))
+      all_ids.insert(ids.begin(), ids.end());
+    valid = valid && all_ids.size() == graph.cells.size() &&
+            terminal_ids.size() ==
+              physics.terminals.size() + physics.sealed_terminals.size();
+    AssertThrow(
+      Utilities::MPI::min(valid ? 1u : 0u, mpi_communicator_) == 1,
+      ExcMessage(
+        "Initialization graph does not match the prepared mesh cell/material/endpoint identities."));
+    const auto packed = Utilities::pack(graph);
+    const auto reference =
+      Utilities::MPI::broadcast(mpi_communicator_, packed, 0);
+    AssertThrow(Utilities::MPI::min(packed == reference ? 1u : 0u,
+                                    mpi_communicator_) == 1,
+                ExcMessage(
+                  "Initialization graph must be identical on every rank."));
+    initial_graph_points_     = graph.points;
+    initial_graph_cells_      = graph.cells;
+    initial_graph_boundaries_ = graph.boundaries;
   }
 
   template <int dim, int spacedim>

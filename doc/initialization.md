@@ -44,6 +44,43 @@ avoids the vector-setup path; verified native initialization avoids `CalcIC`.
 Do not infer empty-rank support for the retained built-in/IDA-correction paths
 from the native-pair and custom-weight MPI tests.
 
+## A prepared in-memory mesh
+
+`setup(physics)` retains the native rest seed. A caller that already owns the
+mesh can select `Initial state source = steady network` and provide an
+initialization graph without creating another triangulation:
+
+```cpp
+if (flow.requests_steady_network_initialization())
+  flow.setup(physics, initial_graph);
+else
+  flow.setup(physics);
+```
+
+`BloodFlowSystem::InitialGraph` contains endpoint `points`, `cells` keyed by the
+existing coarse `CellId`, and degree-one endpoint `boundaries`. Each cell stores
+`node0`, `node1` and its compact native `vessel_id`/material id. Node indices are
+identities: coincident disconnected endpoints must remain distinct. Preserve the
+mesh's endpoint orientation, including reversed vessels, and use the same graph
+and coefficients on all ranks. Capture these small metadata tables while
+constructing the existing mesh; do not reconstruct connectivity by deduplicating
+coordinates after partitioning. The policy query permits this work to be skipped
+for the default rest seed.
+
+The native initializer uses the same inlet flow and reservoir `P_out(t0)`,
+including embedded pressure samples, as the transient problem. Resolved terminal
+links take precedence over unused reservoir data. Sealed endpoints contribute
+zero injection and no reservoir; a connected component without a real pressure
+reference is rejected. The graph solve, native tube-law inverse and trace
+correction provide an initial guess, not solid equilibrium or a converged
+coupled solution. Existing admissibility and residual checks still apply.
+
+Initialization metadata is not required when loading an accepted checkpoint:
+`load_checkpoint()` restores the native mesh, fields, rates and future forcing
+samples directly, even if its saved policy is `steady network`. It does not
+call `initialize_state()`. Fresh graph initialization still requires a supplied
+graph; requesting it on a restored object without that metadata is an error.
+
 ## The static 0D seed
 
 Before mesh refinement, retain the original graph's vertex and coarse-cell
