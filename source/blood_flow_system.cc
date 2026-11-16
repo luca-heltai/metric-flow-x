@@ -6353,7 +6353,7 @@ namespace MetricFlowX
             jacobian_matrix.add(a_row,
                                 a_row,
                                 dPdA_hat - resistance * sign * U_hat_cur);
-            jacobian_matrix.add(a_row, u_row, -resistance * sign * A_hat);
+            jacobian_matrix.add(a_row, u_row, -resistance * sign * A_hat_cur);
             jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
             jacobian_matrix.add(u_row, u_row, 1.);
             for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
