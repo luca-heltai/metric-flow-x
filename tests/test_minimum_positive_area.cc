@@ -235,6 +235,153 @@ evaluate(const double       area,
   return result;
 }
 
+// Hold areas fixed on either side of the numerical floor. This checks only
+// velocity columns, not derivatives with respect to a clamped area.
+void
+rcr_velocity_columns(const double area, const bool capacitive)
+{
+  parameters("minimum_area_velocity.prm", "1e-10");
+  ParameterAcceptor::clear();
+  Flow flow(MPI_COMM_WORLD);
+  flow.initialize_params("minimum_area_velocity.prm", "");
+  make_mesh(flow);
+  auto input = physics(area);
+  for (auto &[id, rcr] : input.terminals)
+    {
+      (void)id;
+      const double total = rcr.R2;
+      rcr.R1             = .3 * total;
+      rcr.R2             = .7 * total;
+      rcr.C              = capacitive ? 1e-9 : 0.;
+    }
+  flow.setup(input);
+  auto y = flow.make_state(), rate = flow.make_state();
+  rate = y = 0.;
+  for (const auto component : {Flow::Component::area,
+                               Flow::Component::area_trace,
+                               Flow::Component::velocity,
+                               Flow::Component::velocity_trace})
+    for (const auto i : flow.component_dofs(component))
+      if (flow.locally_owned_dofs().is_element(i))
+        y[i] = component == Flow::Component::area ||
+                   component == Flow::Component::area_trace ?
+                 area :
+                 velocity;
+  y.compress(VectorOperation::insert);
+  AssertThrow(flow.has_admissible_wall_states(y),
+              ExcMessage(
+                "Positive below-floor RCR states must remain admissible"));
+  flow.assemble_state_jacobian(.37, y, rate);
+  for (const types::boundary_id bid : {1u, 2u})
+    {
+      types::global_dof_index arow  = numbers::invalid_dof_index,
+                              ucol  = numbers::invalid_dof_index,
+                              pcrow = numbers::invalid_dof_index;
+      unsigned int count            = 0;
+      for (const auto &cell : flow.dof_handler().active_cell_iterators())
+        if (cell->is_locally_owned())
+          for (const auto f : cell->face_indices())
+            if (cell->face(f)->at_boundary() &&
+                cell->face(f)->boundary_id() == bid)
+              {
+                ++count;
+                std::vector<types::global_dof_index> indices(
+                  cell->get_fe().n_dofs_per_cell());
+                cell->get_dof_indices(indices);
+                for (unsigned int j = 0; j < indices.size(); ++j)
+                  {
+                    const auto c =
+                      cell->get_fe().system_to_component_index(j).first;
+                    if (c == 4)
+                      pcrow = indices[j];
+                    else if ((c == 2 || c == 3) &&
+                             cell->get_fe().shape_value(j, Point<1>(f)) > .5)
+                      (c == 2 ? arow : ucol) = indices[j];
+                  }
+              }
+      count = Utilities::MPI::sum(count, MPI_COMM_WORLD);
+      arow  = Utilities::MPI::min(arow, MPI_COMM_WORLD);
+      ucol  = Utilities::MPI::min(ucol, MPI_COMM_WORLD);
+      pcrow = Utilities::MPI::min(pcrow, MPI_COMM_WORLD);
+      AssertThrow(count == 1 && arow != numbers::invalid_dof_index &&
+                    ucol != numbers::invalid_dof_index &&
+                    (!capacitive || pcrow != numbers::invalid_dof_index),
+                  ExcInternalError());
+      auto direction = flow.make_state(), product = flow.make_state();
+      direction = 0.;
+      if (flow.locally_owned_dofs().is_element(ucol))
+        direction[ucol] = 1.;
+      direction.compress(VectorOperation::insert);
+      flow.state_jacobian_matrix().vmult(product, direction);
+      const auto entry = [&](const VectorType             &v,
+                             const types::global_dof_index row) {
+        return Utilities::MPI::sum(flow.locally_owned_dofs().is_element(row) ?
+                                     static_cast<double>(v[row]) :
+                                     0.,
+                                   MPI_COMM_WORLD);
+      };
+      const double sign       = bid == 1 ? -1. : 1.;
+      const auto  &rcr        = input.terminals.at(bid);
+      const double resistance = capacitive ? rcr.R1 : rcr.R1 + rcr.R2;
+      // Full F=M*ydot-R: the pressure row has +R_eff*sign*A_raw*dU.
+      const double exact = resistance * sign * area;
+      AssertThrow(std::isfinite(entry(product, arow)) &&
+                    std::abs(entry(product, arow) - exact) <
+                      1e-12 * std::abs(exact),
+                  ExcMessage("RCR velocity column must use raw trace area"));
+      if (capacitive)
+        AssertThrow(
+          std::abs(entry(product, pcrow) + sign * area) < 1e-12 * area,
+          ExcMessage("Capacitor velocity column must use raw trace area"));
+      for (const double h : {1e-3, 1e-4, 1e-5})
+        {
+          auto plus = y, minus = y;
+          if (flow.locally_owned_dofs().is_element(ucol))
+            {
+              plus[ucol]  = y[ucol] + h;
+              minus[ucol] = y[ucol] - h;
+            }
+          plus.compress(VectorOperation::insert);
+          minus.compress(VectorOperation::insert);
+          auto fp = flow.make_state(), fm = flow.make_state();
+          flow.assemble_residual(.37, plus, rate, fp);
+          flow.assemble_residual(.37, minus, rate, fm);
+          fp -= fm;
+          fp *= .5 / h;
+          AssertThrow(
+            std::abs(entry(fp, arow) - exact) < 2e-6 * std::abs(exact),
+            ExcMessage(
+              "RCR pressure-row finite difference disagrees with raw flow"));
+          if (capacitive)
+            AssertThrow(
+              std::abs(entry(fp, pcrow) + sign * area) < 2e-6 * area,
+              ExcMessage(
+                "Capacitor-row finite difference disagrees with raw flow"));
+          for (const auto component : {Flow::Component::area,
+                                       Flow::Component::velocity,
+                                       Flow::Component::area_trace,
+                                       Flow::Component::velocity_trace,
+                                       Flow::Component::capacitor_pressure})
+            {
+              double error = 0., scale = 0.;
+              for (const auto i : flow.component_dofs(component))
+                if (flow.locally_owned_dofs().is_element(i))
+                  {
+                    const double difference = fp[i] - product[i];
+                    error += difference * difference;
+                    scale += product[i] * product[i];
+                  }
+              error = std::sqrt(Utilities::MPI::sum(error, MPI_COMM_WORLD));
+              scale = std::sqrt(Utilities::MPI::sum(scale, MPI_COMM_WORLD));
+              AssertThrow(std::isfinite(error) && std::isfinite(scale) &&
+                            error <= 2e-6 * std::max(scale, 1e-300),
+                          ExcMessage(
+                            "Full residual velocity-column FD failed"));
+            }
+        }
+    }
+}
+
 void
 identical(const Evaluation &a, const Evaluation &b)
 {
@@ -302,6 +449,9 @@ main(int argc, char **argv)
       identical(evaluate(1.e-4, "", flux, true, check_derivative),
                 evaluate(1.e-4, "1e-10", flux, true, false));
     }
+  for (const double area : {4.e-11, 1.e-4})
+    for (const bool capacitive : {false, true})
+      rcr_velocity_columns(area, capacitive);
   for (const bool in_memory : {false, true})
     {
       for (const std::string value : {"0", "nan", "inf", "-inf"})
