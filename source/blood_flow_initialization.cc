@@ -276,7 +276,7 @@ namespace MetricFlowX
     for (const auto &[node, bid] : initial_graph_boundaries_)
       if (bid == 0)
         injections[node] += inflow;
-      else if (!terminal_links.count(bid))
+      else if (!terminal_links.count(bid) && !sealed_terminal_ids.count(bid))
         {
           AssertThrow(
             rcr_map.count(bid),

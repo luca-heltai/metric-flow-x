@@ -457,6 +457,39 @@ namespace MetricFlowX
       }
     };
 
+    /** Coarse edge of an already prepared mesh. Node numbers are identities,
+     * not coordinates: coincident disconnected endpoints keep distinct ids. */
+    struct InitialGraphCell
+    {
+      unsigned int node0, node1, vessel_id;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &node0 &node1 &vessel_id;
+      }
+    };
+
+    /** Replicated initialization metadata for the existing triangulation.
+     * Cell keys are its exact coarse CellIds and vessel ids are its compact
+     * material ids. Points are endpoint metadata, not a second mesh.
+     * Boundaries identify every degree-one endpoint, including explicit seals;
+     * internal/junction nodes have no boundary record. */
+    struct InitialGraph
+    {
+      std::vector<Point<spacedim>>                      points;
+      std::map<types::coarse_cell_id, InitialGraphCell> cells;
+      std::map<unsigned int, types::boundary_id>        boundaries;
+
+      template <class Archive>
+      void
+      serialize(Archive &archive, const unsigned int)
+      {
+        archive &points &cells &boundaries;
+      }
+    };
+
     /** Collectively publish a self-contained checkpoint by atomic directory
      * rename. The destination and its .incomplete staging directory must not
      * exist. Uses native deal.II mesh serialization and Boost archives.
@@ -596,11 +629,28 @@ namespace MetricFlowX
      * Called collectively with identical coefficient tables on every rank.
      * The caller owns refinement, partitioning and material/boundary ids.
      * No input file or serial copy of the mesh is required. This path uses
-     * the native rest seed and consistency preparation; the optional static
-     * coarse-graph warm start requires the file-based input path.
+     * the native rest seed and consistency preparation. Use the graph overload
+     * for a requested steady-network initial guess.
      */
     void
     setup(const NetworkPhysics &physics);
+
+    /** Set up the same prepared mesh with explicit coarse-graph metadata.
+     * Collectively requires identical physics and graph on all ranks. Allows
+     * Initial state source = steady network and reuses the native hydraulic
+     * seed, tube-law inverse and trace correction. This is an initial guess,
+     * not a coupled equilibrium or a replacement nonlinear solver.
+     * Restored checkpoints do not require this initialization-only metadata. */
+    void
+    setup(const NetworkPhysics &physics, const InitialGraph &initial_graph);
+
+    /** Query the parsed initial-state policy before optional graph capture. */
+    bool
+    requests_steady_network_initialization() const
+    {
+      return initial_state_source == "steady network";
+    }
+
 
     VectorType
     make_state() const;
@@ -2388,15 +2438,16 @@ namespace MetricFlowX
     std::vector<BoundaryFace> boundary_faces;
 
 
-    struct InitialGraphCell
-    {
-      unsigned int node0, node1, vessel_id;
-    };
     std::vector<Point<spacedim>>                      initial_graph_points_;
     std::map<types::coarse_cell_id, InitialGraphCell> initial_graph_cells_;
     std::map<unsigned int, types::boundary_id>        initial_graph_boundaries_;
     InitialStateDiagnostics initial_state_diagnostics_;
     VectorType              initial_trace_weights_;
+
+    void
+    setup_network_physics(const NetworkPhysics &, const InitialGraph *);
+    void
+    set_initial_graph(const NetworkPhysics &, const InitialGraph &);
 
     void
     compute_steady_network_initial_solution(VectorType &, const double);
