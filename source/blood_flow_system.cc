@@ -868,7 +868,13 @@ namespace MetricFlowX
     for (unsigned int node = 0; node < degree.size(); ++node)
       valid = valid && degree[node] > 0 &&
               (degree[node] != 1 || graph.boundaries.count(node));
-    std::set<types::coarse_cell_id> owned_ids;
+    // Native ids follow vertex incidence and CellId communication, not point
+    // coordinates. Check a bijection so coincident disconnected junctions
+    // cannot be merged, or a true shared junction split into fake inlets.
+    const auto native_vertices =
+      GridTools::compute_local_to_global_vertex_index_map(triangulation_);
+    std::vector<std::pair<types::global_vertex_index, unsigned int>> vertex_ids;
+    std::set<types::coarse_cell_id>                                  owned_ids;
     for (const auto &cell : triangulation_.active_cell_iterators())
       if (cell->is_locally_owned())
         {
@@ -890,6 +896,13 @@ namespace MetricFlowX
                   valid = valid &&
                           coarse->vertex(0) == graph.points[edge.node0] &&
                           coarse->vertex(1) == graph.points[edge.node1];
+                  for (const auto coarse_face : coarse->face_indices())
+                    for (const auto face : cell->face_indices())
+                      if (cell->vertex_index(face) ==
+                          coarse->vertex_index(coarse_face))
+                        vertex_ids.emplace_back(
+                          native_vertices.at(cell->vertex_index(face)),
+                          coarse_face == 0 ? edge.node0 : edge.node1);
                   for (const auto face : cell->face_indices())
                     if (cell->face(face)->at_boundary() &&
                         cell->face(face)->boundary_id() != 255)
@@ -908,6 +921,18 @@ namespace MetricFlowX
     for (const auto &ids :
          Utilities::MPI::all_gather(mpi_communicator_, owned_ids))
       all_ids.insert(ids.begin(), ids.end());
+    std::map<types::global_vertex_index, unsigned int> native_to_graph;
+    std::map<unsigned int, types::global_vertex_index> graph_to_native;
+    for (const auto &ids :
+         Utilities::MPI::all_gather(mpi_communicator_, vertex_ids))
+      for (const auto &[native, node] : ids)
+        {
+          const auto [n, n_added] = native_to_graph.emplace(native, node);
+          const auto [g, g_added] = graph_to_native.emplace(node, native);
+          valid                   = valid && (n_added || n->second == node) &&
+                  (g_added || g->second == native);
+        }
+    valid = valid && graph_to_native.size() == graph.points.size();
     valid = valid && all_ids.size() == graph.cells.size() &&
             terminal_ids.size() ==
               physics.terminals.size() + physics.sealed_terminals.size();

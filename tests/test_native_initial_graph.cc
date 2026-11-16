@@ -43,8 +43,9 @@ mesh(Flow &flow, const Flow::InitialGraph &g, unsigned int refinements = 0)
         const auto key =
           face == 0 ? node : g.cells.at(cell->id().get_coarse_cell_id()).node1;
         const auto boundary = g.boundaries.find(key);
-        cell->face(face)->set_boundary_id(
-          boundary == g.boundaries.end() ? 255 : boundary->second);
+        if (cell->face(face)->at_boundary())
+          cell->face(face)->set_boundary_id(
+            boundary == g.boundaries.end() ? 255 : boundary->second);
       }
   prepared.refine_global(refinements);
   GridTools::partition_triangulation_zorder(
@@ -154,6 +155,65 @@ test()
             }
         }
     }
+  // Coordinates alone cannot establish incidence. Reject a split real
+  // junction (fake extra inlet0s) and a merge of coincident disconnected ones.
+  for (const bool coincident : {false, true})
+    for (const bool corrupt : {false, true})
+      {
+        ParameterAcceptor::clear();
+        Flow flow(comm);
+        flow.initialize_params("native-graph.prm", "");
+        Flow::InitialGraph good, bad;
+        good.points     = {{0., 0., 0.}, {.1, 0., 0.}, {.2, 0., 0.}};
+        good.cells      = {{0, {0, 1, 0}}, {1, {1, 2, 1}}};
+        good.boundaries = {{0, 0}, {2, 1}};
+        auto input      = physics();
+        input.sealed_terminals.clear();
+        input.terminals.clear();
+        input.terminals[1] = {0., 1e8, 0., 1000., "reservoir"};
+        if (coincident)
+          {
+            good.points.insert(good.points.end(),
+                               {Point<3>(0., 0., 0.),
+                                Point<3>(.1, 0., 0.),
+                                Point<3>(.2, 0., 0.)});
+            good.cells.emplace(2, Flow::InitialGraphCell{3, 4, 0});
+            good.cells.emplace(3, Flow::InitialGraphCell{4, 5, 1});
+            good.boundaries.emplace(3, 2);
+            good.boundaries.emplace(5, 3);
+            input.terminals[2] = {0., 1e8, 0., 1000., "second-root"};
+            input.terminals[3] = {0., 1e8, 0., 1000., "second-outlet"};
+            bad.points         = {{0., 0., 0.},
+                                  {.1, 0., 0.},
+                                  {.2, 0., 0.},
+                                  {0., 0., 0.},
+                                  {.2, 0., 0.}};
+            bad.cells          = {{0, {0, 1, 0}},
+                                  {1, {1, 2, 1}},
+                                  {2, {3, 1, 0}},
+                                  {3, {1, 4, 1}}};
+            bad.boundaries     = {{0, 0}, {2, 1}, {3, 2}, {4, 3}};
+          }
+        else
+          {
+            bad.points     = {{0., 0., 0.},
+                              {.1, 0., 0.},
+                              {.1, 0., 0.},
+                              {.2, 0., 0.}};
+            bad.cells      = {{0, {0, 1, 0}}, {1, {2, 3, 1}}};
+            bad.boundaries = {{0, 0}, {1, 0}, {2, 0}, {3, 1}};
+          }
+        mesh(flow, good, 1);
+        if (corrupt)
+          rejected([&] { flow.setup(input, bad); });
+        else
+          {
+            flow.setup(input, good);
+            auto y = flow.make_state();
+            flow.compute_steady_network_initial_solution(y, .25);
+            AssertThrow(std::isfinite(y.l2_norm()), ExcInternalError());
+          }
+      }
   // Malformed or inconsistent metadata must fail before native DoF setup.
   for (unsigned int kind = 0; kind < 5; ++kind)
     {
