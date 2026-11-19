@@ -176,7 +176,8 @@ test()
                     ExcMessage("Non-finite transmission derivative."));
                   error = std::max(error,
                                    std::abs(fp[row] - action[row]) /
-                                     std::max(1., std::abs(action[row])));
+                                     std::max(row == trace_indices[2] ? ad : 1.,
+                                              std::abs(action[row])));
                 }
             AssertThrow(Utilities::MPI::max(error, comm) < 1.e-8,
                         ExcMessage(

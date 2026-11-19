@@ -458,8 +458,11 @@ namespace MetricFlowX
         assemble_jacobian_trace_interior_block(y_relevant);
         assemble_jacobian_trace_boundary_block(t, y_relevant);
         assemble_jacobian_trace_junction_block(y_relevant);
-        assemble_jacobian_trace_continuity_block();
+        if (interior_transmission == InteriorTransmission::flux)
+          assemble_jacobian_trace_continuity_block();
         jacobian_matrix.compress(VectorOperation::add);
+        if (interior_transmission == InteriorTransmission::state)
+          assemble_jacobian_trace_continuity_block();
         std::vector<TraceRow> local;
         for (const auto i : trace_dofs_owned)
           {
