@@ -2859,6 +2859,30 @@ namespace MetricFlowX
                                 locally_owned_dofs_,
                                 dsp,
                                 mpi_communicator_);
+
+    // Keep only the ordinary interior trace pattern, rather than another copy
+    // of the full Jacobian pattern. Build independently of the selected mode so
+    // switching flux -> state can reuse the same mesh/ownership snapshot.
+    DynamicSparsityPattern trace_dsp(n_total_dofs,
+                                     n_total_dofs,
+                                     locally_relevant_dofs_);
+    build_trace_continuity_sparsity(trace_dsp);
+    SparsityTools::distribute_sparsity_pattern(trace_dsp,
+                                               locally_owned_dofs_,
+                                               mpi_communicator_,
+                                               locally_relevant_dofs_);
+    state_trace_continuity_matrix_.reinit(locally_owned_dofs_,
+                                          locally_owned_dofs_,
+                                          trace_dsp,
+                                          mpi_communicator_);
+    for (const auto &p : trace_continuity_pairs)
+      {
+        state_trace_continuity_matrix_.add(p.a_dup, p.a_dup, 1.);
+        state_trace_continuity_matrix_.add(p.a_dup, p.a_canon, -1.);
+        state_trace_continuity_matrix_.add(p.u_dup, p.u_dup, 1.);
+        state_trace_continuity_matrix_.add(p.u_dup, p.u_canon, -1.);
+      }
+    state_trace_continuity_matrix_.compress(VectorOperation::add);
   }
 
   // ============================================================================
@@ -4902,16 +4926,14 @@ namespace MetricFlowX
   {
     TimerOutput::Scope timer(computing_timer,
                              "assemble_jacobian_trace_continuity_block");
+    if (interior_transmission == InteriorTransmission::state)
+      {
+        jacobian_matrix.add(1., state_trace_continuity_matrix_);
+        return;
+      }
     for (const auto &p : trace_continuity_pairs)
       {
-        if (interior_transmission == InteriorTransmission::state)
-          {
-            jacobian_matrix.add(p.a_dup, p.a_dup, 1.0);
-            jacobian_matrix.add(p.a_dup, p.a_canon, -1.0);
-            jacobian_matrix.add(p.u_dup, p.u_dup, 1.0);
-            jacobian_matrix.add(p.u_dup, p.u_canon, -1.0);
-          }
-        else if (interior_transmission == InteriorTransmission::flux)
+        if (interior_transmission == InteriorTransmission::flux)
           {
             const double ad_c =
               compute_a_d_at_face(p.canonical_cell, p.canonical_face_no);
@@ -5622,9 +5644,12 @@ namespace MetricFlowX
     assemble_jacobian_trace_interior_block(y_relevant);
     assemble_jacobian_trace_boundary_block(t, y_relevant);
     assemble_jacobian_trace_junction_block(y_relevant);
-    assemble_jacobian_trace_continuity_block();
+    if (interior_transmission == InteriorTransmission::flux)
+      assemble_jacobian_trace_continuity_block();
     assemble_jacobian_rcr_capacitor_block(y_relevant);
     jacobian_matrix.compress(VectorOperation::add);
+    if (interior_transmission == InteriorTransmission::state)
+      assemble_jacobian_trace_continuity_block();
     jacobian_matrix *= -1.0;
     jacobian_matrix.compress(VectorOperation::insert);
     if (viscoelastic_wall)

@@ -1535,6 +1535,8 @@ namespace MetricFlowX
     // -----------------------------------------------------------------------
     MatrixType jacobian_matrix;
     MatrixType state_jacobian_matrix_;
+    // Fixed state-mode trace constraints on the current mesh/DoF ownership.
+    MatrixType state_trace_continuity_matrix_;
     MatrixType derivative_jacobian_matrix_;
     bool       derivative_jacobian_is_current_ = false;
     MatrixType linear_system_matrix;

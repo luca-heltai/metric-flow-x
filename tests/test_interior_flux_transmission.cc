@@ -136,6 +136,55 @@ test()
   AssertThrow(trace_indices[0] != numbers::invalid_dof_index,
               ExcMessage("The fixture must have one ordinary interior face."));
 
+  // Repeated state/flux/state updates must neither accumulate the fixed tie
+  // nor retain a state-dependent flux block. Check the actual duplicate rows
+  // against an independent central difference after each mode switch.
+  for (unsigned int repeat = 0; repeat < 2; ++repeat)
+    for (const auto mode : {Flow::InteriorTransmission::state,
+                            Flow::InteriorTransmission::flux,
+                            Flow::InteriorTransmission::state})
+      {
+        flow.set_interior_transmission(mode);
+        auto y =
+          state({{al * (1. + .01 * repeat), ar}}, {{ul + .07 * repeat, ur}});
+        flow.assemble_state_jacobian(.375, y, rate);
+        for (const auto column : trace_indices)
+          {
+            auto direction = flow.make_state();
+            if (flow.locally_owned_dofs().is_element(column))
+              direction[column] =
+                column == trace_indices[0] || column == trace_indices[2] ? ad :
+                                                                           1.;
+            direction.compress(VectorOperation::insert);
+            auto             plus = y, minus = y;
+            constexpr double h = 1.e-5;
+            plus.add(h, direction);
+            minus.add(-h, direction);
+            auto fp = flow.make_state(), fm = flow.make_state(),
+                 action = flow.make_state();
+            flow.assemble_residual(.375, plus, rate, fp);
+            flow.assemble_residual(.375, minus, rate, fm);
+            fp.add(-1., fm);
+            fp *= .5 / h;
+            flow.state_jacobian_matrix().vmult(action, direction);
+            double error = 0.;
+            for (const auto row : {trace_indices[2], trace_indices[3]})
+              if (flow.locally_owned_dofs().is_element(row))
+                {
+                  AssertThrow(
+                    std::isfinite(fp[row]) && std::isfinite(action[row]),
+                    ExcMessage("Non-finite transmission derivative."));
+                  error = std::max(error,
+                                   std::abs(fp[row] - action[row]) /
+                                     std::max(1., std::abs(action[row])));
+                }
+            AssertThrow(Utilities::MPI::max(error, comm) < 1.e-8,
+                        ExcMessage(
+                          "Repeated transmission Jacobian differs from FD."));
+          }
+      }
+  flow.set_interior_transmission(Flow::InteriorTransmission::flux);
+
   for (const auto flux : {Flow::NumericalFluxType::HLL,
                           Flow::NumericalFluxType::HLL_HDG,
                           Flow::NumericalFluxType::LAX_FRIEDRICHS})
