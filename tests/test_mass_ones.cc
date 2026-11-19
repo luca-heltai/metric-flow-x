@@ -16,8 +16,8 @@
 
 // Test length of domain using mass matrix.
 //
-// solution = 1.0 sets every FE component to 1, not just area: per_cell_mass
-// carries mass entries for BOTH cell components (0 = area, 1 = velocity --
+// solution = 1.0 sets every FE component to 1, not just area: the global cell
+// mass carries mass entries for BOTH cell components (0 = area, 1 = velocity --
 // see build_per_cell_mass_inv(), which explicitly skips components >= 2
 // since the trace DOFs carry no mass term). Area and velocity share the
 // same FE_DGQ basis/degree, so each block independently integrates to the
@@ -57,39 +57,17 @@ test()
   problem.setup_system();
   problem.initialize_terminal_capacitors();
 
-  problem
-    .build_per_cell_mass_inv(); // fills per_cell_mass and per_cell_mass_inv
+  problem.build_per_cell_mass_inv(); // builds the global cell mass only
 
   problem.solution = 1.0;
 
-  // --- Compute L = sum_K v_K^T M_K v_K using per-cell mass blocks ----------
-  // Locally owned cells only -- per_cell_mass has no entries for ghost
-  // cells -- then reduced across ranks.
+  // Compute the quadratic form over owned entries of the global mass action.
 
-  double             L_local  = 0.0;
-  const unsigned int max_dofs = problem.fe_collection_.max_dofs_per_cell();
-  Vector<double>     local_v(max_dofs), local_Mv(max_dofs);
-
-  for (const auto &cell : problem.dof_handler_.active_cell_iterators())
-    {
-      if (!cell->is_locally_owned())
-        continue;
-
-      std::vector<types::global_dof_index> ldofs(max_dofs);
-      const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
-      ldofs.resize(n_dofs);
-      cell->get_dof_indices(ldofs);
-
-      local_v.reinit(n_dofs);
-      local_Mv.reinit(n_dofs);
-      for (unsigned int i = 0; i < n_dofs; ++i)
-        local_v(i) = problem.solution(ldofs[i]); // = 1.0 for all cell DOFs
-
-      problem.per_cell_mass[cell->active_cell_index()].vmult(local_Mv, local_v);
-
-      for (unsigned int i = 0; i < n_dofs; ++i)
-        L_local += local_v(i) * local_Mv(i);
-    }
+  auto mass_v = problem.make_state();
+  problem.cell_mass_matrix_.vmult(mass_v, problem.solution);
+  double L_local = 0.;
+  for (const auto i : problem.locally_owned_dofs_)
+    L_local += problem.solution(i) * mass_v(i);
 
   const double L = Utilities::MPI::sum(L_local, problem.mpi_communicator_);
 

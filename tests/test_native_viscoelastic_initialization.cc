@@ -104,25 +104,13 @@ test()
           hyperbolic      = 0.;
           flow.assemble_cell_residuals(.1, flow.y_relevant, hyperbolic);
           hyperbolic.compress(VectorOperation::add);
-          std::vector<types::global_dof_index> indices(
-            flow.fe_collection_.max_dofs_per_cell());
-          for (const auto &cell : flow.dof_handler_.active_cell_iterators())
-            if (cell->is_locally_owned())
-              {
-                indices.resize(cell->get_fe().n_dofs_per_cell());
-                cell->get_dof_indices(indices);
-                Vector<double> local(indices.size()), mass_rate(indices.size());
-                rate.extract_subvector_to(indices.begin(),
-                                          indices.end(),
-                                          local.begin());
-                flow.per_cell_mass[cell->active_cell_index()].vmult(mass_rate,
-                                                                    local);
-                for (unsigned int i = 0; i < indices.size(); ++i)
-                  if (cell->get_fe().system_to_component_index(i).first == 0)
-                    defect =
-                      std::max(defect,
-                               std::abs(mass_rate[i] - hyperbolic(indices[i])));
-              }
+          auto mass_rate = flow.make_state();
+          flow.cell_mass_matrix_.vmult(mass_rate, rate);
+          for (const auto i : flow.locally_owned_dofs_)
+            if (flow.component_dofs_[0].is_element(i))
+              defect = std::max(defect, std::abs(mass_rate(i) - hyperbolic(i)));
+          AssertThrow(!flow.initial_cell_mass_inverse_,
+                      ExcMessage("Initial inverse survived initialization."));
           defect = Utilities::MPI::max(defect, comm);
           AssertThrow(defect < 1e-12,
                       ExcMessage("Initial area conservation failed."));

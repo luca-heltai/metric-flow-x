@@ -149,6 +149,8 @@ test()
     flow.initialize_params("checkpoint-input.prm", "");
     make_mesh(flow);
     flow.setup(make_physics());
+    AssertThrow(!flow.initial_cell_mass_inverse_,
+                ExcMessage("Setup must not construct the initial inverse."));
     for (const auto i : flow.locally_owned_dofs_)
       owned.push_back(i);
     for (unsigned int c = 0; c < 5; ++c)
@@ -174,6 +176,9 @@ test()
         auto state = flow.make_state(), rate = flow.make_state(),
              residual = flow.make_state();
         flow.initialize_consistent_state(state, rate, times[step]);
+        AssertThrow(!flow.initial_cell_mass_inverse_,
+                    ExcMessage(
+                      "Repeated initialization retained its inverse."));
         if (step == 1)
           {
             // This second pair tests serialization of every native component,
@@ -362,6 +367,9 @@ test()
                 cell->face(face)->boundary_id() == boundaries.at(id)[face],
                 ExcMessage("Checkpoint boundary association changed."));
           }
+      AssertThrow(!restored.initial_cell_mass_inverse_,
+                  ExcMessage(
+                    "Checkpoint restore constructed an initial inverse."));
       auto residual = restored.make_state();
       restored.assemble_residual(restored.time,
                                  restored.solution,

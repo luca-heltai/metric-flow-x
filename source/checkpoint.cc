@@ -496,6 +496,8 @@ namespace MetricFlowX
     in_memory_physics          = true;
     setup_system();
     initialize_terminal_capacitors();
+    // Rebuild only the global cell mass. Restoring archived state/rates does
+    // not enter coherent initialization and must not allocate its inverse.
     build_per_cell_mass_inv();
     collective_file_operation(mpi_communicator_, [&] {
       AssertThrow(read_cell_elements(root, this_mpi_process) ==
