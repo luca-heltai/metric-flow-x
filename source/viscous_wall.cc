@@ -12,11 +12,12 @@ namespace MetricFlowX
    */
   template <int dim, int spacedim>
   void
-  BloodFlowSystem<dim, spacedim>::assemble_viscous_wall(const VectorType &y,
-                                                        const VectorType &ydot,
-                                                        VectorType *residual,
-                                                        MatrixType *matrix,
-                                                        const bool  derivative)
+  BloodFlowSystem<dim, spacedim>::assemble_viscous_wall(
+    const VectorType    &y,
+    const VectorType    &ydot,
+    std::vector<double> *residual,
+    MatrixType          *matrix,
+    const bool           derivative)
   {
     update_ghosted_vectors(y);
     VectorType rate;
@@ -52,7 +53,8 @@ namespace MetricFlowX
       const auto  &wall = vessel_map.at(cell->material_id()).wall;
       const double nu = wall.viscosity(area, compute_a_d_at_point(cell, point));
       if (residual)
-        (*residual)(row) += weight * nu * area_rate;
+        (*residual)[locally_owned_dofs_.index_within_set(row)] +=
+          weight * nu * area_rate;
       if (matrix)
         for (unsigned int j = 0; j < indices.size(); ++j)
           if (cell->get_fe().system_to_component_index(j).first == 0)
@@ -132,15 +134,14 @@ namespace MetricFlowX
               junction.half_faces[i].cell,
               junction.location);
         }
-    if (residual)
-      residual->compress(VectorOperation::add);
+    // Residual contributions are added to the caller's owned-row buffer.
     if (matrix)
       matrix->compress(VectorOperation::add);
   }
   template void
   BloodFlowSystem<1, 3>::assemble_viscous_wall(const VectorType &,
                                                const VectorType &,
-                                               VectorType *,
+                                               std::vector<double> *,
                                                MatrixType *,
                                                const bool);
 } // namespace MetricFlowX

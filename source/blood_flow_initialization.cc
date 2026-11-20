@@ -594,24 +594,10 @@ namespace MetricFlowX
     state_dot           = 0.;
     VectorType residual = make_state();
     assemble_residual(t, state, state_dot, residual);
-    std::vector<Index> ldofs(fe_collection_.max_dofs_per_cell());
-    Vector<double>     local(fe_collection_.max_dofs_per_cell()),
-      rate(fe_collection_.max_dofs_per_cell());
-    for (const auto &cell : dof_handler_.active_cell_iterators())
-      if (cell->is_locally_owned())
-        {
-          ldofs.resize(cell->get_fe().n_dofs_per_cell());
-          cell->get_dof_indices(ldofs);
-          local.reinit(ldofs.size());
-          rate.reinit(ldofs.size());
-          residual.extract_subvector_to(ldofs.begin(),
-                                        ldofs.end(),
-                                        local.begin());
-          per_cell_mass_inv[cell->active_cell_index()].vmult(rate, local);
-          for (unsigned int i = 0; i < ldofs.size(); ++i)
-            if (cell->get_fe().system_to_component_index(i).first < 2)
-              state_dot(ldofs[i]) = -rate[i];
-        }
+    initial_cell_mass_inverse().vmult(state_dot, residual);
+    for (const auto i : locally_owned_dofs_)
+      if (component_dofs_[0].is_element(i) || component_dofs_[1].is_element(i))
+        state_dot(i) = -state_dot(i);
     for (const auto &[bid, index] : rcr_pc_dof)
       if (locally_owned_dofs_.is_element(index))
         state_dot(index) = -residual(index) / rcr_map.at(bid).C;
@@ -670,30 +656,16 @@ namespace MetricFlowX
     for (const auto i : trace_dofs_owned)
       algebraic =
         std::max(algebraic, std::abs(residual(i)) / initial_trace_weights_(i));
-    std::vector<Index> ldofs(fe_collection_.max_dofs_per_cell());
-    Vector<double>     local(fe_collection_.max_dofs_per_cell()),
-      rate(fe_collection_.max_dofs_per_cell());
-    for (const auto &cell : dof_handler_.active_cell_iterators())
-      if (cell->is_locally_owned())
+    auto rate = make_state();
+    initial_cell_mass_inverse().vmult(rate, residual);
+    for (const auto i : locally_owned_dofs_)
+      if (component_dofs_[0].is_element(i) || component_dofs_[1].is_element(i))
         {
-          ldofs.resize(cell->get_fe().n_dofs_per_cell());
-          cell->get_dof_indices(ldofs);
-          local.reinit(ldofs.size());
-          rate.reinit(ldofs.size());
-          residual.extract_subvector_to(ldofs.begin(),
-                                        ldofs.end(),
-                                        local.begin());
-          per_cell_mass_inv[cell->active_cell_index()].vmult(rate, local);
-          for (unsigned int i = 0; i < ldofs.size(); ++i)
-            if (cell->get_fe().system_to_component_index(i).first < 2)
-              {
-                const double scaled =
-                  horizon * std::abs(rate[i]) / weight(ldofs[i]);
-                if (!std::isfinite(rate[i]) || !std::isfinite(scaled))
-                  invalid = 1;
-                else
-                  differential = std::max(differential, scaled);
-              }
+          const double scaled = horizon * std::abs(rate(i)) / weight(i);
+          if (!std::isfinite(rate(i)) || !std::isfinite(scaled))
+            invalid = 1;
+          else
+            differential = std::max(differential, scaled);
         }
     for (const auto &[bid, index] : rcr_pc_dof)
       if (locally_owned_dofs_.is_element(index))
@@ -1031,6 +1003,17 @@ namespace MetricFlowX
     const double t)
   {
     TimerOutput::Scope timer(computing_timer, "initialize_consistent_state");
+    // Every call owns its lazy inverse, including failed initialization. No
+    // inverse survives to stepping, replay, or a subsequent initialization.
+    initial_cell_mass_inverse_.reset();
+    struct ReleaseInitialInverse
+    {
+      std::unique_ptr<MatrixType> &inverse;
+      ~ReleaseInitialInverse()
+      {
+        inverse.reset();
+      }
+    } release_inverse{initial_cell_mass_inverse_};
     initial_state_diagnostics_ = InitialStateDiagnostics{};
     reinit_state(state);
     compute_initial_solution(state, t);

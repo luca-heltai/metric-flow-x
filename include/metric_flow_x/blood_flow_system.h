@@ -884,7 +884,8 @@ namespace MetricFlowX
     const MatrixType &
     derivative_jacobian_matrix() const;
 
-    // Local mass matrices M_K and their inverses for every locally owned cell.
+    // Build the global cell mass matrix (legacy entry point name).
+    // The inverse is created lazily only by initialize_consistent_state().
     void
     build_per_cell_mass_inv();
 
@@ -1341,10 +1342,10 @@ namespace MetricFlowX
     build_rcr_dof_map();
 
     void
-    assemble_rcr_capacitor_equations(const VectorType &y,
-                                     const VectorType &ydot,
-                                     VectorType       &F,
-                                     const double      t);
+    assemble_rcr_capacitor_equations(const VectorType    &y,
+                                     const VectorType    &ydot,
+                                     std::vector<double> &F,
+                                     const double         t);
 
     // A resistor graph between terminal compartments. A terminal with C>0
     // exposes Pc; a terminal with C=0 exposes its physical trace pressure.
@@ -1478,11 +1479,11 @@ namespace MetricFlowX
     }
 
     void
-    assemble_viscous_wall(const VectorType &y,
-                          const VectorType &ydot,
-                          VectorType       *residual,
-                          MatrixType       *matrix,
-                          const bool        derivative);
+    assemble_viscous_wall(const VectorType    &y,
+                          const VectorType    &ydot,
+                          std::vector<double> *residual,
+                          MatrixType          *matrix,
+                          const bool           derivative);
 
     double
     compute_invariant(const double       A,
@@ -1571,12 +1572,11 @@ namespace MetricFlowX
                                         const MatrixType        &matrix) const;
 
 
-    // Per-cell mass matrices, indexed by cell->active_cell_index(): deal.II
-    // numbers the locally stored active cells contiguously, so no CellId lookup
-    // is needed in the residual inner loop.  Only locally owned entries are
-    // filled.
-    std::vector<FullMatrix<double>> per_cell_mass_inv;
-    std::vector<FullMatrix<double>> per_cell_mass;
+    // Only cell components (0,1) enter this fixed sparse block. Capacitor
+    // mass and state-dependent viscous terms are handled separately.
+    MatrixType cell_mass_matrix_;
+    // Non-null only while a coherent initial pair is being prepared.
+    std::unique_ptr<MatrixType> initial_cell_mass_inverse_;
 
     VectorType solution;
     VectorType solution_dot;
@@ -2455,6 +2455,11 @@ namespace MetricFlowX
     compute_steady_network_initial_solution(VectorType &, const double);
     void
     correct_initial_traces(VectorType &, const double);
+    void
+    assemble_cell_mass_matrix(MatrixType &, const bool inverse);
+    const MatrixType &
+    initial_cell_mass_inverse();
+
     void
     reconstruct_initial_derivative(const VectorType &,
                                    VectorType &,

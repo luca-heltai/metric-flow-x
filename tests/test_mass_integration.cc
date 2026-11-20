@@ -13,16 +13,8 @@
 // at the top level of the bare-dealii-app distribution.
 //
 // ---------------------------------------------------------------------
-// Test length of domain using per-cell mass matrix blocks.
-//
-// Parallel: problem.triangulation_ is a parallel::fullydistributed
-// triangulation_, so mesh loading, partitioning, material/boundary IDs and
-// rcr_map all go through problem.create_triangulation() -- attaching
-// GridIn directly to a fully-distributed triangulation_ (as a serial test
-// might) does not work. per_cell_mass only holds entries for locally
-// owned cells, indexed by cell->active_cell_index(), so both assembly
-// loops are restricted to is_locally_owned() cells and the scalar results
-// are reduced across ranks with Utilities::MPI::sum before comparing.
+// Check the area block against the independently measured physical length.
+// The global sparse mass action is reduced over owned vector entries only.
 // ---------------------------------------------------------------------
 
 #include <deal.II/base/mpi.h>
@@ -53,8 +45,7 @@ test()
 
   problem.setup_system();
   problem.initialize_terminal_capacitors();
-  problem
-    .build_per_cell_mass_inv(); // fills per_cell_mass and per_cell_mass_inv
+  problem.build_per_cell_mass_inv(); // builds the global cell mass only
 
   // Build v = 1 on area (component 0) cell DOFs, 0 elsewhere, over locally
   // owned cells only. With this choice:
@@ -83,31 +74,12 @@ test()
     }
   v.compress(VectorOperation::insert);
 
-  // Compute L = sum_K  v_K^T M_K v_K  (cell DOFs only; trace block
-  // untouched), locally owned cells only, then reduce across ranks.
-  double         L_local = 0.0;
-  Vector<double> local_v(max_dofs), local_Mv(max_dofs);
-
-  for (const auto &cell : problem.dof_handler_.active_cell_iterators())
-    {
-      if (!cell->is_locally_owned())
-        continue;
-
-      std::vector<types::global_dof_index> ldofs(max_dofs);
-      const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
-      ldofs.resize(n_dofs);
-      cell->get_dof_indices(ldofs);
-
-      local_v.reinit(n_dofs);
-      local_Mv.reinit(n_dofs);
-      for (unsigned int i = 0; i < n_dofs; ++i)
-        local_v(i) = v(ldofs[i]);
-
-      problem.per_cell_mass[cell->active_cell_index()].vmult(local_Mv, local_v);
-
-      for (unsigned int i = 0; i < n_dofs; ++i)
-        L_local += local_v(i) * local_Mv(i);
-    }
+  // Compute v^T M v, including the exactly zero trace/capacitor rows.
+  auto mass_v = problem.make_state();
+  problem.cell_mass_matrix_.vmult(mass_v, v);
+  double L_local = 0.;
+  for (const auto i : problem.locally_owned_dofs_)
+    L_local += v(i) * mass_v(i);
 
   const double L = Utilities::MPI::sum(L_local, problem.mpi_communicator_);
 

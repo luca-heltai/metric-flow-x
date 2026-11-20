@@ -35,6 +35,9 @@ test()
   flow.default_terminal_c        = 1e-8;
   flow.n_global_refinements      = 0;
   flow.setup();
+  AssertThrow(!flow.initial_cell_mass_inverse_,
+              ExcMessage(
+                "Ordinary setup must not allocate an initial inverse."));
   for (unsigned int cycle = 0; cycle < 2; ++cycle)
     {
       auto state      = flow.make_state();
@@ -51,6 +54,9 @@ test()
       state      = 2.;
       derivative = -3.;
       flow.assemble_derivative_jacobian(1., state, derivative);
+      AssertThrow(!flow.initial_cell_mass_inverse_,
+                  ExcMessage(
+                    "Jacobian assembly allocated an initial inverse."));
       AssertThrow(entries(flow.derivative_jacobian_matrix(),
                           flow.locally_owned_dofs()) == original,
                   ExcMessage("Derivative Jacobian must be state independent."));

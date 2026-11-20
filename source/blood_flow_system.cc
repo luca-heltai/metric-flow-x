@@ -3141,79 +3141,105 @@ namespace MetricFlowX
   }
 
   // ============================================================================
-  // build_per_cell_mass_inv
-  //
-  // For every locally owned cell K:
-  //   per_cell_mass     : M_K, used for the M*ydot term of the residual and the
-  //                       alpha*M term of the Jacobian
-  //   per_cell_mass_inv : M_K^{-1}, initial derivative reconstruction
-  //
-  // Indexed by cell->active_cell_index(): deal.II numbers the locally stored
-  // active cells contiguously from zero, so the vectors are sized to the local
-  // cell count and no CellId comparison happens in the residual inner loop.
+  // Cell mass is a global sparse operator. Dense element matrices below are
+  // scratch objects, discarded after each cell is inserted.
   // ============================================================================
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::build_per_cell_mass_inv()
   {
+    // Retain the public entry point used after explicit geometry changes.
     TimerOutput::Scope timer(computing_timer, "build_per_cell_mass_inv");
     derivative_jacobian_is_current_ = false;
+    initial_cell_mass_inverse_.reset();
+    assemble_cell_mass_matrix(cell_mass_matrix_, false);
+  }
 
-    const unsigned int n_local_cells = triangulation_.n_active_cells();
-    per_cell_mass.assign(n_local_cells, FullMatrix<double>());
-    per_cell_mass_inv.assign(n_local_cells, FullMatrix<double>());
-
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::assemble_cell_mass_matrix(MatrixType &matrix,
+                                                            const bool  inverse)
+  {
+    DynamicSparsityPattern               dsp(n_total_dofs,
+                               n_total_dofs,
+                               locally_relevant_dofs_);
+    std::vector<types::global_dof_index> indices(
+      fe_collection_.max_dofs_per_cell());
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          const auto &fe = cell->get_fe();
+          indices.resize(fe.n_dofs_per_cell());
+          cell->get_dof_indices(indices);
+          for (unsigned int i = 0; i < indices.size(); ++i)
+            if (const auto component = fe.system_to_component_index(i).first;
+                component < 2)
+              for (unsigned int j = 0; j < indices.size(); ++j)
+                if (fe.system_to_component_index(j).first == component)
+                  dsp.add(indices[i], indices[j]);
+        }
+    SparsityTools::distribute_sparsity_pattern(dsp,
+                                               locally_owned_dofs_,
+                                               mpi_communicator_,
+                                               locally_relevant_dofs_);
+    matrix.reinit(locally_owned_dofs_,
+                  locally_owned_dofs_,
+                  dsp,
+                  mpi_communicator_);
     const QGauss<dim>           quad(fe_degree + 1);
     hp::FEValues<dim, spacedim> hp_fev(fe_collection_,
                                        hp::QCollection<dim>(quad),
                                        update_values | update_JxW_values);
-
     for (const auto &cell : dof_handler_.active_cell_iterators())
-      {
-        if (!cell->is_locally_owned())
-          continue;
-        const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
-
-        hp_fev.reinit(cell);
-        const auto        &fev = hp_fev.get_present_fe_values();
-        FullMatrix<double> M(n_dofs, n_dofs);
-
-        // FESystem(FE_DGQ, 2) shape functions are component specific: phi_i is
-        // nonzero only for its own component, so M(i,j) = 0 whenever
-        // component(i) != component(j).  Cross-component pairs are skipped;
-        // otherwise M would have zero rows and gauss_jordan() would abort.
-        // Only the cell components (0,1) carry a mass term, so the trace rows
-        // and columns of M stay exactly zero -- which is what makes alpha*M
-        // leave the trace rows algebraic.
-        for (unsigned int q = 0; q < quad.size(); ++q)
-          for (unsigned int i = 0; i < n_dofs; ++i)
+      if (cell->is_locally_owned())
+        {
+          const auto        &fe = cell->get_fe();
+          const unsigned int n  = fe.n_dofs_per_cell();
+          indices.resize(n);
+          cell->get_dof_indices(indices);
+          hp_fev.reinit(cell);
+          const auto        &fev = hp_fev.get_present_fe_values();
+          FullMatrix<double> local(n, n);
+          for (unsigned int q = 0; q < quad.size(); ++q)
+            for (unsigned int i = 0; i < n; ++i)
+              if (const auto component = fe.system_to_component_index(i).first;
+                  component < 2)
+                for (unsigned int j = 0; j < n; ++j)
+                  if (fe.system_to_component_index(j).first == component)
+                    local(i, j) += fev.shape_value(i, q) *
+                                   fev.shape_value(j, q) * fev.JxW(q);
+          if (inverse)
             {
-              const unsigned int ci =
-                cell->get_fe().system_to_component_index(i).first;
-              if (ci >= 2)
-                continue;
-              for (unsigned int j = 0; j < n_dofs; ++j)
-                {
-                  const unsigned int cj =
-                    cell->get_fe().system_to_component_index(j).first;
-                  if (ci != cj)
-                    continue;
-                  M(i, j) +=
-                    fev.shape_value(i, q) * fev.shape_value(j, q) * fev.JxW(q);
-                }
+              // Complete the scratch matrix only for inversion. Non-cell
+              // identity entries are never inserted in the global operator.
+              for (unsigned int i = 0; i < n; ++i)
+                if (fe.system_to_component_index(i).first >= 2)
+                  local(i, i) = 1.;
+              local.gauss_jordan();
             }
+          for (unsigned int i = 0; i < n; ++i)
+            if (const auto component = fe.system_to_component_index(i).first;
+                component < 2)
+              for (unsigned int j = 0; j < n; ++j)
+                if (fe.system_to_component_index(j).first == component)
+                  matrix.add(indices[i], indices[j], local(i, j));
+        }
+    matrix.compress(VectorOperation::add);
+  }
 
-        per_cell_mass[cell->active_cell_index()] = M;
-
-        // For the initial-state inverse, put 1 on non-cell diagonals so the
-        // dense inverse exists; those entries are never applied.
-        FullMatrix<double> M_inv(M);
-        for (unsigned int i = 0; i < n_dofs; ++i)
-          if (cell->get_fe().system_to_component_index(i).first >= 2)
-            M_inv(i, i) = 1.0;
-        M_inv.gauss_jordan();
-        per_cell_mass_inv[cell->active_cell_index()] = std::move(M_inv);
+  template <int dim, int spacedim>
+  const MatrixType &
+  BloodFlowSystem<dim, spacedim>::initial_cell_mass_inverse()
+  {
+    if (!initial_cell_mass_inverse_)
+      {
+        TimerOutput::Scope timer(computing_timer,
+                                 "build_initial_cell_mass_inverse");
+        auto               inverse = std::make_unique<MatrixType>();
+        assemble_cell_mass_matrix(*inverse, true);
+        initial_cell_mass_inverse_ = std::move(inverse);
       }
+    return *initial_cell_mass_inverse_;
   }
 
   // ============================================================================
@@ -4587,10 +4613,10 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::assemble_rcr_capacitor_equations(
-    const VectorType &y,
-    const VectorType &ydot,
-    VectorType       &F,
-    const double      t)
+    const VectorType    &y,
+    const VectorType    &ydot,
+    std::vector<double> &F,
+    const double         t)
   {
     if (rcr_pc_dof.empty())
       return;
@@ -4629,7 +4655,9 @@ namespace MetricFlowX
           }
         else
           discharge = (Pc - rcr.outlet_pressure(t)) / rcr.R2;
-        F(pc_dof) += rcr.C * Pc_dot - Q + discharge;
+        Assert(locally_owned_dofs_.is_element(pc_dof), ExcInternalError());
+        F[locally_owned_dofs_.index_within_set(pc_dof)] +=
+          rcr.C * Pc_dot - Q + discharge;
       }
   }
 
@@ -4975,10 +5003,10 @@ namespace MetricFlowX
   // ============================================================================
   // assemble_residual
   //
-  // IDA's F(t, y, ydot) = 0.  Reads go through the ghosted vectors filled by
-  // update_ghosted_vectors(); writes go to the locally owned `residual` and are
-  // closed by a single compress(add).  Every routine called here uses add
-  // semantics, so the two are never mixed in one compress.
+  // IDA's F(t, y, ydot) = 0. Reads go through the ghosted vectors filled by
+  // update_ghosted_vectors(). Assemble all contributions in an owned-row
+  // buffer, then write and compress the output once. This avoids mixing
+  // backend-specific matrix-action state with vector add operations.
   // ============================================================================
   template <int dim, int spacedim>
   void
@@ -5005,52 +5033,28 @@ namespace MetricFlowX
     assemble_trace_continuity_equations(t, y_relevant, residual_F);
     residual_F.compress(VectorOperation::add);
 
-    // ---- residual = M_K * ydot - R, uniformly over the FE range -------------
-    // per_cell_mass has an exactly zero block on the trace components (2,3), so
-    // this single formula produces the right thing for both kinds of row:
-    //   cell rows  (differential):  M ydot - R_cell
-    //   trace rows (algebraic)   :  0      - R_trace  =  -R_trace
-    // Every FE DoF, trace ones included, belongs to exactly one cell, and that
-    // cell is locally owned, so each row is written by exactly one rank once.
-    residual = 0.0;
+    // The fixed cell mass has zero trace/capacitor rows. Keep the sparse
+    // matrix action separate from the output vector: PETSc and Trilinos have
+    // different assembly-state rules for subsequent vector operations.
+    VectorType mass_action;
+    mass_action.reinit(locally_owned_dofs_, mpi_communicator_);
+    cell_mass_matrix_.vmult(mass_action, ydot);
 
-    const unsigned int max_dofs = fe_collection_.max_dofs_per_cell();
-    Vector<double>     local_F(max_dofs), local_Mydot(max_dofs),
-      local_res(max_dofs);
-    std::vector<types::global_dof_index> ldofs(max_dofs);
-
-    for (const auto &cell : dof_handler_.active_cell_iterators())
-      {
-        if (!cell->is_locally_owned())
-          continue;
-        const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
-        local_F.reinit(n_dofs);
-        local_Mydot.reinit(n_dofs);
-        local_res.reinit(n_dofs);
-
-        ldofs.resize(cell->get_fe().n_dofs_per_cell());
-        cell->get_dof_indices(ldofs);
-
-        residual_F.extract_subvector_to(ldofs.begin(),
-                                        ldofs.end(),
-                                        local_F.begin());
-        ydot.extract_subvector_to(ldofs.begin(),
-                                  ldofs.end(),
-                                  local_Mydot.begin());
-
-        per_cell_mass[cell->active_cell_index()].vmult(local_res, local_Mydot);
-
-        for (unsigned int i = 0; i < n_dofs; ++i)
-          local_res(i) -= local_F(i);
-        residual.add(ldofs, local_res);
-      }
+    std::vector<double> residual_values(locally_owned_dofs_.n_elements());
+    for (const auto row : locally_owned_dofs_)
+      residual_values[locally_owned_dofs_.index_within_set(row)] =
+        mass_action(row) - residual_F(row);
 
     // RCR capacitor rows: differential, written directly in M*ydot - R form.
-    assemble_rcr_capacitor_equations(y_relevant, ydot, residual, t);
+    assemble_rcr_capacitor_equations(y_relevant, ydot, residual_values, t);
 
-    residual.compress(VectorOperation::add);
     if (viscoelastic_wall)
-      assemble_viscous_wall(y, ydot, &residual, nullptr, false);
+      assemble_viscous_wall(y, ydot, &residual_values, nullptr, false);
+
+    for (const auto row : locally_owned_dofs_)
+      residual(row) =
+        residual_values[locally_owned_dofs_.index_within_set(row)];
+    residual.compress(VectorOperation::insert);
     if (verbosity > 1)
       deallog.pop();
   }
@@ -5678,21 +5682,7 @@ namespace MetricFlowX
       return;
     derivative_jacobian_matrix_ = 0.0;
 
-    const unsigned int max_dofs = fe_collection_.max_dofs_per_cell();
-    std::vector<types::global_dof_index> ldofs(max_dofs);
-    for (const auto &cell : dof_handler_.active_cell_iterators())
-      {
-        if (!cell->is_locally_owned())
-          continue;
-        const unsigned int n_dofs = cell->get_fe().n_dofs_per_cell();
-        ldofs.resize(cell->get_fe().n_dofs_per_cell());
-        cell->get_dof_indices(ldofs);
-        const FullMatrix<double> &M_K =
-          per_cell_mass[cell->active_cell_index()];
-        for (unsigned int i = 0; i < n_dofs; ++i)
-          for (unsigned int j = 0; j < n_dofs; ++j)
-            derivative_jacobian_matrix_.add(ldofs[i], ldofs[j], M_K(i, j));
-      }
+    derivative_jacobian_matrix_.add(1., cell_mass_matrix_);
 
     for (const auto &[bid, pc_dof] : rcr_pc_dof)
       if (locally_owned_dofs_.is_element(pc_dof))
