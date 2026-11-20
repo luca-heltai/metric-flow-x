@@ -5001,10 +5001,9 @@ namespace MetricFlowX
   // ============================================================================
   // assemble_residual
   //
-  // IDA's F(t, y, ydot) = 0.  Reads go through the ghosted vectors filled by
-  // update_ghosted_vectors(); writes go to the locally owned `residual` and are
-  // closed by a single compress(add).  Every routine called here uses add
-  // semantics, so the two are never mixed in one compress.
+  // IDA's F(t, y, ydot) = 0. Reads go through the ghosted vectors filled by
+  // update_ghosted_vectors(). The matrix action and the remaining terms write
+  // only owned rows, so no compression is needed for the output vector.
   // ============================================================================
   template <int dim, int spacedim>
   void
@@ -5040,7 +5039,6 @@ namespace MetricFlowX
     // RCR capacitor rows: differential, written directly in M*ydot - R form.
     assemble_rcr_capacitor_equations(y_relevant, ydot, residual, t);
 
-    residual.compress(VectorOperation::add);
     if (viscoelastic_wall)
       assemble_viscous_wall(y, ydot, &residual, nullptr, false);
     if (verbosity > 1)

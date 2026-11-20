@@ -132,8 +132,9 @@ namespace MetricFlowX
               junction.half_faces[i].cell,
               junction.location);
         }
-    if (residual)
-      residual->compress(VectorOperation::add);
+    // Residual contributions are added only to locally owned rows. Avoid
+    // compressing the caller's vector, whose backend action state may have
+    // been set by a preceding matrix-vector product.
     if (matrix)
       matrix->compress(VectorOperation::add);
   }
