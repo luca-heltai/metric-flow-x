@@ -1342,10 +1342,10 @@ namespace MetricFlowX
     build_rcr_dof_map();
 
     void
-    assemble_rcr_capacitor_equations(const VectorType &y,
-                                     const VectorType &ydot,
-                                     VectorType       &F,
-                                     const double      t);
+    assemble_rcr_capacitor_equations(const VectorType    &y,
+                                     const VectorType    &ydot,
+                                     std::vector<double> &F,
+                                     const double         t);
 
     // A resistor graph between terminal compartments. A terminal with C>0
     // exposes Pc; a terminal with C=0 exposes its physical trace pressure.
@@ -1479,11 +1479,11 @@ namespace MetricFlowX
     }
 
     void
-    assemble_viscous_wall(const VectorType &y,
-                          const VectorType &ydot,
-                          VectorType       *residual,
-                          MatrixType       *matrix,
-                          const bool        derivative);
+    assemble_viscous_wall(const VectorType    &y,
+                          const VectorType    &ydot,
+                          std::vector<double> *residual,
+                          MatrixType          *matrix,
+                          const bool           derivative);
 
     double
     compute_invariant(const double       A,

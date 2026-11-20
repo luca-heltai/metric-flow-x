@@ -4613,10 +4613,10 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::assemble_rcr_capacitor_equations(
-    const VectorType &y,
-    const VectorType &ydot,
-    VectorType       &F,
-    const double      t)
+    const VectorType    &y,
+    const VectorType    &ydot,
+    std::vector<double> &F,
+    const double         t)
   {
     if (rcr_pc_dof.empty())
       return;
@@ -4655,7 +4655,9 @@ namespace MetricFlowX
           }
         else
           discharge = (Pc - rcr.outlet_pressure(t)) / rcr.R2;
-        F(pc_dof) += rcr.C * Pc_dot - Q + discharge;
+        Assert(locally_owned_dofs_.is_element(pc_dof), ExcInternalError());
+        F[locally_owned_dofs_.index_within_set(pc_dof)] +=
+          rcr.C * Pc_dot - Q + discharge;
       }
   }
 
@@ -5002,8 +5004,9 @@ namespace MetricFlowX
   // assemble_residual
   //
   // IDA's F(t, y, ydot) = 0. Reads go through the ghosted vectors filled by
-  // update_ghosted_vectors(). The matrix action and the remaining terms write
-  // only owned rows, so no compression is needed for the output vector.
+  // update_ghosted_vectors(). Assemble all contributions in an owned-row
+  // buffer, then write and compress the output once. This avoids mixing
+  // backend-specific matrix-action state with vector add operations.
   // ============================================================================
   template <int dim, int spacedim>
   void
@@ -5030,17 +5033,28 @@ namespace MetricFlowX
     assemble_trace_continuity_equations(t, y_relevant, residual_F);
     residual_F.compress(VectorOperation::add);
 
-    // The fixed cell mass has zero trace/capacitor rows. The capacitor
-    // routine below contributes C*Pdot exactly once, separately from this
-    // block.
-    cell_mass_matrix_.vmult(residual, ydot);
-    residual.add(-1., residual_F);
+    // The fixed cell mass has zero trace/capacitor rows. Keep the sparse
+    // matrix action separate from the output vector: PETSc and Trilinos have
+    // different assembly-state rules for subsequent vector operations.
+    VectorType mass_action;
+    mass_action.reinit(locally_owned_dofs_, mpi_communicator_);
+    cell_mass_matrix_.vmult(mass_action, ydot);
+
+    std::vector<double> residual_values(locally_owned_dofs_.n_elements());
+    for (const auto row : locally_owned_dofs_)
+      residual_values[locally_owned_dofs_.index_within_set(row)] =
+        mass_action(row) - residual_F(row);
 
     // RCR capacitor rows: differential, written directly in M*ydot - R form.
-    assemble_rcr_capacitor_equations(y_relevant, ydot, residual, t);
+    assemble_rcr_capacitor_equations(y_relevant, ydot, residual_values, t);
 
     if (viscoelastic_wall)
-      assemble_viscous_wall(y, ydot, &residual, nullptr, false);
+      assemble_viscous_wall(y, ydot, &residual_values, nullptr, false);
+
+    for (const auto row : locally_owned_dofs_)
+      residual(row) =
+        residual_values[locally_owned_dofs_.index_within_set(row)];
+    residual.compress(VectorOperation::insert);
     if (verbosity > 1)
       deallog.pop();
   }
