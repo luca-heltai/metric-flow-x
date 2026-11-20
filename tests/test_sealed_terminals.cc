@@ -121,9 +121,11 @@ test()
       {
         residual = 0.;
         flow.assemble_trace_boundary_equations(t, flow.y_relevant, residual);
+        std::vector<double> capacitor_residual(
+          flow.locally_owned_dofs().n_elements(), 0.);
         flow.assemble_rcr_capacitor_equations(flow.y_relevant,
                                               rate,
-                                              residual,
+                                              capacitor_residual,
                                               t);
         residual.compress(VectorOperation::add);
         const double p_out = 1200. + (time_dependent ? 100. * t : 0.);
@@ -138,8 +140,11 @@ test()
               AssertThrow(std::abs(residual[face.a_hat_dof] - expected) < 1.e-9,
                           ExcMessage("Reservoir pressure trace oracle failed"));
               if (capacitor)
-                AssertThrow(std::abs(residual[flow.rcr_pc_dof.at(2)] -
-                                     (-q + (1100. - p_out) / 9.e7)) < 1.e-16,
+                AssertThrow(std::abs(
+                              capacitor_residual[flow.locally_owned_dofs()
+                                                   .index_within_set(
+                                                     flow.rcr_pc_dof.at(2))] -
+                              (-q + (1100. - p_out) / 9.e7)) < 1.e-16,
                             ExcMessage("Reservoir capacitor oracle failed"));
             }
       }
