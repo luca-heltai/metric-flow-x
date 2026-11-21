@@ -5583,7 +5583,7 @@ namespace MetricFlowX
     assemble_state_jacobian(t, y, ydot);
     assemble_derivative_jacobian(t, y, ydot);
 
-    jacobian_matrix.copy_from(state_jacobian_matrix_);
+    // State assembly already leaves the state Jacobian in this matrix.
     jacobian_matrix.add(alpha, derivative_jacobian_matrix_);
     if (!jacobian_export_filename.empty() && !jacobian_exported &&
         t >= jacobian_export_time)
