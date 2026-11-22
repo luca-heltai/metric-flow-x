@@ -520,6 +520,7 @@ namespace MetricFlowX
                 !problem.has_admissible_wall_states(y))
               return 1;
             problem.assemble_jacobian(t, y, ydot, alpha);
+            problem.ensure_linear_system_matrix();
             problem.linear_system_matrix.copy_from(problem.jacobian_matrix);
 
             if (problem.use_direct_solver)

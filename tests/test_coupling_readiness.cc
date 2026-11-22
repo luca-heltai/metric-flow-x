@@ -24,6 +24,10 @@ test()
   flow.assemble_residual(0.0, y, y_dot, F);
   flow.assemble_state_jacobian(0.0, y, y_dot);
   flow.assemble_derivative_jacobian(0.0, y, y_dot);
+  AssertThrow(
+    !flow.linear_system_matrix_is_initialized_,
+    ExcMessage(
+      "Split coupled Jacobians must not allocate the native solve matrix."));
 
   auto direction = flow.make_state();
   direction      = 0.0;

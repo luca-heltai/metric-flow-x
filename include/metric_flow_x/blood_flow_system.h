@@ -1541,6 +1541,7 @@ namespace MetricFlowX
     MatrixType derivative_jacobian_matrix_;
     bool       derivative_jacobian_is_current_ = false;
     MatrixType linear_system_matrix;
+    bool       linear_system_matrix_is_initialized_ = false;
 
     // The direct solver is the one object with no common alias in the LA
     // namespace: PETSc reaches MUMPS through SparseDirectMUMPS, Trilinos
@@ -2472,6 +2473,9 @@ namespace MetricFlowX
 
     void
     correct_viscoelastic_initial_pair(VectorType &, VectorType &, const double);
+
+    void
+    ensure_linear_system_matrix();
 
     friend void ::test();
   };
