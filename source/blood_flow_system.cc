@@ -2821,6 +2821,17 @@ namespace MetricFlowX
   // ============================================================================
   template <int dim, int spacedim>
   void
+  BloodFlowSystem<dim, spacedim>::ensure_linear_system_matrix()
+  {
+    if (!linear_system_matrix_is_initialized_)
+      {
+        linear_system_matrix.reinit(jacobian_matrix);
+        linear_system_matrix_is_initialized_ = true;
+      }
+  }
+
+  template <int dim, int spacedim>
+  void
   BloodFlowSystem<dim, spacedim>::build_extended_sparsity_pattern()
   {
     TimerOutput::Scope timer(computing_timer,
@@ -2855,10 +2866,8 @@ namespace MetricFlowX
                                        locally_owned_dofs_,
                                        dsp,
                                        mpi_communicator_);
-    linear_system_matrix.reinit(locally_owned_dofs_,
-                                locally_owned_dofs_,
-                                dsp,
-                                mpi_communicator_);
+    linear_system_matrix.clear();
+    linear_system_matrix_is_initialized_ = false;
 
     // Keep only the ordinary interior trace pattern, rather than another copy
     // of the full Jacobian pattern. Build independently of the selected mode so

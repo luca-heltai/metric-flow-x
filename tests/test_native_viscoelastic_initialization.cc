@@ -68,17 +68,23 @@ test()
                   }
               for (auto *matrix : {&flow.jacobian_matrix,
                                    &flow.state_jacobian_matrix_,
-                                   &flow.derivative_jacobian_matrix_,
-                                   &flow.linear_system_matrix})
+                                   &flow.derivative_jacobian_matrix_})
                 matrix->reinit(flow.locally_owned_dofs_,
                                flow.locally_owned_dofs_,
                                pattern,
                                comm);
             }
+          AssertThrow(
+            !flow.linear_system_matrix_is_initialized_,
+            ExcMessage("Setup must defer the native solve matrix allocation."));
           auto state = flow.make_state(), rate = flow.make_state(),
                seed = flow.make_state(), residual = flow.make_state();
           flow.compute_initial_solution(seed, .1);
           flow.initialize_consistent_state(state, rate, .1);
+          AssertThrow(
+            flow.linear_system_matrix_is_initialized_,
+            ExcMessage(
+              "Native viscoelastic initialization must allocate its solve matrix."));
           const auto diagnostics = flow.initial_state_diagnostics_;
           AssertThrow(diagnostics.algebraic_defect <=
                           flow.initial_consistency_tolerance &&

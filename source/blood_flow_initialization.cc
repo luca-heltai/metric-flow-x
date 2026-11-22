@@ -703,6 +703,8 @@ namespace MetricFlowX
     VectorType  &state_dot,
     const double t)
   {
+    ensure_linear_system_matrix();
+
     // The elastic face solution is a useful predictor and gives the exact
     // zero-viscosity limit. Its mass-only rates are subsequently corrected
     // by the full coupled equations, never accepted without verification.
