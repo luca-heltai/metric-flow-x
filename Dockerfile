@@ -5,9 +5,10 @@ USER root
 WORKDIR /src
 COPY . .
 ARG BUILD_JOBS=2
-RUN cmake -S . -B /build -GNinja -DCMAKE_BUILD_TYPE=Release \
+RUN cmake -S . -B /build -GNinja -DCMAKE_BUILD_TYPE=DebugRelease \
       -DCMAKE_INSTALL_PREFIX=/opt/metric-flow-x \
-    && cmake --build /build --target blood_flow -j "${BUILD_JOBS}" \
+      -DMETRIC_FLOW_X_BACKEND=Trilinos \
+    && cmake --build /build --target blood_flow blood_flow_debug -j "${BUILD_JOBS}" \
     && cmake --install /build
 
 # Keep the matching deal.II SDK and shared dependencies for library consumers.

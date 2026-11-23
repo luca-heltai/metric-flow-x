@@ -1,7 +1,7 @@
 # Run MetricFlowX in a container
 
-The container workflow builds an OCI image containing the Release `blood_flow` executable, the compiled
-MetricFlowX shared library, its headers and CMake package, and the matching
+The container workflow builds an OCI image containing the Release `blood_flow` and Debug `blood_flow_debug` executables,
+both variants of the MetricFlowX shared library built with Trilinos, its headers and CMake package, and the matching
 deal.II SDK. It targets Linux AMD64 and ARM64. Docker, Podman, and Apptainer use
 the same image. A container runtime must already be available; MetricFlowX,
 deal.II, a compiler, and their dependencies need no host installation.
@@ -84,7 +84,9 @@ bash run_container.sh --workdir /path/to/consumer --exec cmake \
 ```
 
 The package is found through `CMAKE_PREFIX_PATH`; consumers link
-`MetricFlowX::metric_flow_x`. This image installs the Release variant only.
+`MetricFlowX::metric_flow_x`. CMake selects the installed library matching
+`CMAKE_BUILD_TYPE`. The image entry point continues to run Release. To run Debug,
+use `bash run_container.sh --exec blood_flow_debug parameters.prm`.
 The historical `scripts/run_docker.sh` delegates to this launcher with Docker
 selected and no longer parses a removed GitLab configuration.
 
@@ -92,8 +94,8 @@ selected and no longer parses a removed GitLab configuration.
 
 The container workflow builds natively on GitHub's AMD64 and ARM64 runners.
 For each architecture it runs the installed executable with one and two MPI
-ranks using the inflow integration smoke test, compiles a downstream library
-consumer, and checks launcher output ownership. AMD64 additionally checks
+ranks using the inflow integration smoke test, compiles and runs a downstream
+Trilinos consumer in both configurations, and checks launcher output ownership. AMD64 additionally checks
 rootful Podman and conversion to Apptainer SIF; both execute the installed
 library consumer. Rootless Podman remains a separate environment-dependent check. These checks establish infrastructure
 operation; they do not validate the paper's scientific results.
