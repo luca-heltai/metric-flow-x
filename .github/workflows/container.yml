@@ -108,7 +108,7 @@ jobs:
           - runner: ubuntu-24.04-arm
             arch: arm64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    timeout-minutes: 75
     permissions:
       contents: read
       packages: write
@@ -133,25 +133,25 @@ jobs:
           cache-to: type=gha,mode=max,scope=metric-flow-x-${{ matrix.arch }}
       - name: Check installed executable with one and two MPI ranks
         run: |
-          docker run --rm --mount "type=bind,source=$PWD,target=/source,readonly" \
-            --entrypoint python3 "$IMAGE" /source/tests/test_inflow_integration.py \
-            --executable /opt/metric-flow-x/bin/blood_flow --mpi
+          for executable in blood_flow blood_flow_debug; do
+            docker run --rm --mount "type=bind,source=$PWD,target=/source,readonly" \
+              --entrypoint python3 "$IMAGE" /source/tests/test_inflow_integration.py \
+              --executable "/opt/metric-flow-x/bin/$executable" --mpi
+          done
       - name: Check the standalone launcher, ownership, and installed SDK
         run: |
-          mkdir -p "$RUNNER_TEMP/consumer"
-          cp tools/package_smoke/main.cc "$RUNNER_TEMP/consumer/main.cc"
-          cat > "$RUNNER_TEMP/consumer/CMakeLists.txt" <<'CMAKE'
-          cmake_minimum_required(VERSION 3.23)
-          project(ContainerConsumer LANGUAGES CXX)
-          find_package(MetricFlowX CONFIG REQUIRED)
-          deal_ii_initialize_cached_variables()
-          add_executable(consumer main.cc)
-          deal_ii_setup_target(consumer)
-          target_link_libraries(consumer MetricFlowX::metric_flow_x)
-          CMAKE
-          bash scripts/run_container.sh --runtime docker --image "$IMAGE" \
-            --workdir "$RUNNER_TEMP/consumer" --exec bash -c \
-            'cmake -S . -B build -GNinja -DCMAKE_BUILD_TYPE=Release && cmake --build build -j2 && ./build/consumer && touch ownership'
+          cp -R tools/package_smoke "$RUNNER_TEMP/consumer"
+          for config in Release Debug; do
+            bash scripts/run_container.sh --runtime docker --image "$IMAGE" \
+              --workdir "$RUNNER_TEMP/consumer" --exec bash -ec '
+                if [[ "$1" == Release ]]; then build=build; else build=build-debug; fi
+                cmake -S . -B "$build" -GNinja -DCMAKE_BUILD_TYPE="$1" \
+                  -DMETRIC_FLOW_X_EXPECT_BACKEND=Trilinos
+                cmake --build "$build" -j2
+                ctest --test-dir "$build" --no-tests=error --output-on-failure
+                touch ownership
+              ' bash "$config"
+          done
           test "$(stat -c %u "$RUNNER_TEMP/consumer/ownership")" = "$(id -u)"
           bash scripts/run_container.sh --runtime docker --image "$IMAGE" --ranks 2 \
             --exec bash -c 'test -n "$OMPI_COMM_WORLD_RANK"'
@@ -189,7 +189,7 @@ jobs:
         run: |
           docker save "$IMAGE" | sudo podman load
           sudo bash scripts/run_container.sh --runtime podman --image "$IMAGE" \
-            --workdir "$RUNNER_TEMP/consumer" --exec bash -c './build/consumer && touch podman-output'
+            --workdir "$RUNNER_TEMP/consumer" --exec bash -c './build/package_smoke && touch podman-output'
           test -f "$RUNNER_TEMP/consumer/podman-output"
           sudo podman image rm "$IMAGE"
       - name: Check Apptainer SIF and two-rank library consumer
@@ -198,7 +198,7 @@ jobs:
           apptainer build "$RUNNER_TEMP/metric-flow-x.sif" "docker-daemon://$IMAGE"
           bash scripts/run_container.sh --runtime apptainer --image "$RUNNER_TEMP/metric-flow-x.sif" \
             --workdir "$RUNNER_TEMP/consumer" --ranks 2 --exec bash -c \
-            'test -n "$OMPI_COMM_WORLD_RANK" && mkdir -p "rank-$OMPI_COMM_WORLD_RANK" && cd "rank-$OMPI_COMM_WORLD_RANK" && ../build/consumer && touch ../apptainer-output'
+            'test -n "$OMPI_COMM_WORLD_RANK" && mkdir -p "rank-$OMPI_COMM_WORLD_RANK" && cd "rank-$OMPI_COMM_WORLD_RANK" && ../build/package_smoke && touch ../apptainer-output'
           test "$(stat -c %u "$RUNNER_TEMP/consumer/apptainer-output")" = "$(id -u)"
 
   publish:
