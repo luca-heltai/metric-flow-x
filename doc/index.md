@@ -85,6 +85,7 @@ adan_complete
 hepatic_datasets
 api
 references
+releases/v1.1.0
 releases/v1.0.0
 releases/terminal_pressure_waveform
 ```
