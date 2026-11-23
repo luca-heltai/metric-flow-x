@@ -17,7 +17,7 @@ USER root
 COPY --from=build /opt/metric-flow-x /opt/metric-flow-x
 COPY LICENSE.md /opt/metric-flow-x/share/LICENSE.md
 ARG VCS_REF=unknown
-ARG VERSION=1.0.0
+ARG VERSION=1.1.0
 LABEL org.opencontainers.image.title="MetricFlowX" \
       org.opencontainers.image.source="https://github.com/luca-heltai/metric-flow-x" \
       org.opencontainers.image.version="${VERSION}" \
