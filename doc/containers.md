@@ -140,3 +140,7 @@ reuse that base; they do not copy binaries from a developer's build directory.
 docker build --build-arg BUILD_JOBS=2 -t metric-flow-x:local .
 bash scripts/run_container.sh --image metric-flow-x:local --workdir /path/to/case parameters.prm
 ```
+
+Pushing a stable Git tag such as `v1.2.3` on `main` builds and tests that
+revision before publishing `ghcr.io/luca-heltai/metric-flow-x:v1.2.3`. The
+`latest` tag follows the highest tested stable release published to GHCR.
