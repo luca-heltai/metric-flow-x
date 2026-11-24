@@ -774,8 +774,8 @@ namespace MetricFlowX
             // ghost layer, including structural zeros from remote assembly.
             // Import metadata for the complete row graph, not just FE ghosts.
             IndexSet columns(locally_owned_dofs_);
-            for (const auto *matrix :
-                 {&state_jacobian_matrix_, derivative_jacobian_matrix_.get()})
+            for (const auto *matrix : {state_jacobian_matrix_.get(),
+                                       derivative_jacobian_matrix_.get()})
               for (const auto row : locally_owned_dofs_)
                 for (auto entry = matrix->begin(row); entry != matrix->end(row);
                      ++entry)
@@ -797,7 +797,7 @@ namespace MetricFlowX
             double weight = 0.;
             for (const bool state_block : {true, false})
               {
-                const auto &matrix = state_block ? state_jacobian_matrix_ :
+                const auto &matrix = state_block ? *state_jacobian_matrix_ :
                                                    *derivative_jacobian_matrix_;
                 for (auto entry = matrix.begin(row); entry != matrix.end(row);
                      ++entry)
@@ -837,7 +837,7 @@ namespace MetricFlowX
             rhs(row) = -residual(row) / row_weights(row);
             for (const bool state_block : {true, false})
               {
-                const auto &matrix = state_block ? state_jacobian_matrix_ :
+                const auto &matrix = state_block ? *state_jacobian_matrix_ :
                                                    *derivative_jacobian_matrix_;
                 for (auto entry = matrix.begin(row); entry != matrix.end(row);
                      ++entry)

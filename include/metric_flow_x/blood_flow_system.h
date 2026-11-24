@@ -881,6 +881,14 @@ namespace MetricFlowX
     const MatrixType &
     state_jacobian_matrix() const;
 
+    /** Return the immutable owner of the most recently assembled state
+     * Jacobian. The state Jacobian is reassembled for each new state; a
+     * retained owner keeps its matrix version unchanged across later
+     * assemblies and sparsity rebuilds.
+     */
+    std::shared_ptr<const MatrixType>
+    state_jacobian_matrix_owner() const;
+
     const MatrixType &
     derivative_jacobian_matrix() const;
 
@@ -1126,6 +1134,17 @@ namespace MetricFlowX
     }
 
   private:
+    // Make the copy-on-write decision collectively: distributed matrix
+    // reinitialization and updates must follow the same path on every rank.
+    bool
+    state_jacobian_matrix_has_retained_owners() const
+    {
+      const unsigned int local_has_retained_owners =
+        state_jacobian_matrix_.use_count() > 1 ? 1u : 0u;
+      return Utilities::MPI::max(local_has_retained_owners,
+                                 mpi_communicator_) != 0;
+    }
+
     void
     finalize_parameter_initialization();
 
@@ -1544,8 +1563,9 @@ namespace MetricFlowX
     // -----------------------------------------------------------------------
     // Linear algebra
     // -----------------------------------------------------------------------
-    MatrixType jacobian_matrix;
-    MatrixType state_jacobian_matrix_;
+    MatrixType                  jacobian_matrix;
+    std::shared_ptr<MatrixType> state_jacobian_matrix_ =
+      std::make_shared<MatrixType>();
     // Fixed state-mode trace constraints on the current mesh/DoF ownership.
     MatrixType                  state_trace_continuity_matrix_;
     std::shared_ptr<MatrixType> derivative_jacobian_matrix_ =
