@@ -1,3 +1,3 @@
-PR: pending
+PR: https://github.com/luca-heltai/metric-flow-x/pull/115
 
 - Expose an immutable owner for the assembled global state Jacobian. Detach before reassembly or sparsity rebuild when a solver snapshot retains the previous version, allowing coupled applications to avoid an extra full sparse-matrix clone.
