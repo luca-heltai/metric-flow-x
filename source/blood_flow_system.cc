@@ -2862,10 +2862,12 @@ namespace MetricFlowX
                                   locally_owned_dofs_,
                                   dsp,
                                   mpi_communicator_);
-    derivative_jacobian_matrix_.reinit(locally_owned_dofs_,
-                                       locally_owned_dofs_,
-                                       dsp,
-                                       mpi_communicator_);
+    if (derivative_jacobian_matrix_.use_count() > 1)
+      derivative_jacobian_matrix_ = std::make_shared<MatrixType>();
+    derivative_jacobian_matrix_->reinit(locally_owned_dofs_,
+                                        locally_owned_dofs_,
+                                        dsp,
+                                        mpi_communicator_);
     linear_system_matrix.clear();
     linear_system_matrix_is_initialized_ = false;
 
@@ -5593,7 +5595,7 @@ namespace MetricFlowX
     assemble_derivative_jacobian(t, y, ydot);
 
     // State assembly already leaves the state Jacobian in this matrix.
-    jacobian_matrix.add(alpha, derivative_jacobian_matrix_);
+    jacobian_matrix.add(alpha, *derivative_jacobian_matrix_);
     if (!jacobian_export_filename.empty() && !jacobian_exported &&
         t >= jacobian_export_time)
       {
@@ -5689,18 +5691,26 @@ namespace MetricFlowX
     // They change during setup or parameter reload, which invalidate the cache.
     if (derivative_jacobian_is_current_ && !viscoelastic_wall)
       return;
-    derivative_jacobian_matrix_ = 0.0;
+    // Retained immutable consumers keep the previous version alive. Rebuild
+    // into a new owner before changing its values.
+    if (derivative_jacobian_matrix_.use_count() > 1)
+      {
+        auto next = std::make_shared<MatrixType>();
+        next->reinit(*derivative_jacobian_matrix_);
+        derivative_jacobian_matrix_ = std::move(next);
+      }
+    *derivative_jacobian_matrix_ = 0.0;
 
-    derivative_jacobian_matrix_.add(1., cell_mass_matrix_);
+    derivative_jacobian_matrix_->add(1., cell_mass_matrix_);
 
     for (const auto &[bid, pc_dof] : rcr_pc_dof)
       if (locally_owned_dofs_.is_element(pc_dof))
-        derivative_jacobian_matrix_.add(pc_dof, pc_dof, rcr_map.at(bid).C);
+        derivative_jacobian_matrix_->add(pc_dof, pc_dof, rcr_map.at(bid).C);
 
-    derivative_jacobian_matrix_.compress(VectorOperation::add);
+    derivative_jacobian_matrix_->compress(VectorOperation::add);
     if (viscoelastic_wall)
       assemble_viscous_wall(
-        y, ydot, nullptr, &derivative_jacobian_matrix_, true);
+        y, ydot, nullptr, derivative_jacobian_matrix_.get(), true);
     derivative_jacobian_is_current_ = true;
   }
 
@@ -5715,7 +5725,22 @@ namespace MetricFlowX
   const MatrixType &
   BloodFlowSystem<dim, spacedim>::derivative_jacobian_matrix() const
   {
+    return *derivative_jacobian_matrix_;
+  }
+
+  template <int dim, int spacedim>
+  std::shared_ptr<const MatrixType>
+  BloodFlowSystem<dim, spacedim>::derivative_jacobian_matrix_owner() const
+  {
     return derivative_jacobian_matrix_;
+  }
+
+  template <int dim, int spacedim>
+  bool
+  BloodFlowSystem<dim, spacedim>::derivative_jacobian_is_state_independent()
+    const
+  {
+    return !viscoelastic_wall;
   }
 
   template <int dim, int spacedim>

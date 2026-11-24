@@ -884,6 +884,16 @@ namespace MetricFlowX
     const MatrixType &
     derivative_jacobian_matrix() const;
 
+    /** Return the owner of the current derivative Jacobian version.
+     * Consumers may retain this owner only when the derivative Jacobian is
+     * state independent, and must treat the matrix as immutable.
+     */
+    std::shared_ptr<const MatrixType>
+    derivative_jacobian_matrix_owner() const;
+
+    bool
+    derivative_jacobian_is_state_independent() const;
+
     // Build the global cell mass matrix (legacy entry point name).
     // The inverse is created lazily only by initialize_consistent_state().
     void
@@ -1537,8 +1547,9 @@ namespace MetricFlowX
     MatrixType jacobian_matrix;
     MatrixType state_jacobian_matrix_;
     // Fixed state-mode trace constraints on the current mesh/DoF ownership.
-    MatrixType state_trace_continuity_matrix_;
-    MatrixType derivative_jacobian_matrix_;
+    MatrixType                  state_trace_continuity_matrix_;
+    std::shared_ptr<MatrixType> derivative_jacobian_matrix_ =
+      std::make_shared<MatrixType>();
     bool       derivative_jacobian_is_current_ = false;
     MatrixType linear_system_matrix;
     bool       linear_system_matrix_is_initialized_ = false;
