@@ -2858,10 +2858,12 @@ namespace MetricFlowX
                            locally_owned_dofs_,
                            dsp,
                            mpi_communicator_);
-    state_jacobian_matrix_.reinit(locally_owned_dofs_,
-                                  locally_owned_dofs_,
-                                  dsp,
-                                  mpi_communicator_);
+    if (state_jacobian_matrix_has_retained_owners())
+      state_jacobian_matrix_ = std::make_shared<MatrixType>();
+    state_jacobian_matrix_->reinit(locally_owned_dofs_,
+                                   locally_owned_dofs_,
+                                   dsp,
+                                   mpi_communicator_);
     if (derivative_jacobian_matrix_.use_count() > 1)
       derivative_jacobian_matrix_ = std::make_shared<MatrixType>();
     derivative_jacobian_matrix_->reinit(locally_owned_dofs_,
@@ -5674,7 +5676,13 @@ namespace MetricFlowX
                                            y,
                                            external_pressure_provider,
                                            jacobian_matrix);
-    state_jacobian_matrix_.copy_from(jacobian_matrix);
+    if (state_jacobian_matrix_has_retained_owners())
+      {
+        auto next = std::make_shared<MatrixType>();
+        next->reinit(jacobian_matrix);
+        state_jacobian_matrix_ = std::move(next);
+      }
+    state_jacobian_matrix_->copy_from(jacobian_matrix);
   }
 
   template <int dim, int spacedim>
@@ -5717,6 +5725,13 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   const MatrixType &
   BloodFlowSystem<dim, spacedim>::state_jacobian_matrix() const
+  {
+    return *state_jacobian_matrix_;
+  }
+
+  template <int dim, int spacedim>
+  std::shared_ptr<const MatrixType>
+  BloodFlowSystem<dim, spacedim>::state_jacobian_matrix_owner() const
   {
     return state_jacobian_matrix_;
   }
