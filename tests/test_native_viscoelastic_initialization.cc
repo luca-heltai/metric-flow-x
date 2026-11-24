@@ -68,7 +68,7 @@ test()
                   }
               for (auto *matrix : {&flow.jacobian_matrix,
                                    &flow.state_jacobian_matrix_,
-                                   &flow.derivative_jacobian_matrix_})
+                                   flow.derivative_jacobian_matrix_.get()})
                 matrix->reinit(flow.locally_owned_dofs_,
                                flow.locally_owned_dofs_,
                                pattern,

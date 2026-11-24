@@ -45,6 +45,11 @@ test()
       state           = 0.;
       derivative      = 0.;
       flow.assemble_derivative_jacobian(0., state, derivative);
+      AssertThrow(
+        flow.derivative_jacobian_is_state_independent(),
+        ExcMessage(
+          "The constant profile must have a fixed derivative Jacobian."));
+      const auto original_owner = flow.derivative_jacobian_matrix_owner();
       const auto original =
         entries(flow.derivative_jacobian_matrix(), flow.locally_owned_dofs());
       for (const auto &[boundary, index] : flow.rcr_pc_dof)
@@ -54,6 +59,9 @@ test()
       state      = 2.;
       derivative = -3.;
       flow.assemble_derivative_jacobian(1., state, derivative);
+      AssertThrow(
+        flow.derivative_jacobian_matrix_owner().get() == original_owner.get(),
+        ExcMessage("A fixed derivative Jacobian must reuse its owner."));
       AssertThrow(!flow.initial_cell_mass_inverse_,
                   ExcMessage(
                     "Jacobian assembly allocated an initial inverse."));
@@ -64,6 +72,12 @@ test()
       GridTools::scale(2., flow.triangulation());
       flow.build_per_cell_mass_inv();
       flow.assemble_derivative_jacobian(2., state, derivative);
+      const auto scaled_owner = flow.derivative_jacobian_matrix_owner();
+      AssertThrow(scaled_owner.get() != original_owner.get(),
+                  ExcMessage("Invalidation must create a new matrix version."));
+      AssertThrow(entries(*original_owner, flow.locally_owned_dofs()) ==
+                    original,
+                  ExcMessage("Reassembly must preserve retained versions."));
       const auto scaled =
         entries(flow.derivative_jacobian_matrix(), flow.locally_owned_dofs());
       for (const auto &[index, value] : original)
