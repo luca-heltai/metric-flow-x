@@ -2864,7 +2864,7 @@ namespace MetricFlowX
                                    locally_owned_dofs_,
                                    dsp,
                                    mpi_communicator_);
-    if (derivative_jacobian_matrix_.use_count() > 1)
+    if (derivative_jacobian_matrix_has_retained_owners())
       derivative_jacobian_matrix_ = std::make_shared<MatrixType>();
     derivative_jacobian_matrix_->reinit(locally_owned_dofs_,
                                         locally_owned_dofs_,
@@ -5701,7 +5701,7 @@ namespace MetricFlowX
       return;
     // Retained immutable consumers keep the previous version alive. Rebuild
     // into a new owner before changing its values.
-    if (derivative_jacobian_matrix_.use_count() > 1)
+    if (derivative_jacobian_matrix_has_retained_owners())
       {
         auto next = std::make_shared<MatrixType>();
         next->reinit(*derivative_jacobian_matrix_);

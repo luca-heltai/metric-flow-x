@@ -892,9 +892,12 @@ namespace MetricFlowX
     const MatrixType &
     derivative_jacobian_matrix() const;
 
-    /** Return the owner of the current derivative Jacobian version.
-     * Consumers may retain this owner only when the derivative Jacobian is
-     * state independent, and must treat the matrix as immutable.
+    /** Return the immutable owner of the current derivative Jacobian version.
+     * A retained owner remains unchanged across state-dependent viscoelastic
+     * reassembly and sparsity rebuilds. Copy-on-write detachment is collective:
+     * if any rank retains its current version, every rank detaches before
+     * writing. Retain the owner on every rank when using the distributed matrix
+     * collectively.
      */
     std::shared_ptr<const MatrixType>
     derivative_jacobian_matrix_owner() const;
@@ -1141,6 +1144,17 @@ namespace MetricFlowX
     {
       const unsigned int local_has_retained_owners =
         state_jacobian_matrix_.use_count() > 1 ? 1u : 0u;
+      return Utilities::MPI::max(local_has_retained_owners,
+                                 mpi_communicator_) != 0;
+    }
+
+    // Keep derivative-matrix copy-on-write decisions consistent across ranks,
+    // including when only a subset locally retains the previous version.
+    bool
+    derivative_jacobian_matrix_has_retained_owners() const
+    {
+      const unsigned int local_has_retained_owners =
+        derivative_jacobian_matrix_.use_count() > 1 ? 1u : 0u;
       return Utilities::MPI::max(local_has_retained_owners,
                                  mpi_communicator_) != 0;
     }
