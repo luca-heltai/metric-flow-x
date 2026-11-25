@@ -2463,6 +2463,8 @@ namespace MetricFlowX
     void
     build_cell_sparsity(DynamicSparsityPattern &dsp);
     void
+    build_cell_mass_sparsity(DynamicSparsityPattern &dsp);
+    void
     build_trace_sparsity(DynamicSparsityPattern &dsp);
     void
     build_junction_sparsity(DynamicSparsityPattern &dsp);

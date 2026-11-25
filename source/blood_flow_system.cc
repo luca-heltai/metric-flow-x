@@ -2650,6 +2650,31 @@ namespace MetricFlowX
       }
   }
 
+  // Cell mass couples only DoFs of the same differential component (area or
+  // velocity). Keep this pattern separate from the full nonlinear Jacobian so
+  // the cached derivative matrix does not reserve trace and junction entries.
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::build_cell_mass_sparsity(
+    DynamicSparsityPattern &dsp)
+  {
+    std::vector<types::global_dof_index> indices(
+      fe_collection_.max_dofs_per_cell());
+    for (const auto &cell : dof_handler_.active_cell_iterators())
+      if (cell->is_locally_owned())
+        {
+          const auto &fe = cell->get_fe();
+          indices.resize(fe.n_dofs_per_cell());
+          cell->get_dof_indices(indices);
+          for (unsigned int i = 0; i < indices.size(); ++i)
+            if (const auto component = fe.system_to_component_index(i).first;
+                component < 2)
+              for (unsigned int j = 0; j < indices.size(); ++j)
+                if (fe.system_to_component_index(j).first == component)
+                  dsp.add(indices[i], indices[j]);
+        }
+  }
+
   // Trace rows of interior and boundary faces: coupled to their own pair and to
   // the cell DoFs on both sides of the face.
   template <int dim, int spacedim>
@@ -2866,10 +2891,29 @@ namespace MetricFlowX
                                    mpi_communicator_);
     if (derivative_jacobian_matrix_has_retained_owners())
       derivative_jacobian_matrix_ = std::make_shared<MatrixType>();
-    derivative_jacobian_matrix_->reinit(locally_owned_dofs_,
-                                        locally_owned_dofs_,
-                                        dsp,
-                                        mpi_communicator_);
+    if (viscoelastic_wall)
+      derivative_jacobian_matrix_->reinit(locally_owned_dofs_,
+                                          locally_owned_dofs_,
+                                          dsp,
+                                          mpi_communicator_);
+    else
+      {
+        DynamicSparsityPattern derivative_dsp(n_total_dofs,
+                                              n_total_dofs,
+                                              locally_relevant_dofs_);
+        build_cell_mass_sparsity(derivative_dsp);
+        for (const auto &rcr : rcr_pc_dof)
+          if (locally_owned_dofs_.is_element(rcr.second))
+            derivative_dsp.add(rcr.second, rcr.second);
+        SparsityTools::distribute_sparsity_pattern(derivative_dsp,
+                                                   locally_owned_dofs_,
+                                                   mpi_communicator_,
+                                                   locally_relevant_dofs_);
+        derivative_jacobian_matrix_->reinit(locally_owned_dofs_,
+                                            locally_owned_dofs_,
+                                            derivative_dsp,
+                                            mpi_communicator_);
+      }
     linear_system_matrix.clear();
     linear_system_matrix_is_initialized_ = false;
 
@@ -3178,19 +3222,7 @@ namespace MetricFlowX
                                locally_relevant_dofs_);
     std::vector<types::global_dof_index> indices(
       fe_collection_.max_dofs_per_cell());
-    for (const auto &cell : dof_handler_.active_cell_iterators())
-      if (cell->is_locally_owned())
-        {
-          const auto &fe = cell->get_fe();
-          indices.resize(fe.n_dofs_per_cell());
-          cell->get_dof_indices(indices);
-          for (unsigned int i = 0; i < indices.size(); ++i)
-            if (const auto component = fe.system_to_component_index(i).first;
-                component < 2)
-              for (unsigned int j = 0; j < indices.size(); ++j)
-                if (fe.system_to_component_index(j).first == component)
-                  dsp.add(indices[i], indices[j]);
-        }
+    build_cell_mass_sparsity(dsp);
     SparsityTools::distribute_sparsity_pattern(dsp,
                                                locally_owned_dofs_,
                                                mpi_communicator_,
