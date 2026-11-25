@@ -26,6 +26,16 @@ entries(const MatrixType &matrix, const IndexSet &owned)
   return result;
 }
 
+types::global_dof_index
+stored_entries(const MatrixType &matrix, const IndexSet &owned)
+{
+  types::global_dof_index count = 0;
+  for (const auto row : owned)
+    for (auto entry = matrix.begin(row); entry != matrix.end(row); ++entry)
+      ++count;
+  return Utilities::MPI::sum(count, MPI_COMM_WORLD);
+}
+
 void
 test()
 {
@@ -35,6 +45,12 @@ test()
   flow.default_terminal_c        = 1e-8;
   flow.n_global_refinements      = 0;
   flow.setup();
+  AssertThrow(
+    stored_entries(flow.derivative_jacobian_matrix(),
+                   flow.locally_owned_dofs()) <
+      stored_entries(flow.jacobian_matrix, flow.locally_owned_dofs()),
+    ExcMessage(
+      "The non-viscoelastic derivative matrix must use a reduced sparsity pattern."));
   AssertThrow(!flow.initial_cell_mass_inverse_,
               ExcMessage(
                 "Ordinary setup must not allocate an initial inverse."));
