@@ -180,10 +180,11 @@ test()
                     ExcMessage("Incorrect arterial compartment balance."));
       if (flow.locally_owned_dofs_.is_element(v2.area))
         {
-          const double boundary = venous_capacitor ?
-                                    p2 + 2e6 * a2 * u2 - 7000. :
-                                    p2 + 1e9 * a2 * u2 - 9000.;
-          AssertThrow(std::abs(residual(v2.area) + boundary) < 1e-9,
+          const double boundary  = venous_capacitor ?
+                                     p2 + 2e6 * a2 * u2 - 7000. :
+                                     (p2 - 9000.) / 1e9 + a2 * u2;
+          const double tolerance = venous_capacitor ? 1e-9 : 1e-18;
+          AssertThrow(std::abs(residual(v2.area) + boundary) < tolerance,
                       ExcMessage("Incorrect inward venous port balance."));
         }
       if (venous_capacitor &&

@@ -4524,7 +4524,7 @@ namespace MetricFlowX
                           weighted_pressure +=
                             terminal_pressures.at(other) / resistance;
                       }
-                    pressure -= weighted_pressure / conductance;
+                    pressure = conductance * pressure - weighted_pressure;
                   }
                 F(face.a_hat_dof) += pressure;
               }
@@ -4597,7 +4597,9 @@ namespace MetricFlowX
                       terminal_pressure(other, y, terminal_pressures) /
                       resistance;
                   }
-                res_A = pressure - (Q + weighted_pressure) / conductance;
+                // Constant positive left scaling of the algebraic pressure law:
+                // express this row in flow units without changing its zero.
+                res_A = conductance * pressure - Q - weighted_pressure;
               }
             res_U = U_hat_cur +
                     sign * compute_invariant(A_hat, vid, a_d_local) - U_int -
@@ -5433,20 +5435,21 @@ namespace MetricFlowX
           face_values.get_present_fe_values().quadrature_point(0);
         if (terminal_links.count(bid))
           {
-            emit(face.a_hat_dof,
-                 basis({t, point, cell->material_id(), cell->id()}),
-                 -1.);
+            double pressure_scale = 1.;
             if (!rcr_pc_dof.count(bid))
               {
-                double conductance = 0.;
+                pressure_scale = 0.;
                 for (const auto &[other, resistance] : terminal_links.at(bid))
-                  conductance += 1. / resistance;
+                  pressure_scale += 1. / resistance;
                 for (const auto &[other, resistance] : terminal_links.at(bid))
                   if (!rcr_pc_dof.count(other))
                     emit(face.a_hat_dof,
                          terminal_basis.at(other),
-                         1. / (resistance * conductance));
+                         1. / resistance);
               }
+            emit(face.a_hat_dof,
+                 basis({t, point, cell->material_id(), cell->id()}),
+                 -pressure_scale);
           }
         else if (outlet_type == "RCR" && rcr_map.count(bid) &&
                  (rcr_map.at(bid).R1 > 0. || rcr_map.at(bid).R2 > 0.))
@@ -6410,26 +6413,30 @@ namespace MetricFlowX
           }
         else if (terminal_links.count(bid))
           {
-            const double sign       = terminal_ports.at(bid).outward_sign;
-            double       resistance = rcr_map.at(bid).R1;
+            const double sign             = terminal_ports.at(bid).outward_sign;
+            double       flow_coefficient = rcr_map.at(bid).R1;
+            double       pressure_scale   = 1.;
             if (!rcr_pc_dof.count(bid))
               {
-                double conductance = 0.;
+                pressure_scale = 0.;
                 for (const auto &[other, edge_resistance] :
                      terminal_links.at(bid))
-                  conductance += 1. / edge_resistance;
-                resistance = 1. / conductance;
+                  pressure_scale += 1. / edge_resistance;
+                flow_coefficient = 1.;
                 for (const auto &[other, edge_resistance] :
                      terminal_links.at(bid))
                   jacobian_matrix.add(a_row,
                                       terminal_pressure_dof(other),
-                                      -resistance / edge_resistance *
-                                        terminal_pressure_derivative(other, y));
+                                      -terminal_pressure_derivative(other, y) /
+                                        edge_resistance);
               }
             jacobian_matrix.add(a_row,
                                 a_row,
-                                dPdA_hat - resistance * sign * U_hat_cur);
-            jacobian_matrix.add(a_row, u_row, -resistance * sign * A_hat_cur);
+                                pressure_scale * dPdA_hat -
+                                  flow_coefficient * sign * U_hat_cur);
+            jacobian_matrix.add(a_row,
+                                u_row,
+                                -flow_coefficient * sign * A_hat_cur);
             jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
             jacobian_matrix.add(u_row, u_row, 1.);
             for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
