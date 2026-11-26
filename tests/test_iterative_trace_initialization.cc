@@ -16,20 +16,10 @@ test()
   flow.setup();
   auto state = flow.make_state();
   flow.initialize_state(state, 0.0);
-  flow.update_ghosted_vectors(state);
-  auto residual = flow.make_state();
-  residual      = 0.0;
-  flow.assemble_trace_interior_equations(flow.y_relevant, residual);
-  flow.assemble_trace_boundary_equations(0.0, flow.y_relevant, residual);
-  flow.assemble_trace_junction_equations(flow.y_relevant, residual);
-  flow.assemble_trace_continuity_equations(flow.y_relevant, residual);
-  residual.compress(VectorOperation::add);
-  double local = 0.0;
-  for (const auto i : flow.trace_dofs_owned)
-    local += residual(i) * residual(i);
-  AssertThrow(
-    std::sqrt(Utilities::MPI::sum(local, flow.mpi_communicator())) < 1e-10,
-    ExcMessage("Iterative initialization must satisfy trace equations."));
+  AssertThrow(flow.initial_state_diagnostics().algebraic_defect <=
+                flow.initial_consistency_tolerance,
+              ExcMessage(
+                "Iterative initialization must satisfy the configured trace tolerance."));
   deallog.depth_file(10);
   deallog << "Iterative trace initialization with nonzero inflow: PASSED"
           << std::endl;

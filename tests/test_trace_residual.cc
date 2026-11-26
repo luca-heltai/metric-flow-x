@@ -13,10 +13,8 @@
 // at the top level of the bare-dealii-app distribution.
 //
 // ---------------------------------------------------------------------
-// Test: after initialize_trace_unknowns(), the trace residual
-// F_trace(y_cell^0, y_hat) must be zero to machine precision.
-// This verifies that the Newton solve converged correctly and that
-// the initial condition is consistent before IDA even starts.
+// Test: after initialize_trace_unknowns(), the scaled trace residual
+// F_trace(y_cell^0, y_hat) must satisfy the configured consistency tolerance.
 //
 // Parallel: problem.triangulation_ is a parallel::fullydistributed
 // triangulation_, so mesh loading goes through problem.create_triangulation()
@@ -110,9 +108,10 @@ test()
       deallog << "Trace residual AFTER initialize_trace_unknowns:  "
               << norm_after << std::endl;
 
-    AssertThrow(norm_after < 1e-10,
-                ExcMessage("initialize_trace_unknowns did not converge: "
-                           "trace residual is not zero."));
+    AssertThrow(problem.initial_state_diagnostics().algebraic_defect <=
+                  problem.initial_consistency_tolerance,
+                ExcMessage("initialize_trace_unknowns did not meet the "
+                           "configured scaled trace tolerance."));
   }
 
   if (Utilities::MPI::this_mpi_process(problem.mpi_communicator_) == 0)

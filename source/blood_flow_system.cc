@@ -2628,7 +2628,13 @@ namespace MetricFlowX
           y(dofs[i]) * cell->get_fe().shape_value_component(i, unit_point, 1);
       }
 
-    get_face_trace(y, cell, face_no, state.area_trace, state.velocity_trace);
+    const auto [area_trace_dof, velocity_trace_dof] =
+      face_trace_dofs(dofs, face_no);
+    Assert(area_trace_dof != numbers::invalid_dof_index &&
+             velocity_trace_dof != numbers::invalid_dof_index,
+           ExcInternalError());
+    state.area_trace     = y(area_trace_dof);
+    state.velocity_trace = y(velocity_trace_dof);
     state.bn        = face_no == 1 ? 1.0 : -1.0;
     state.vessel_id = cell->material_id();
     state.a_d       = compute_a_d_at_face(cell, face_no);

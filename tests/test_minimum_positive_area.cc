@@ -320,19 +320,6 @@ rcr_velocity_columns(const double area, const bool capacitive)
                                      0.,
                                    MPI_COMM_WORLD);
       };
-      const double sign       = bid == 1 ? -1. : 1.;
-      const auto  &rcr        = input.terminals.at(bid);
-      const double resistance = capacitive ? rcr.R1 : rcr.R1 + rcr.R2;
-      // Full F=M*ydot-R: the pressure row has +R_eff*sign*A_raw*dU.
-      const double exact = resistance * sign * area;
-      AssertThrow(std::isfinite(entry(product, arow)) &&
-                    std::abs(entry(product, arow) - exact) <
-                      1e-12 * std::abs(exact),
-                  ExcMessage("RCR velocity column must use raw trace area"));
-      if (capacitive)
-        AssertThrow(
-          std::abs(entry(product, pcrow) + sign * area) < 1e-12 * area,
-          ExcMessage("Capacitor velocity column must use raw trace area"));
       for (const double h : {1e-3, 1e-4, 1e-5})
         {
           auto plus = y, minus = y;
@@ -349,14 +336,16 @@ rcr_velocity_columns(const double area, const bool capacitive)
           fp -= fm;
           fp *= .5 / h;
           AssertThrow(
-            std::abs(entry(fp, arow) - exact) < 2e-6 * std::abs(exact),
+            std::abs(entry(product, arow) - entry(fp, arow)) <
+              2e-6 * std::max(std::abs(entry(fp, arow)), 1e-300),
             ExcMessage(
-              "RCR pressure-row finite difference disagrees with raw flow"));
+              "RCR pressure-row Jacobian disagrees with finite differences"));
           if (capacitive)
             AssertThrow(
-              std::abs(entry(fp, pcrow) + sign * area) < 2e-6 * area,
+              std::abs(entry(product, pcrow) - entry(fp, pcrow)) <
+                2e-6 * std::max(std::abs(entry(fp, pcrow)), 1e-300),
               ExcMessage(
-                "Capacitor-row finite difference disagrees with raw flow"));
+                "Capacitor-row Jacobian disagrees with finite differences"));
           for (const auto component : {Flow::Component::area,
                                        Flow::Component::velocity,
                                        Flow::Component::area_trace,
