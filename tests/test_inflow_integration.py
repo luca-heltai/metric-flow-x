@@ -91,6 +91,14 @@ def validate(executable, destination, mpi, initial_time=0.0):
             with (folder / "output/terminals.csv").open(newline="") as stream:
                 terminal_rows = list(csv.DictReader(stream))
             assert len(terminal_rows) == 22
+            for mass_row in mass:
+                time = float(mass_row["t"])
+                outward_flux = sum(
+                    float(row["flow_m3_s"])
+                    for row in terminal_rows
+                    if float(row["time_s"]) == time
+                )
+                assert abs(float(mass_row["net_flux"]) + outward_flux) < 1e-14
             assert [(float(row["time_s"]), int(row["boundary_id"])) for row in terminal_rows] == sorted(
                 (float(row["time_s"]), int(row["boundary_id"])) for row in terminal_rows)
             traces[kind, ranks] = {}

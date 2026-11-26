@@ -150,46 +150,44 @@ test()
       auto residual = flow.make_state();
       flow.assemble_residual(.1, y, rate, residual);
       flow.update_ghosted_vectors(y);
-      double a1 = 0., u1 = 0., a2 = 0., u2 = 0.;
+      double q1 = 0., q2 = 0.;
       for (const auto &face : flow.boundary_faces)
         {
-          const auto bid = face.cell->face(face.face_no)->boundary_id();
+          const auto   bid = face.cell->face(face.face_no)->boundary_id();
+          const double q =
+            flow.numerical_area_flux(face.cell, face.face_no, flow.y_relevant);
           if (bid == 1)
-            {
-              a1 = y(face.a_hat_dof);
-              u1 = y(face.u_hat_dof);
-            }
-          if (bid == 2)
-            {
-              a2 = y(face.a_hat_dof);
-              u2 = y(face.u_hat_dof);
-            }
+            q1 = q;
+          else if (bid == 2)
+            q2 = q;
         }
-      a1              = Utilities::MPI::sum(a1, comm);
-      u1              = Utilities::MPI::sum(u1, comm);
-      a2              = Utilities::MPI::sum(a2, comm);
-      u2              = Utilities::MPI::sum(u2, comm);
+      q1        = Utilities::MPI::sum(q1, comm);
+      q2        = Utilities::MPI::sum(q2, comm);
+      double a2 = 0.;
+      for (const auto &face : flow.boundary_faces)
+        if (face.cell->face(face.face_no)->boundary_id() == 2)
+          a2 = y(face.a_hat_dof);
+      a2 = Utilities::MPI::sum(a2, comm);
       const auto  &v2 = flow.terminal_ports.at(2);
       const double p2 =
         flow.compute_pressure_value(a2, v2.vessel, v2.reference_area);
       const double downstream_pressure = venous_capacitor ? 7000. : p2;
       if (flow.locally_owned_dofs_.is_element(pc))
         AssertThrow(std::abs(residual(pc) -
-                             (1e-9 * 100. - a1 * u1 +
+                             (1e-9 * 100. - q1 +
                               (9000. - downstream_pressure) / 1e9)) < 1e-16,
                     ExcMessage("Incorrect arterial compartment balance."));
       if (flow.locally_owned_dofs_.is_element(v2.area))
         {
-          const double boundary = venous_capacitor ?
-                                    p2 + 2e6 * a2 * u2 - 7000. :
-                                    p2 + 1e9 * a2 * u2 - 9000.;
+          const double boundary =
+            venous_capacitor ? p2 - 2e6 * q2 - 7000. : p2 - 1e9 * q2 - 9000.;
           AssertThrow(std::abs(residual(v2.area) + boundary) < 1e-9,
                       ExcMessage("Incorrect inward venous port balance."));
         }
       if (venous_capacitor &&
           flow.locally_owned_dofs_.is_element(flow.rcr_pc_dof.at(2)))
         AssertThrow(std::abs(residual(flow.rcr_pc_dof.at(2)) -
-                             (2e-9 * 200. + a2 * u2 + (7000. - 9000.) / 1e9)) <
+                             (2e-9 * 200. - q2 + (7000. - 9000.) / 1e9)) <
                       1e-16,
                     ExcMessage("Incorrect venous compartment balance."));
 
@@ -263,8 +261,11 @@ test()
         {
           const auto   bid  = face.cell->face(face.face_no)->boundary_id();
           const double area = y(face.a_hat_dof), velocity = y(face.u_hat_dof);
+          const double expected_outward_flow =
+            face.face_no == 1 ? 1e-6 : -1e-6;
           AssertThrow(
-            std::abs(area * velocity - 1e-6) < 1e-16,
+            std::abs(flow.numerical_area_flux(face.cell, face.face_no, y) -
+                     expected_outward_flow) < 1e-16,
             ExcMessage(
               "Graph seed did not retain the analytical through-flow."));
           if (bid == 1 || bid == 2)

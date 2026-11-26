@@ -52,6 +52,15 @@ test()
   flow.write_csv_row(0.005, y);
   flow.write_csv_row(0.125, y);
   flow.close_csv_files();
+  std::vector<double> expected_flows(2, 0.0);
+  for (const auto &face : flow.boundary_faces)
+    {
+      const auto boundary = face.cell->face(face.face_no)->boundary_id();
+      expected_flows[boundary] +=
+        flow.numerical_area_flux(face.cell, face.face_no, y);
+    }
+  for (auto &expected_flow : expected_flows)
+    expected_flow = Utilities::MPI::sum(expected_flow, flow.mpi_communicator());
   MPI_Barrier(flow.mpi_communicator());
   if (Utilities::MPI::this_mpi_process(flow.mpi_communicator()) == 0)
     {
@@ -84,8 +93,7 @@ test()
                                flow.pressure(area, 0) - 234.) < 1e-9,
                       ExcInternalError());
           AssertThrow(std::abs(input.GetCell<double>("flow_m3_s", row) -
-                               (boundary == 0 ? -1 : 1) * area * velocity) <
-                        1e-16,
+                               expected_flows[boundary]) < 1e-16,
                       ExcInternalError());
         }
       for (const auto &entry :

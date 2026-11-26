@@ -1,0 +1,1 @@
+Boundary and junction conservation equations, RCR balances, terminal output, and mass diagnostics now use the same numerical area flux as the cell residuals. This includes the HLL-HDG stabilization contribution.

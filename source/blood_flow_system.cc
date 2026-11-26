@@ -2602,6 +2602,93 @@ namespace MetricFlowX
     U_hat = y(it->second.u_hat_dof);
   }
 
+  template <int dim, int spacedim>
+  typename BloodFlowSystem<dim, spacedim>::NumericalAreaFluxState
+  BloodFlowSystem<dim, spacedim>::get_numerical_area_flux_state(
+    const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+    const unsigned int                                              face_no,
+    const VectorType                                               &y) const
+  {
+    AssertIndexRange(face_no, GeometryInfo<dim>::faces_per_cell);
+
+    Point<dim> unit_point;
+    unit_point[0] = static_cast<double>(face_no);
+
+    std::vector<types::global_dof_index> dofs(cell->get_fe().n_dofs_per_cell());
+    cell->get_dof_indices(dofs);
+
+    NumericalAreaFluxState state;
+    state.area_cell     = 0.0;
+    state.velocity_cell = 0.0;
+    for (unsigned int i = 0; i < dofs.size(); ++i)
+      {
+        state.area_cell +=
+          y(dofs[i]) * cell->get_fe().shape_value_component(i, unit_point, 0);
+        state.velocity_cell +=
+          y(dofs[i]) * cell->get_fe().shape_value_component(i, unit_point, 1);
+      }
+
+    get_face_trace(y, cell, face_no, state.area_trace, state.velocity_trace);
+    state.bn        = face_no == 1 ? 1.0 : -1.0;
+    state.vessel_id = cell->material_id();
+    state.a_d       = compute_a_d_at_face(cell, face_no);
+    return state;
+  }
+
+  template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::numerical_area_flux(
+    const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+    const unsigned int                                              face_no,
+    const VectorType                                               &y) const
+  {
+    const auto state = get_numerical_area_flux_state(cell, face_no, y);
+    return numerical_flux(state.bn,
+                          state.bn,
+                          std::max(state.area_cell, minimum_positive_area_),
+                          state.velocity_cell,
+                          std::max(state.area_trace, minimum_positive_area_),
+                          state.velocity_trace,
+                          state.vessel_id,
+                          state.vessel_id,
+                          state.a_d,
+                          state.a_d)[0];
+  }
+
+  template <int dim, int spacedim>
+  double
+  BloodFlowSystem<dim, spacedim>::numerical_area_flux_derivative(
+    const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+    const unsigned int                                              face_no,
+    const VectorType                                               &y,
+    double                                                          dA_cell,
+    double                                                          dU_cell,
+    double                                                          dA_trace,
+    double dU_trace) const
+  {
+    const auto state = get_numerical_area_flux_state(cell, face_no, y);
+    if (state.area_cell <= minimum_positive_area_)
+      dA_cell = 0.0;
+    if (state.area_trace <= minimum_positive_area_)
+      dA_trace = 0.0;
+
+    return numerical_flux_jac(state.bn,
+                              state.bn,
+                              std::max(state.area_cell, minimum_positive_area_),
+                              state.velocity_cell,
+                              std::max(state.area_trace,
+                                       minimum_positive_area_),
+                              state.velocity_trace,
+                              dA_cell,
+                              dU_cell,
+                              dA_trace,
+                              dU_trace,
+                              state.vessel_id,
+                              state.vessel_id,
+                              state.a_d,
+                              state.a_d)[0];
+  }
+
   // ============================================================================
   // Sparsity
   //
@@ -2789,6 +2876,9 @@ namespace MetricFlowX
   BloodFlowSystem<dim, spacedim>::build_rcr_sparsity(
     DynamicSparsityPattern &dsp)
   {
+    std::vector<types::global_dof_index> cell_dofs(
+      fe_collection_.max_dofs_per_cell());
+
     for (const auto &cell : dof_handler_.active_cell_iterators())
       {
         if (!cell->is_locally_owned())
@@ -2817,6 +2907,10 @@ namespace MetricFlowX
             dsp.add(pc, it->second.a_hat_dof);
             dsp.add(pc, it->second.u_hat_dof);
             dsp.add(it->second.a_hat_dof, pc);
+            cell_dofs.resize(cell->get_fe().n_dofs_per_cell());
+            cell->get_dof_indices(cell_dofs);
+            for (const auto dof : cell_dofs)
+              dsp.add(pc, dof);
           }
       }
   }
@@ -3141,8 +3235,7 @@ namespace MetricFlowX
           }
 
         // Trace: seed A_hat with the diastolic area at that face and U_hat with
-        // zero, which is consistent for every face type (inflow, terminal,
-        // interior and junction all start from a flux A_hat*U_hat*bn = 0).
+        // zero, which gives a zero numerical area flux on every face type.
         // Seeding both sides of an interior face from the same rule also starts
         // the continuity residual at zero.
         for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f)
@@ -3507,6 +3600,7 @@ namespace MetricFlowX
                       const auto bid  = cell->face(f)->boundary_id();
                       double     area = 0., velocity = 0.;
                       get_face_trace(sol, cell, f, area, velocity);
+                      (void)velocity;
                       const double pressure =
                         compute_physical_pressure(area,
                                                   cell->material_id(),
@@ -3526,13 +3620,13 @@ namespace MetricFlowX
                           rcr->second.label;
                       local_rows.emplace_back(
                         bid,
-                        std::vector<std::string>{csv_cell(t),
-                                                 csv_cell(pressure),
-                                                 csv_cell((f == 0 ? -1. : 1.) *
-                                                          area * velocity),
-                                                 csv_cell(bid),
-                                                 csv_cell(cell->material_id()),
-                                                 label});
+                        std::vector<std::string>{
+                          csv_cell(t),
+                          csv_cell(pressure),
+                          csv_cell(numerical_area_flux(cell, f, sol)),
+                          csv_cell(bid),
+                          csv_cell(cell->material_id()),
+                          label});
                     }
           }
         catch (const std::exception &exception)
@@ -4566,14 +4660,14 @@ namespace MetricFlowX
             const double W2_int =
               U_int - compute_invariant(A_int, vid, a_d_local);
 
-            res_A = A_hat_cur * U_hat_cur - Q_in;
+            res_A = numerical_area_flux(cell, f, y) + Q_in;
             res_U =
               (U_hat_cur - compute_invariant(A_hat, vid, a_d_local)) - W2_int;
           }
         else if (sealed_terminal_ids.count(bid))
           {
             const double sign = f == 1 ? 1. : -1.;
-            res_A             = sign * A_hat_cur * U_hat_cur;
+            res_A             = numerical_area_flux(cell, f, y);
             res_U             = U_hat_cur +
                     sign * compute_invariant(A_hat, vid, a_d_local) - U_int -
                     sign * compute_invariant(A_int, vid, a_d_local);
@@ -4582,7 +4676,7 @@ namespace MetricFlowX
           {
             const auto  &port     = terminal_ports.at(bid);
             const double sign     = port.outward_sign;
-            const double Q        = sign * A_hat_cur * U_hat_cur;
+            const double Q        = numerical_area_flux(cell, f, y);
             const double pressure = compute_physical_pressure(
               A_hat, vid, a_d_local, t, point, cell->id());
             if (rcr_pc_dof.count(bid))
@@ -4609,7 +4703,7 @@ namespace MetricFlowX
           {
             const auto  &rcr  = rcr_map.at(bid);
             const double sign = f == 1 ? 1. : -1.;
-            const double Q    = sign * A_hat_cur * U_hat_cur;
+            const double Q    = numerical_area_flux(cell, f, y);
             if (rcr.C > 0.0)
               {
                 // const double Pc =
@@ -4679,11 +4773,8 @@ namespace MetricFlowX
         const types::global_dof_index pc_dof = pit->second;
         const auto &rcr = rcr_map.at(cell->face(f)->boundary_id());
 
-        const double A_hat  = y(face.a_hat_dof);
-        const double U_hat  = y(face.u_hat_dof);
         const auto   bid    = cell->face(f)->boundary_id();
-        const double sign   = f == 1 ? 1. : -1.;
-        const double Q      = sign * A_hat * U_hat;
+        const double Q      = numerical_area_flux(cell, f, y);
         const double Pc     = y(pc_dof);
         const double Pc_dot = ydot(pc_dof);
 
@@ -4860,7 +4951,9 @@ namespace MetricFlowX
           {
             double mass_res = 0.0;
             for (unsigned int i = 0; i < K; ++i)
-              mass_res += static_cast<double>(s[i]) * A_hat[i] * U_hat[i];
+              mass_res += numerical_area_flux(J.half_faces[i].cell,
+                                              J.half_faces[i].face_no,
+                                              y);
             F(a_idx[0]) += mass_res;
           }
 
@@ -6351,7 +6444,6 @@ namespace MetricFlowX
           0.25 * compute_invariant_derivative(A_int, vid, a_d_local);
 
         const double A_hat_cur = y(face.a_hat_dof);
-        const double U_hat_cur = y(face.u_hat_dof);
         const double A_hat     = std::max(A_hat_cur, minimum_positive_area_);
         const double dc_hat =
           0.25 * compute_invariant_derivative(A_hat, vid, a_d_local);
@@ -6361,6 +6453,25 @@ namespace MetricFlowX
         const types::global_dof_index a_row = face.a_hat_dof;
         const types::global_dof_index u_row = face.u_hat_dof;
 
+        const auto add_area_flux_jacobian = [&](const double coefficient) {
+          jacobian_matrix.add(a_row,
+                              a_row,
+                              coefficient * numerical_area_flux_derivative(
+                                              cell, f, y, 0., 0., 1., 0.));
+          jacobian_matrix.add(a_row,
+                              u_row,
+                              coefficient * numerical_area_flux_derivative(
+                                              cell, f, y, 0., 0., 0., 1.));
+          for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
+            {
+              const double dA = fef[area_extractor].value(j, 0);
+              const double dU = fef[velocity_extractor].value(j, 0);
+              const double derivative =
+                numerical_area_flux_derivative(cell, f, y, dA, dU, 0., 0.);
+              jacobian_matrix.add(a_row, ldofs[j], coefficient * derivative);
+            }
+        };
+
         if (outlet_type == "Dirichlet")
           {
             jacobian_matrix.add(a_row, a_row, 1.0);
@@ -6368,14 +6479,11 @@ namespace MetricFlowX
           }
         else if (bid == 0) // inflow
           {
-            // R1 = A_hat * U_hat - Q_in(t)
+            // R1 = conservative numerical area flux + Q_in(t)
             // R2 = U_hat - 4(c_hat - c0) - W2_int
             // where W2_int = U_int - 4(c_int - c0)
 
-            // \partialR1/ \partialA_hat, \partialR1/
-            // \partialU_hat
-            jacobian_matrix.add(a_row, a_row, U_hat_cur);
-            jacobian_matrix.add(a_row, u_row, A_hat);
+            add_area_flux_jacobian(1.0);
 
             // \partialR2/\partialA_hat,
             // \partialR2/\partialU_hat
@@ -6397,8 +6505,7 @@ namespace MetricFlowX
         else if (sealed_terminal_ids.count(bid))
           {
             const double sign = f == 1 ? 1. : -1.;
-            jacobian_matrix.add(a_row, a_row, sign * U_hat_cur);
-            jacobian_matrix.add(a_row, u_row, sign * A_hat_cur);
+            add_area_flux_jacobian(1.0);
             jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
             jacobian_matrix.add(u_row, u_row, 1.);
             for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
@@ -6426,10 +6533,8 @@ namespace MetricFlowX
                                       -resistance / edge_resistance *
                                         terminal_pressure_derivative(other, y));
               }
-            jacobian_matrix.add(a_row,
-                                a_row,
-                                dPdA_hat - resistance * sign * U_hat_cur);
-            jacobian_matrix.add(a_row, u_row, -resistance * sign * A_hat_cur);
+            jacobian_matrix.add(a_row, a_row, dPdA_hat);
+            add_area_flux_jacobian(-resistance);
             jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
             jacobian_matrix.add(u_row, u_row, 1.);
             for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
@@ -6446,10 +6551,8 @@ namespace MetricFlowX
             const auto  &rcr        = rcr_map.at(bid);
             const double sign       = f == 1 ? 1. : -1.;
             const double resistance = rcr.C > 0. ? rcr.R1 : rcr.R1 + rcr.R2;
-            jacobian_matrix.add(a_row,
-                                a_row,
-                                dPdA_hat - resistance * sign * U_hat_cur);
-            jacobian_matrix.add(a_row, u_row, -resistance * sign * A_hat_cur);
+            jacobian_matrix.add(a_row, a_row, dPdA_hat);
+            add_area_flux_jacobian(-resistance);
             jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
             jacobian_matrix.add(u_row, u_row, 1.);
             for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
@@ -6511,14 +6614,32 @@ namespace MetricFlowX
         const types::global_dof_index pc_dof = pit->second;
         const auto &rcr = rcr_map.at(cell->face(f)->boundary_id());
 
-        const double A_hat = y(face.a_hat_dof);
-        const double U_hat = y(face.u_hat_dof);
-
-        // R_pc = Q_out - (Pc - P_out)/R2
-        const auto   bid  = cell->face(f)->boundary_id();
-        const double sign = f == 1 ? 1. : -1.;
-        jacobian_matrix.add(pc_dof, face.a_hat_dof, sign * U_hat);
-        jacobian_matrix.add(pc_dof, face.u_hat_dof, sign * A_hat);
+        // The capacitor residual is C*Pc_dot - Q_out + discharge.
+        const auto bid = cell->face(f)->boundary_id();
+        jacobian_matrix.add(
+          pc_dof,
+          face.a_hat_dof,
+          numerical_area_flux_derivative(cell, f, y, 0., 0., 1., 0.));
+        jacobian_matrix.add(
+          pc_dof,
+          face.u_hat_dof,
+          numerical_area_flux_derivative(cell, f, y, 0., 0., 0., 1.));
+        Point<dim> unit_point;
+        unit_point[0] = static_cast<double>(f);
+        std::vector<types::global_dof_index> cell_dofs(
+          cell->get_fe().n_dofs_per_cell());
+        cell->get_dof_indices(cell_dofs);
+        for (unsigned int j = 0; j < cell_dofs.size(); ++j)
+          {
+            const double dA =
+              cell->get_fe().shape_value_component(j, unit_point, 0);
+            const double dU =
+              cell->get_fe().shape_value_component(j, unit_point, 1);
+            jacobian_matrix.add(
+              pc_dof,
+              cell_dofs[j],
+              numerical_area_flux_derivative(cell, f, y, dA, dU, 0., 0.));
+          }
         if (terminal_links.count(bid))
           {
             double conductance = 0.;
@@ -6634,15 +6755,34 @@ namespace MetricFlowX
             dP_hat[i] = compute_pressure_derivative(A_hat[i], vid, a_d_face);
           }
 
-        // Row a_row[0]: mass conservation \sum s_i A_hat_i U_hat_i = 0.
-        // Each row group is guarded exactly as in the residual, so the two stay
-        // in step and the sparsity built by build_junction_sparsity() matches.
+        // Row a_row[0]: sum of the outward numerical area fluxes is zero.
+        // This is the same flux used by each incident cell's face residual.
         if (locally_owned_dofs_.is_element(a_row[0]))
           for (unsigned int i = 0; i < K; ++i)
             {
-              const double s = static_cast<double>(orient[i]);
-              jacobian_matrix.add(a_row[0], a_row[i], s * U_hat[i]);
-              jacobian_matrix.add(a_row[0], u_row[i], s * A_hat[i]);
+              const auto &hf = J.half_faces[i];
+              jacobian_matrix.add(a_row[0],
+                                  a_row[i],
+                                  numerical_area_flux_derivative(
+                                    hf.cell, hf.face_no, y, 0., 0., 1., 0.));
+              jacobian_matrix.add(a_row[0],
+                                  u_row[i],
+                                  numerical_area_flux_derivative(
+                                    hf.cell, hf.face_no, y, 0., 0., 0., 1.));
+
+              hp_fef.reinit(hf.cell, hf.face_no);
+              const auto &fef = hp_fef.get_present_fe_values();
+              for (unsigned int j = 0; j < hf.cell->get_fe().n_dofs_per_cell();
+                   ++j)
+                {
+                  const double dA = fef[area_extractor].value(j, 0);
+                  const double dU = fef[velocity_extractor].value(j, 0);
+                  jacobian_matrix.add(
+                    a_row[0],
+                    cell_dofs[i][j],
+                    numerical_area_flux_derivative(
+                      hf.cell, hf.face_no, y, dA, dU, 0., 0.));
+                }
             }
 
         // Rows u_row[0..K-2]: H_0 − H_i = 0
@@ -7116,11 +7256,7 @@ namespace MetricFlowX
             if (is_junction_face(cell->id(), f))
               continue;
 
-            double A_hat = 0.0, U_hat = 0.0;
-            get_face_trace(y_relevant, cell, f, A_hat, U_hat);
-            const double Q            = A_hat * U_hat;
-            const double outward_sign = f == 1 ? 1. : -1.;
-            local_net_flux -= outward_sign * Q;
+            local_net_flux -= numerical_area_flux(cell, f, y_relevant);
           }
       }
     const double net_flux =
