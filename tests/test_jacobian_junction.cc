@@ -32,6 +32,7 @@ test()
 {
   BloodFlowSystem<1, 3> problem;
   problem.initialize_params(PRM_DIR "aortic.prm");
+  problem.set_numerical_flux(BloodFlowSystem<1, 3>::NumericalFluxType::HLL_HDG);
 
   // initialize_params() resets deallog depth according to the parameter file.
   deallog.depth_console(10);
@@ -49,6 +50,22 @@ test()
   problem.initialize_trace_unknowns(problem.solution,
                                     problem.ida_parameters.initial_time);
 
+  // Create a nonzero cell/trace jump at each junction. The junction mass row
+  // must use the same stabilized numerical flux as the incident cell faces.
+  for (const auto &cell : problem.dof_handler_.active_cell_iterators())
+    if (cell->is_locally_owned())
+      {
+        std::vector<types::global_dof_index> dofs(
+          cell->get_fe().n_dofs_per_cell());
+        cell->get_dof_indices(dofs);
+        for (unsigned int i = 0; i < dofs.size(); ++i)
+          if (cell->get_fe().system_to_component_index(i).first == 0)
+            problem.solution(dofs[i]) *= 1.05;
+      }
+  problem.solution.compress(VectorOperation::insert);
+  AssertThrow(!problem.junctions.empty(),
+              ExcMessage("The aortic fixture must contain a junction."));
+
   problem.time = problem.ida_parameters.initial_time;
 
   const double t = problem.time;
@@ -58,6 +75,35 @@ test()
   // assemble_jacobian() does, so the ghosted vectors must be refreshed from
   // problem.solution first.
   problem.update_ghosted_vectors(problem.solution);
+
+  auto junction_residual = problem.make_state();
+  junction_residual      = 0.0;
+  problem.assemble_trace_junction_equations(t,
+                                            problem.y_relevant,
+                                            junction_residual);
+  junction_residual.compress(VectorOperation::add);
+  for (const auto &junction : problem.junctions)
+    {
+      std::vector<types::global_dof_index> dofs(
+        junction.half_faces[0].cell->get_fe().n_dofs_per_cell());
+      junction.half_faces[0].cell->get_dof_indices(dofs);
+      const auto [mass_row, velocity_row] =
+        problem.face_trace_dofs(dofs, junction.half_faces[0].face_no);
+      (void)velocity_row;
+
+      double expected_mass_residual = 0.0;
+      for (const auto &half_face : junction.half_faces)
+        expected_mass_residual +=
+          problem.numerical_area_flux(half_face.cell,
+                                      half_face.face_no,
+                                      problem.y_relevant);
+      if (problem.locally_owned_dofs_.is_element(mass_row))
+        AssertThrow(
+          std::abs(junction_residual(mass_row) - expected_mass_residual) <
+            1.e-12,
+          ExcMessage(
+            "Junction mass row does not use the cell numerical flux."));
+    }
 
   problem.jacobian_matrix = 0.0;
   problem.assemble_jacobian_trace_junction_block(problem.y_relevant);

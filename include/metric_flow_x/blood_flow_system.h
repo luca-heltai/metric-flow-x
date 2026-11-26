@@ -2066,6 +2066,39 @@ namespace MetricFlowX
       double                                                         &A_hat,
       double &U_hat) const;
 
+    struct NumericalAreaFluxState
+    {
+      double       bn;
+      double       area_cell;
+      double       velocity_cell;
+      double       area_trace;
+      double       velocity_trace;
+      unsigned int vessel_id;
+      double       a_d;
+    };
+
+    NumericalAreaFluxState
+    get_numerical_area_flux_state(
+      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+      const unsigned int                                              face_no,
+      const VectorType                                               &y) const;
+
+    double
+    numerical_area_flux(
+      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+      const unsigned int                                              face_no,
+      const VectorType                                               &y) const;
+
+    double
+    numerical_area_flux_derivative(
+      const typename DoFHandler<dim, spacedim>::active_cell_iterator &cell,
+      const unsigned int                                              face_no,
+      const VectorType                                               &y,
+      double                                                          dA_cell,
+      double                                                          dU_cell,
+      double                                                          dA_trace,
+      double dU_trace) const;
+
     // -----------------------------------------------------------------------
     // Internal helpers — physical fluxes (scalar projections)
     // -----------------------------------------------------------------------

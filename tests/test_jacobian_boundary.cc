@@ -33,6 +33,7 @@ test()
 {
   BloodFlowSystem<1, 3> problem;
   problem.initialize_params(PRM_DIR "constant.prm");
+  problem.set_numerical_flux(BloodFlowSystem<1, 3>::NumericalFluxType::HLL_HDG);
 
   // initialize_params() resets deallog depth according to the parameter file.
   deallog.depth_console(10);

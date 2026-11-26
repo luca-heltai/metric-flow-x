@@ -107,7 +107,8 @@ test()
           AssertThrow(face.face_no == (reverse ? 1u : 0u), ExcInternalError());
           const double sign = reverse ? 1. : -1.;
           AssertThrow(
-            std::abs(residual[face.a_hat_dof] - sign * 1.1 * area * .03) <
+            std::abs(residual[face.a_hat_dof] -
+                     flow.numerical_area_flux(face.cell, face.face_no, y)) <
                 1.e-15 &&
               std::abs(residual[face.u_hat_dof] -
                        (.03 - .02 + sign * invariant(1.1 * area))) < 1.e-11,
@@ -134,7 +135,9 @@ test()
         for (const auto &face : flow.boundary_faces)
           if (face.cell->face(face.face_no)->boundary_id() == 2)
             {
-              const double q = (reverse ? -1. : 1.) * 1.1 * area * .03;
+              const double q = flow.numerical_area_flux(face.cell,
+                                                        face.face_no,
+                                                        flow.y_relevant);
               const double expected =
                 p_wall - (capacitor ? 1.e7 * q + 1100. : 1.e8 * q + p_out);
               AssertThrow(std::abs(residual[face.a_hat_dof] - expected) < 1.e-9,
