@@ -135,8 +135,9 @@ test()
         for (const auto &face : flow.boundary_faces)
           if (face.cell->face(face.face_no)->boundary_id() == 2)
             {
-              const double q =
-                flow.numerical_area_flux(face.cell, face.face_no, flow.y_relevant);
+              const double q = flow.numerical_area_flux(face.cell,
+                                                        face.face_no,
+                                                        flow.y_relevant);
               const double expected =
                 p_wall - (capacitor ? 1.e7 * q + 1100. : 1.e8 * q + p_out);
               AssertThrow(std::abs(residual[face.a_hat_dof] - expected) < 1.e-9,

@@ -16,10 +16,11 @@ test()
   flow.setup();
   auto state = flow.make_state();
   flow.initialize_state(state, 0.0);
-  AssertThrow(flow.initial_state_diagnostics().algebraic_defect <=
-                flow.initial_consistency_tolerance,
-              ExcMessage(
-                "Iterative initialization must satisfy the configured trace tolerance."));
+  AssertThrow(
+    flow.initial_state_diagnostics().algebraic_defect <=
+      flow.initial_consistency_tolerance,
+    ExcMessage(
+      "Iterative initialization must satisfy the configured trace tolerance."));
   deallog.depth_file(10);
   deallog << "Iterative trace initialization with nonzero inflow: PASSED"
           << std::endl;

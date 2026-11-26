@@ -120,14 +120,14 @@ test()
         };
         for (const auto &face : flow.boundary_faces)
           {
-            const auto   bid     = face.cell->face(face.face_no)->boundary_id();
-            const double area    = 1.1 * reference_area;
+            const auto   bid  = face.cell->face(face.face_no)->boundary_id();
+            const double area = 1.1 * reference_area;
             const double outward =
               flow.numerical_area_flux(face.cell, face.face_no, y);
             const double sign = bid == 1 ? -1. : 1.;
-            const double pc      = capacitor ? physics.terminals.at(bid).P_out +
+            const double pc   = capacitor ? physics.terminals.at(bid).P_out +
                                             r2 * sign * reference_area * speed :
-                                               physics.terminals.at(bid).P_out;
+                                            physics.terminals.at(bid).P_out;
             const double expected_pressure =
               pressure + beta / reference_area *
                            (std::sqrt(area) - std::sqrt(reference_area));

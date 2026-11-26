@@ -2635,9 +2635,9 @@ namespace MetricFlowX
            ExcInternalError());
     state.area_trace     = y(area_trace_dof);
     state.velocity_trace = y(velocity_trace_dof);
-    state.bn        = face_no == 1 ? 1.0 : -1.0;
-    state.vessel_id = cell->material_id();
-    state.a_d       = compute_a_d_at_face(cell, face_no);
+    state.bn             = face_no == 1 ? 1.0 : -1.0;
+    state.vessel_id      = cell->material_id();
+    state.a_d            = compute_a_d_at_face(cell, face_no);
     return state;
   }
 
