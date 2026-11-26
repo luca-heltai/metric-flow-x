@@ -167,7 +167,7 @@ test()
       for (const auto &face : flow.boundary_faces)
         if (face.cell->face(face.face_no)->boundary_id() == 2)
           a2 = y(face.a_hat_dof);
-      a2 = Utilities::MPI::sum(a2, comm);
+      a2              = Utilities::MPI::sum(a2, comm);
       const auto  &v2 = flow.terminal_ports.at(2);
       const double p2 =
         flow.compute_pressure_value(a2, v2.vessel, v2.reference_area);
@@ -261,8 +261,7 @@ test()
         {
           const auto   bid  = face.cell->face(face.face_no)->boundary_id();
           const double area = y(face.a_hat_dof), velocity = y(face.u_hat_dof);
-          const double expected_outward_flow =
-            face.face_no == 1 ? 1e-6 : -1e-6;
+          const double expected_outward_flow = face.face_no == 1 ? 1e-6 : -1e-6;
           AssertThrow(
             std::abs(flow.numerical_area_flux(face.cell, face.face_no, y) -
                      expected_outward_flow) < 1e-16,
