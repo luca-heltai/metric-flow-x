@@ -1436,7 +1436,9 @@ namespace MetricFlowX
       const std::map<types::boundary_id, double> &external_pressures) const;
 
     void
-    assemble_jacobian_rcr_capacitor_block(const VectorType &y);
+    assemble_jacobian_rcr_capacitor_block(
+      const VectorType &y,
+      const bool        include_invariant_terms = true);
 
     // -----------------------------------------------------------------------
     // Junction detection
@@ -1581,7 +1583,10 @@ namespace MetricFlowX
     std::shared_ptr<MatrixType> state_jacobian_matrix_ =
       std::make_shared<MatrixType>();
     // Fixed state-mode trace constraints on the current mesh/DoF ownership.
-    MatrixType                  state_trace_continuity_matrix_;
+    MatrixType state_trace_continuity_matrix_;
+    // Boundary, junction and capacitor derivatives that are independent of
+    // the current flow state, stored with only their reduced global pattern.
+    MatrixType                  invariant_state_jacobian_matrix_;
     std::shared_ptr<MatrixType> derivative_jacobian_matrix_ =
       std::make_shared<MatrixType>();
     bool       derivative_jacobian_is_current_ = false;
@@ -2477,10 +2482,15 @@ namespace MetricFlowX
     assemble_jacobian_trace_interior_block(const VectorType &y);
 
     void
-    assemble_jacobian_trace_boundary_block(const double t, const VectorType &y);
+    assemble_jacobian_trace_boundary_block(
+      const double      t,
+      const VectorType &y,
+      const bool        include_invariant_terms = true);
 
     void
-    assemble_jacobian_trace_junction_block(const VectorType &y);
+    assemble_jacobian_trace_junction_block(
+      const VectorType &y,
+      const bool        include_invariant_terms = true);
 
     void
     assemble_jacobian_trace_continuity_block();
@@ -2505,6 +2515,8 @@ namespace MetricFlowX
     build_rcr_sparsity(DynamicSparsityPattern &dsp);
     void
     build_trace_continuity_sparsity(DynamicSparsityPattern &dsp);
+    void
+    build_invariant_state_jacobian_matrix();
     void
     build_extended_sparsity_pattern();
 

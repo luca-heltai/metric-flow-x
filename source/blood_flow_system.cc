@@ -2936,6 +2936,167 @@ namespace MetricFlowX
       }
   }
 
+  template <int dim, int spacedim>
+  void
+  BloodFlowSystem<dim, spacedim>::build_invariant_state_jacobian_matrix()
+  {
+    DynamicSparsityPattern dsp(n_total_dofs,
+                               n_total_dofs,
+                               locally_relevant_dofs_);
+    using Entry =
+      std::tuple<types::global_dof_index, types::global_dof_index, double>;
+    std::vector<Entry> entries;
+    const auto         add = [&](const types::global_dof_index row,
+                         const types::global_dof_index column,
+                         const double                  value) {
+      if (value == 0.)
+        return;
+      dsp.add(row, column);
+      entries.emplace_back(row, column, value);
+    };
+
+    const FEValuesExtractors::Scalar     velocity_extractor(1);
+    const QGauss<dim - 1>                quad_face(1);
+    hp::FEFaceValues<dim, spacedim>      hp_fef(fe_collection_,
+                                           hp::QCollection<dim - 1>(quad_face),
+                                           update_values);
+    std::vector<types::global_dof_index> ldofs(
+      fe_collection_.max_dofs_per_cell());
+
+    // These are the state-independent parts of the boundary equations. Keep
+    // only their global sparse entries; local FE values are temporary scratch.
+    for (const auto &face : boundary_faces)
+      {
+        const auto        &cell  = face.cell;
+        const unsigned int f     = face.face_no;
+        const auto         bid   = cell->face(f)->boundary_id();
+        const auto         a_row = face.a_hat_dof;
+        const auto         u_row = face.u_hat_dof;
+
+        if (outlet_type == "Dirichlet")
+          {
+            add(a_row, a_row, 1.0);
+            add(u_row, u_row, 1.0);
+            continue;
+          }
+
+        bool is_reflection = false;
+        if (bid == 0 || sealed_terminal_ids.count(bid) ||
+            terminal_links.count(bid) ||
+            (outlet_type == "RCR" && rcr_map.count(bid) &&
+             (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0)))
+          add(u_row, u_row, 1.0);
+        else
+          {
+            is_reflection = true;
+            add(a_row, u_row, 1.0);
+            add(u_row, u_row, 1.0);
+          }
+
+        if (bid != 0 && !sealed_terminal_ids.count(bid) &&
+            terminal_links.count(bid) && !rcr_pc_dof.count(bid))
+          {
+            double conductance = 0.;
+            for (const auto &[other, edge_resistance] : terminal_links.at(bid))
+              {
+                (void)other;
+                conductance += 1. / edge_resistance;
+              }
+            const double resistance = 1. / conductance;
+            for (const auto &[other, edge_resistance] : terminal_links.at(bid))
+              if (rcr_pc_dof.count(other))
+                add(a_row,
+                    terminal_pressure_dof(other),
+                    -resistance / edge_resistance);
+          }
+
+        hp_fef.reinit(cell, f);
+        const auto &fef = hp_fef.get_present_fe_values();
+        ldofs.resize(cell->get_fe().n_dofs_per_cell());
+        cell->get_dof_indices(ldofs);
+        for (unsigned int j = 0; j < ldofs.size(); ++j)
+          {
+            const double phi_U = fef[velocity_extractor].value(j, 0);
+            if (is_reflection)
+              {
+                add(a_row, ldofs[j], -phi_U);
+                add(u_row, ldofs[j], reflection_coefficient * phi_U);
+              }
+            else
+              add(u_row, ldofs[j], -phi_U);
+          }
+      }
+
+    // Compatibility rows at junctions have one invariant +1 trace coefficient.
+    std::vector<types::global_dof_index> cell_dofs(
+      fe_collection_.max_dofs_per_cell());
+    for (const auto &junction : junctions)
+      {
+        const unsigned int                   K = junction.n_vessels();
+        std::vector<types::global_dof_index> a_row(K), u_row(K);
+        for (unsigned int i = 0; i < K; ++i)
+          {
+            const auto &half_face = junction.half_faces[i];
+            cell_dofs.resize(half_face.cell->get_fe().n_dofs_per_cell());
+            half_face.cell->get_dof_indices(cell_dofs);
+            const auto [a_dof, u_dof] =
+              face_trace_dofs(cell_dofs, half_face.face_no);
+            a_row[i] = a_dof;
+            u_row[i] = u_dof;
+          }
+
+        for (unsigned int i = 0; i < K; ++i)
+          {
+            const auto row = (i == 0) ? u_row[K - 1] : a_row[i];
+            if (!locally_owned_dofs_.is_element(row))
+              continue;
+            add(row, u_row[i], 1.0);
+
+            const auto &half_face = junction.half_faces[i];
+            hp_fef.reinit(half_face.cell, half_face.face_no);
+            const auto &fef = hp_fef.get_present_fe_values();
+            cell_dofs.resize(half_face.cell->get_fe().n_dofs_per_cell());
+            half_face.cell->get_dof_indices(cell_dofs);
+            for (unsigned int j = 0; j < cell_dofs.size(); ++j)
+              add(row, cell_dofs[j], -fef[velocity_extractor].value(j, 0));
+          }
+      }
+
+    // Capacitor rows also contain fixed discharge and pressure-coupling terms.
+    for (const auto &face : boundary_faces)
+      {
+        const auto bid = face.cell->face(face.face_no)->boundary_id();
+        const auto it  = rcr_pc_dof.find(bid);
+        if (it == rcr_pc_dof.end())
+          continue;
+        const auto pc_dof   = it->second;
+        double     diagonal = 0.0;
+        if (terminal_links.count(bid))
+          for (const auto &[other, resistance] : terminal_links.at(bid))
+            {
+              diagonal -= 1. / resistance;
+              if (rcr_pc_dof.count(other))
+                add(pc_dof, terminal_pressure_dof(other), 1. / resistance);
+            }
+        else
+          diagonal = -1. / rcr_map.at(bid).R2;
+        add(pc_dof, pc_dof, diagonal);
+        add(face.a_hat_dof, pc_dof, -1.0);
+      }
+
+    SparsityTools::distribute_sparsity_pattern(dsp,
+                                               locally_owned_dofs_,
+                                               mpi_communicator_,
+                                               locally_relevant_dofs_);
+    invariant_state_jacobian_matrix_.reinit(locally_owned_dofs_,
+                                            locally_owned_dofs_,
+                                            dsp,
+                                            mpi_communicator_);
+    for (const auto &[row, column, value] : entries)
+      invariant_state_jacobian_matrix_.add(row, column, value);
+    invariant_state_jacobian_matrix_.compress(VectorOperation::add);
+  }
+
   // ============================================================================
   // build_extended_sparsity_pattern
   //
@@ -3040,6 +3201,7 @@ namespace MetricFlowX
         state_trace_continuity_matrix_.add(p.u_dup, p.u_canon, -1.);
       }
     state_trace_continuity_matrix_.compress(VectorOperation::add);
+    build_invariant_state_jacobian_matrix();
   }
 
   // ============================================================================
@@ -5790,12 +5952,13 @@ namespace MetricFlowX
     jacobian_matrix = 0.0;
     assemble_jacobian_cell_block(t, y_relevant);
     assemble_jacobian_trace_interior_block(y_relevant);
-    assemble_jacobian_trace_boundary_block(t, y_relevant);
-    assemble_jacobian_trace_junction_block(y_relevant);
+    assemble_jacobian_trace_boundary_block(t, y_relevant, false);
+    assemble_jacobian_trace_junction_block(y_relevant, false);
     if (interior_transmission == InteriorTransmission::flux)
       assemble_jacobian_trace_continuity_block();
-    assemble_jacobian_rcr_capacitor_block(y_relevant);
+    assemble_jacobian_rcr_capacitor_block(y_relevant, false);
     jacobian_matrix.compress(VectorOperation::add);
+    jacobian_matrix.add(1., invariant_state_jacobian_matrix_);
     if (interior_transmission == InteriorTransmission::state)
       assemble_jacobian_trace_continuity_block();
     jacobian_matrix *= -1.0;
@@ -6405,7 +6568,8 @@ namespace MetricFlowX
   void
   BloodFlowSystem<dim, spacedim>::assemble_jacobian_trace_boundary_block(
     const double      t,
-    const VectorType &y)
+    const VectorType &y,
+    const bool        include_invariant_terms)
   {
     TimerOutput::Scope timer(computing_timer,
                              "assemble_jacobian_trace_boundary_block");
@@ -6480,8 +6644,11 @@ namespace MetricFlowX
 
         if (outlet_type == "Dirichlet")
           {
-            jacobian_matrix.add(a_row, a_row, 1.0);
-            jacobian_matrix.add(u_row, u_row, 1.0);
+            if (include_invariant_terms)
+              {
+                jacobian_matrix.add(a_row, a_row, 1.0);
+                jacobian_matrix.add(u_row, u_row, 1.0);
+              }
           }
         else if (bid == 0) // inflow
           {
@@ -6494,13 +6661,16 @@ namespace MetricFlowX
             // \partialR2/\partialA_hat,
             // \partialR2/\partialU_hat
             jacobian_matrix.add(u_row, a_row, -4.0 * dc_hat);
-            jacobian_matrix.add(u_row, u_row, 1.0);
+            if (include_invariant_terms)
+              jacobian_matrix.add(u_row, u_row, 1.0);
 
             // \partialR2/\partial(A_int, U_int) — block (2,1)
             for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
               {
                 const double phi_A = fef[area_extractor].value(j, 0);
-                const double phi_U = fef[velocity_extractor].value(j, 0);
+                const double phi_U = include_invariant_terms ?
+                                       fef[velocity_extractor].value(j, 0) :
+                                       0.;
                 // \partialW2_int/\partialw_int = phi_U -
                 // 4*dc_int*phi_A
                 jacobian_matrix.add(u_row,
@@ -6513,13 +6683,18 @@ namespace MetricFlowX
             const double sign = f == 1 ? 1. : -1.;
             add_area_flux_jacobian(1.0);
             jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
-            jacobian_matrix.add(u_row, u_row, 1.);
+            if (include_invariant_terms)
+              jacobian_matrix.add(u_row, u_row, 1.);
             for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
-              jacobian_matrix.add(u_row,
-                                  ldofs[j],
-                                  -fef[velocity_extractor].value(j, 0) -
-                                    sign * 4. * dc_int *
-                                      fef[area_extractor].value(j, 0));
+              {
+                const double phi_U = include_invariant_terms ?
+                                       fef[velocity_extractor].value(j, 0) :
+                                       0.;
+                jacobian_matrix.add(u_row,
+                                    ldofs[j],
+                                    -phi_U - sign * 4. * dc_int *
+                                               fef[area_extractor].value(j, 0));
+              }
           }
         else if (terminal_links.count(bid))
           {
@@ -6534,21 +6709,35 @@ namespace MetricFlowX
                 resistance = 1. / conductance;
                 for (const auto &[other, edge_resistance] :
                      terminal_links.at(bid))
-                  jacobian_matrix.add(a_row,
-                                      terminal_pressure_dof(other),
-                                      -resistance / edge_resistance *
-                                        terminal_pressure_derivative(other, y));
+                  if (rcr_pc_dof.count(other))
+                    {
+                      if (include_invariant_terms)
+                        jacobian_matrix.add(a_row,
+                                            terminal_pressure_dof(other),
+                                            -resistance / edge_resistance);
+                    }
+                  else
+                    jacobian_matrix.add(a_row,
+                                        terminal_pressure_dof(other),
+                                        -resistance / edge_resistance *
+                                          terminal_pressure_derivative(other,
+                                                                       y));
               }
             jacobian_matrix.add(a_row, a_row, dPdA_hat);
             add_area_flux_jacobian(-resistance);
             jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
-            jacobian_matrix.add(u_row, u_row, 1.);
+            if (include_invariant_terms)
+              jacobian_matrix.add(u_row, u_row, 1.);
             for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
-              jacobian_matrix.add(u_row,
-                                  ldofs[j],
-                                  -fef[velocity_extractor].value(j, 0) -
-                                    sign * 4. * dc_int *
-                                      fef[area_extractor].value(j, 0));
+              {
+                const double phi_U = include_invariant_terms ?
+                                       fef[velocity_extractor].value(j, 0) :
+                                       0.;
+                jacobian_matrix.add(u_row,
+                                    ldofs[j],
+                                    -phi_U - sign * 4. * dc_int *
+                                               fef[area_extractor].value(j, 0));
+              }
           }
         else if (outlet_type == "RCR" && rcr_map.count(bid) &&
                  (rcr_map.at(bid).R1 > 0.0 || rcr_map.at(bid).R2 > 0.0))
@@ -6560,11 +6749,14 @@ namespace MetricFlowX
             jacobian_matrix.add(a_row, a_row, dPdA_hat);
             add_area_flux_jacobian(-resistance);
             jacobian_matrix.add(u_row, a_row, sign * 4. * dc_hat);
-            jacobian_matrix.add(u_row, u_row, 1.);
+            if (include_invariant_terms)
+              jacobian_matrix.add(u_row, u_row, 1.);
             for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
               {
                 const double phi_A = fef[area_extractor].value(j, 0);
-                const double phi_U = fef[velocity_extractor].value(j, 0);
+                const double phi_U = include_invariant_terms ?
+                                       fef[velocity_extractor].value(j, 0) :
+                                       0.;
                 jacobian_matrix.add(u_row,
                                     ldofs[j],
                                     -(phi_U + sign * 4. * dc_int * phi_A));
@@ -6580,19 +6772,23 @@ namespace MetricFlowX
             // \partialR1/\partialA_hat,
             // \partialR1/\partialU_hat
             jacobian_matrix.add(a_row, a_row, 4.0 * dc_hat);
-            jacobian_matrix.add(a_row, u_row, 1.0);
+            if (include_invariant_terms)
+              jacobian_matrix.add(a_row, u_row, 1.0);
 
             // \partialR2/\partialA_hat,
             // \partialR2/\partialU_hat
             jacobian_matrix.add(u_row, a_row, -4.0 * dc_hat);
-            jacobian_matrix.add(u_row, u_row, 1.0);
+            if (include_invariant_terms)
+              jacobian_matrix.add(u_row, u_row, 1.0);
 
             // \partialR1 and \partialR2 /\partial(A_int,U_int)
             // via W1_int
             for (unsigned int j = 0; j < cell->get_fe().n_dofs_per_cell(); ++j)
               {
                 const double phi_A = fef[area_extractor].value(j, 0);
-                const double phi_U = fef[velocity_extractor].value(j, 0);
+                const double phi_U = include_invariant_terms ?
+                                       fef[velocity_extractor].value(j, 0) :
+                                       0.;
                 const double dW1   = phi_U + 4.0 * dc_int * phi_A;
                 jacobian_matrix.add(a_row, ldofs[j], -dW1);
                 jacobian_matrix.add(u_row, ldofs[j], Rt * dW1);
@@ -6604,7 +6800,8 @@ namespace MetricFlowX
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::assemble_jacobian_rcr_capacitor_block(
-    const VectorType &y)
+    const VectorType &y,
+    const bool        include_invariant_terms)
   {
     if (rcr_pc_dof.empty())
       return;
@@ -6651,26 +6848,38 @@ namespace MetricFlowX
             double conductance = 0.;
             for (const auto &[other, resistance] : terminal_links.at(bid))
               {
-                conductance += 1. / resistance;
-                jacobian_matrix.add(pc_dof,
-                                    terminal_pressure_dof(other),
-                                    terminal_pressure_derivative(other, y) /
-                                      resistance);
+                if (include_invariant_terms)
+                  conductance += 1. / resistance;
+                if (rcr_pc_dof.count(other))
+                  {
+                    if (include_invariant_terms)
+                      jacobian_matrix.add(pc_dof,
+                                          terminal_pressure_dof(other),
+                                          1. / resistance);
+                  }
+                else
+                  jacobian_matrix.add(pc_dof,
+                                      terminal_pressure_dof(other),
+                                      terminal_pressure_derivative(other, y) /
+                                        resistance);
               }
-            jacobian_matrix.add(pc_dof, pc_dof, -conductance);
+            if (include_invariant_terms)
+              jacobian_matrix.add(pc_dof, pc_dof, -conductance);
           }
-        else
+        else if (include_invariant_terms)
           jacobian_matrix.add(pc_dof, pc_dof, -1.0 / rcr.R2);
 
         // res_A = P(Â) - R1*Q - Pc  ->  d(res_A)/dPc = -1
-        jacobian_matrix.add(face.a_hat_dof, pc_dof, -1.0);
+        if (include_invariant_terms)
+          jacobian_matrix.add(face.a_hat_dof, pc_dof, -1.0);
       }
   }
 
   template <int dim, int spacedim>
   void
   BloodFlowSystem<dim, spacedim>::assemble_jacobian_trace_junction_block(
-    const VectorType &y)
+    const VectorType &y,
+    const bool        include_invariant_terms)
   {
     TimerOutput::Scope timer(computing_timer,
                              "assemble_jacobian_trace_junction_block");
@@ -6821,7 +7030,8 @@ namespace MetricFlowX
             // \partial/\partialA_hat_i, \partial/\partialU_hat_i of
             // (U_hat_i + s*4(c_hat_i - c0_i) - W_i)
             jacobian_matrix.add(rr, a_row[i], s * 4.0 * dc_hat_v[i]);
-            jacobian_matrix.add(rr, u_row[i], 1.0);
+            if (include_invariant_terms)
+              jacobian_matrix.add(rr, u_row[i], 1.0);
 
             // \partial(-W_i)/\partial(A_int_i, U_int_i)
             const unsigned int vid = J.half_faces[i].cell->material_id();
@@ -6833,7 +7043,9 @@ namespace MetricFlowX
                  ++j)
               {
                 const double phi_A = fef[area_extractor].value(j, 0);
-                const double phi_U = fef[velocity_extractor].value(j, 0);
+                const double phi_U = include_invariant_terms ?
+                                       fef[velocity_extractor].value(j, 0) :
+                                       0.;
                 // \partialW_i/\partialw = phi_U +
                 // s*4*dc_int_v[i]*phi_A
                 const double dW = phi_U + s * 4.0 * dc_int_v[i] * phi_A;
